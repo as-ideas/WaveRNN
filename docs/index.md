@@ -1,3 +1,10 @@
+Inspired by Microsoft's [FastSpeech](https://www.microsoft.com/en-us/research/blog/fastspeech-new-text-to-speech-model-improves-on-speed-accuracy-and-controllability/)
+we modified Tacotron to generate speech in a single forward pass using a duration predictor to align text and generated mel spectrograms.
+
+# 🔈 Samples
+
+The samples are generated with a model trained 100K steps on [LJSpeech](https://keithito.com/LJ-Speech-Dataset/) together with the pretrained WaveRNN vocoder provided by the [WaveRNN repo](https://github.com/fatchord/WaveRNN).
+
 ## ForwardTacotron + WaveRNN Vocoder
 
 <p class="text">Scientists at the CERN laboratory say they have discovered a new particle.</p> 
