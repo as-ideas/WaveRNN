@@ -2,6 +2,7 @@ import argparse
 import itertools
 from pathlib import Path
 
+import os
 import torch
 from torch import optim
 from torch.utils.data.dataloader import DataLoader
@@ -41,7 +42,6 @@ def create_gta_features(model: Tacotron,
 if __name__ == '__main__':
     # Parse Arguments
     parser = argparse.ArgumentParser(description='Train Tacotron TTS')
-    parser.add_argument('--force_train', '-f', action='store_true', help='Forces the model to train past total steps')
     parser.add_argument('--force_gta', '-g', action='store_true', help='Force the model to create GTA features')
     parser.add_argument('--force_cpu', '-c', action='store_true', help='Forces CPU-only training, even when in CUDA capable environment')
     parser.add_argument('--hp_file', metavar='FILE', default='hparams.py', help='The file to use for the hyperparameters')
@@ -50,6 +50,8 @@ if __name__ == '__main__':
     hp.configure(args.hp_file)  # Load hparams from file
 
     paths = Paths(hp.data_path, hp.voc_model_id, hp.tts_model_id)
+    assert len(os.listdir(paths.alg)) > 0, f'Could not find alignment files in {paths.alg}, please predict ' \
+                                           f'alignments first with python train_tacotron.py --force_align!'
 
     force_gta = args.force_gta
 
