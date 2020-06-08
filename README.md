@@ -87,7 +87,7 @@ For training the model on your own dataset just bring it to the LJSpeech-like fo
 For languages other than English, change the language and cleaners params in the hparams.py, e.g. for French:
 ```
 language='fr'
-cleaners='basic_cleaners'
+tts_cleaner_name='basic_cleaners'
 ```
 
 ____
