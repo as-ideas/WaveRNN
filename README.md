@@ -49,6 +49,15 @@ pip install -r requirements.txt
 ```
 
 ## 🚀 Training your own Model
+The repo is meant to use LJSpeech-like datasets with following structure:
+```
+|- dataset_folder/
+|   |- metadata.csv
+|   |- wav/
+|       |- file1.wav
+|       |- ...
+```
+For training the model on your own dataset just prepare it accordingly. For languages other than English, change the language and cleaners params in the hparams.py (e.g. language='fr', cleaners='basic_cleaners').
 
 (1) Download and preprocess the [LJSpeech](https://keithito.com/LJ-Speech-Dataset/) dataset:
  ```
