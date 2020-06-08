@@ -84,7 +84,11 @@ For training the model on your own dataset just bring it to the LJSpeech-like fo
 |       |- ...
 ```
 
-For languages other than English, change the language and cleaners params in the hparams.py (e.g. language='fr', cleaners='basic_cleaners').
+For languages other than English, change the language and cleaners params in the hparams.py, e.g. for French:
+```
+language='fr'
+cleaners='basic_cleaners'
+```
 
 ____
 You can monitor the training processes for Tacotron and ForwardTacotron with 
