@@ -49,15 +49,6 @@ pip install -r requirements.txt
 ```
 
 ## 🚀 Training your own Model
-The repo is meant to use LJSpeech-like datasets with following structure:
-```
-|- dataset_folder/
-|   |- metadata.csv
-|   |- wav/
-|       |- file1.wav
-|       |- ...
-```
-For training the model on your own dataset just prepare it accordingly. For languages other than English, change the language and cleaners params in the hparams.py (e.g. language='fr', cleaners='basic_cleaners').
 
 (1) Download and preprocess the [LJSpeech](https://keithito.com/LJ-Speech-Dataset/) dataset:
  ```
@@ -83,6 +74,18 @@ As in the original repo you can also use a trained WaveRNN vocoder:
 ```
 python gen_forward.py --input_text "this is whatever you want it to be" wavernn
 ```
+
+For training the model on your own dataset just bring it to the LJSpeech-like format:
+```
+|- dataset_folder/
+|   |- metadata.csv
+|   |- wav/
+|       |- file1.wav
+|       |- ...
+```
+
+For languages other than English, change the language and cleaners params in the hparams.py (e.g. language='fr', cleaners='basic_cleaners').
+
 ____
 You can monitor the training processes for Tacotron and ForwardTacotron with 
 ```
