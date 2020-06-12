@@ -72,7 +72,7 @@ python gen_forward.py --alpha 1 --input_text "this is whatever you want it to be
 ```
 As in the original repo you can also use a trained WaveRNN vocoder:
 ```
-python gen_forward.py --input_text "this is whatever you want it to be" wavernn
+python gen_forward.py --input_text 'this is whatever you want it to be' wavernn
 ```
 
 For training the model on your own dataset just bring it to the LJSpeech-like format:
@@ -103,6 +103,14 @@ Here is what the ForwardTacotron tensorboard looks like:
   <b>Figure 2:</b> Tensorboard example for training a ForwardTacotron model.
 </p>
 
+
+## Use the pretrained Models
+
+You can synthesize text using the pretrained models with
+```
+python gen_forward.py --input_text 'Hi there!' --hp_file pretrained/pretrained_hparams.py --tts_weights pretrained/forward_190K.pyt' wavernn --voc_weights pretrained/wave_800K.pyt
+
+```
 
 ## Tips for training a WaveRNN model
 
