@@ -41,38 +41,26 @@ def encode_16bits(x):
 
 def linear_to_mel(spectrogram):
     return librosa.feature.melspectrogram(
-        S=spectrogram, sr=hp.sample_rate, n_fft=hp.n_fft, n_mels=hp.num_mels, fmin=hp.fmin)
+        S=spectrogram, sr=hp.sample_rate, n_fft=hp.n_fft, n_mels=hp.num_mels, fmin=hp.fmin, fmax=hp.fmax)
 
 '''
 def build_mel_basis():
     return librosa.filters.mel(hp.sample_rate, hp.n_fft, n_mels=hp.num_mels, fmin=hp.fmin)
 '''
 
+
 def normalize(S):
-    return np.clip((S - hp.min_level_db) / -hp.min_level_db, 0, 1)
+    S = np.clip(S, a_min=1.e-5, a_max=None)
+    return np.log(S)
 
 
 def denormalize(S):
-    return (np.clip(S, 0, 1) * -hp.min_level_db) + hp.min_level_db
-
-
-def amp_to_db(x):
-    return 20 * np.log10(np.maximum(1e-5, x))
-
-
-def db_to_amp(x):
-    return np.power(10.0, x * 0.05)
-
-
-def spectrogram(y):
-    D = stft(y)
-    S = amp_to_db(np.abs(D)) - hp.ref_level_db
-    return normalize(S)
+    return np.exp(S)
 
 
 def melspectrogram(y):
     D = stft(y)
-    S = amp_to_db(linear_to_mel(np.abs(D)))
+    S = linear_to_mel(np.abs(D))
     return normalize(S)
 
 def raw_melspec(y):
@@ -110,12 +98,6 @@ def decode_mu_law(y, mu, from_labels=True):
     return x
 
 
-def rescale_mel(m):
-    m = (m + 4) / 8
-    np.clip(m, 0, 1, out=m)
-    return m
-
-
 def np_now(x: torch.Tensor): return x.detach().cpu().numpy()
 
 
@@ -123,10 +105,9 @@ def reconstruct_waveform(mel, n_iter=32):
     """Uses Griffin-Lim phase reconstruction to convert from a normalized
     mel spectrogram back into a waveform."""
     denormalized = denormalize(mel)
-    amp_mel = db_to_amp(denormalized)
     S = librosa.feature.inverse.mel_to_stft(
-        amp_mel, power=1, sr=hp.sample_rate,
-        n_fft=hp.n_fft, fmin=hp.fmin)
+        denormalized, power=1, sr=hp.sample_rate,
+        n_fft=hp.n_fft, fmin=hp.fmin, fmax=hp.fmax)
     wav = librosa.core.griffinlim(
         S, n_iter=n_iter,
         hop_length=hp.hop_length, win_length=hp.win_length)
