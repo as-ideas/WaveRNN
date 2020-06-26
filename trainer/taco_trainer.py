@@ -13,7 +13,7 @@ from utils.checkpoints import save_checkpoint
 from utils.dataset import get_tts_datasets
 from utils.decorators import ignore_exception
 from utils.display import stream, simple_table, plot_mel, plot_attention
-from utils.dsp import reconstruct_waveform, rescale_mel, np_now
+from utils.dsp import reconstruct_waveform, np_now
 from utils.paths import Paths
 
 
@@ -134,7 +134,6 @@ class TacoTrainer:
         self.writer.add_figure('Ground_Truth_Aligned/linear', m1_hat_fig, model.step)
         self.writer.add_figure('Ground_Truth_Aligned/postnet', m2_hat_fig, model.step)
 
-        m1_hat, m2_hat, m = rescale_mel(m1_hat), rescale_mel(m2_hat), rescale_mel(m)
         m2_hat_wav = reconstruct_waveform(m2_hat)
         target_wav = reconstruct_waveform(m)
 
@@ -146,7 +145,6 @@ class TacoTrainer:
             global_step=model.step, sample_rate=hp.sample_rate)
 
         m1_hat, m2_hat, att = model.generate(x[0].tolist(), steps=lens[0] + 20)
-        m1_hat, m2_hat = rescale_mel(m1_hat), rescale_mel(m2_hat)
         att_fig = plot_attention(att)
         m1_hat_fig = plot_mel(m1_hat)
         m2_hat_fig = plot_mel(m2_hat)
