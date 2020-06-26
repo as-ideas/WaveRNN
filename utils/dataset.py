@@ -188,11 +188,11 @@ class ForwardDataset(Dataset):
 
 
 def pad1d(x, max_len):
-    return np.pad(x, (0, max_len - len(x)), mode='constant')
+    return np.pad(x, (0, max_len - len(x)), constant_values=-11.51, mode='constant')
 
 
 def pad2d(x, max_len):
-    return np.pad(x, ((0, 0), (0, max_len - x.shape[-1])), mode='constant')
+    return np.pad(x, ((0, 0), (0, max_len - x.shape[-1])), constant_values=-11.51, mode='constant')
 
 
 def collate_tts(batch, r):
