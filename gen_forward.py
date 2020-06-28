@@ -141,10 +141,6 @@ if __name__ == '__main__':
         print(f'\n| Generating {i}/{len(inputs)}')
         _, m, _ = tts_model.generate(x, alpha=args.alpha)
 
-        # Fix mel spectrogram scaling to be from 0 to 1
-        m = (m + 4) / 8
-        np.clip(m, 0, 1, out=m)
-
         if args.vocoder == 'griffinlim':
             v_type = args.vocoder
         elif args.vocoder == 'wavernn' and args.batched:
@@ -162,6 +158,8 @@ if __name__ == '__main__':
             voc_model.generate(m, save_path, batched, hp.voc_target, hp.voc_overlap, hp.mu_law)
         elif args.vocoder == 'griffinlim':
             wav = reconstruct_waveform(m, n_iter=args.iters)
+            m_t = torch.tensor(m).unsqueeze(0)
+            torch.save(m_t, paths.forward_output/f'{i}_{tts_k}k.mel')
             save_wav(wav, save_path)
 
     print('\n\nDone.\n')
