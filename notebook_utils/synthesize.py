@@ -52,18 +52,23 @@ def get_wavernn_model(model_path):
     return model
 
 
+def get_melgan_model():
+    vocoder = torch.hub.load('seungwonpark/melgan', 'melgan')
+    vocoder.eval()
+
+
 def synthesize(input_text, tts_model, voc_model, alpha=1.0):
     text = clean_text(input_text.strip())
     x = text_to_sequence(text)
     _, m, _ = tts_model.generate(x, alpha=alpha)
-    # Fix mel spectrogram scaling to be from 0 to 1
-    m = (m + 4) / 8
-    np.clip(m, 0, 1, out=m)
     if voc_model == 'griffinlim':
         wav = reconstruct_waveform(m, n_iter=32)
-    else:
+    elif isinstance(voc_model, WaveRNN):
         m = torch.tensor(m).unsqueeze(0)
         wav = voc_model.generate(m, '/tmp/sample.wav', True, hp.voc_target, hp.voc_overlap, hp.mu_law)
-        print()
+    else:
+        m = torch.tensor(m).unsqueeze(0).cuda()
+        with torch.no_grad():
+            wav = voc_model.inference(m)
     return wav
 
