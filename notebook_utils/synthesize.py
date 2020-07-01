@@ -55,6 +55,7 @@ def get_wavernn_model(model_path):
 def get_melgan_model():
     vocoder = torch.hub.load('seungwonpark/melgan', 'melgan')
     vocoder.eval()
+    return vocoder
 
 
 def synthesize(input_text, tts_model, voc_model, alpha=1.0):
