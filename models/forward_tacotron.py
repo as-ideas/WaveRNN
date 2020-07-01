@@ -17,7 +17,7 @@ class LengthRegulator(nn.Module):
 
     def forward(self, x, dur):
         return self.expand(x, dur)
-     
+
     @staticmethod
     def build_index(duration, x):
         duration[duration < 0] = 0
@@ -96,7 +96,6 @@ class ForwardTacotron(nn.Module):
                  highways,
                  dropout,
                  n_mels):
-
         super().__init__()
         self.rnn_dim = rnn_dim
         self.embedding = nn.Embedding(num_chars, embed_dims)
@@ -114,7 +113,7 @@ class ForwardTacotron(nn.Module):
                             rnn_dim,
                             batch_first=True,
                             bidirectional=True)
-        self.lin = torch.nn.Linear(2 * rnn_dim, n_mels)
+        self.lin = torch.nn.Linear(2 * rnn_dim + 2 * prenet_dims, n_mels)
         self.register_buffer('step', torch.zeros(1, dtype=torch.long))
         self.postnet = CBHG(K=postnet_k,
                             in_channels=n_mels,
@@ -122,7 +121,7 @@ class ForwardTacotron(nn.Module):
                             proj_channels=[postnet_dims, n_mels],
                             num_highways=highways)
         self.dropout = dropout
-        self.post_proj = nn.Linear(2 * postnet_dims, n_mels, bias=False)
+        self.post_proj = nn.Linear(2 * postnet_dims + 2 * prenet_dims, n_mels, bias=False)
 
     def forward(self, x, mel, dur):
         if self.training:
@@ -133,22 +132,27 @@ class ForwardTacotron(nn.Module):
         dur_hat = dur_hat.squeeze()
 
         x = x.transpose(1, 2)
+
         x = self.prenet(x)
         x = self.lr(x, dur)
-        x, _ = self.lstm(x)
-        x = F.dropout(x,
-                      p=self.dropout,
-                      training=self.training)
-        x = self.lin(x)
-        x = x.transpose(1, 2)
 
-        x_post = self.postnet(x)
+        x_p, _ = self.lstm(x)
+        x_p = F.dropout(x_p,
+                        p=self.dropout,
+                        training=self.training)
+        x_p = torch.cat([x, x_p], dim=-1)
+        x_p = self.lin(x_p)
+
+        x_p = x_p.transpose(1, 2)
+
+        x_post = self.postnet(x_p)
+        x_post = torch.cat([x, x_post], dim=-1)
         x_post = self.post_proj(x_post)
-        x_post = x_post.transpose(1, 2)
 
+        x_post = x_post.transpose(1, 2)
         x_post = self.pad(x_post, mel.size(2))
-        x = self.pad(x, mel.size(2))
-        return x, x_post, dur_hat
+        x_p = self.pad(x_p, mel.size(2))
+        return x_p, x_post, dur_hat
 
     def generate(self, x, alpha=1.0):
         self.eval()
@@ -162,27 +166,32 @@ class ForwardTacotron(nn.Module):
         x = x.transpose(1, 2)
         x = self.prenet(x)
         x = self.lr(x, dur)
-        x, _ = self.lstm(x)
-        x = F.dropout(x,
-                      p=self.dropout,
-                      training=self.training)
-        x = self.lin(x)
-        x = x.transpose(1, 2)
 
-        x_post = self.postnet(x)
+        x_p, _ = self.lstm(x)
+        x_p = F.dropout(x_p,
+                        p=self.dropout,
+                        training=self.training)
+        x_p = torch.cat([x, x_p], dim=-1)
+        x_p = self.lin(x_p)
+
+        x_p = x_p.transpose(1, 2)
+
+        x_post = self.postnet(x_p)
+        x_post = torch.cat([x, x_post], dim=-1)
         x_post = self.post_proj(x_post)
+
         x_post = x_post.transpose(1, 2)
 
-        x, x_post, dur = x.squeeze(), x_post.squeeze(), dur.squeeze()
-        x = x.cpu().data.numpy()
+        x_p, x_post, dur = x_p.squeeze(), x_post.squeeze(), dur.squeeze()
+        x_p = x_p.cpu().data.numpy()
         x_post = x_post.cpu().data.numpy()
         dur = dur.cpu().data.numpy()
 
-        return x, x_post, dur
+        return x_p, x_post, dur
 
     def pad(self, x, max_len):
         x = x[:, :, :max_len]
-        x = F.pad(x, [0, max_len - x.size(2), 0, 0], 'constant', 0.0)
+        x = F.pad(x, [0, max_len - x.size(2), 0, 0], 'constant', -11.5129)
         return x
 
     def get_step(self):
