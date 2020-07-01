@@ -1,7 +1,7 @@
-import time
-import numpy as np
-from typing import Tuple
 import os
+import time
+from typing import Tuple
+
 import torch
 import torch.nn.functional as F
 from torch.optim.optimizer import Optimizer
@@ -9,14 +9,14 @@ from torch.utils.data.dataset import Dataset
 from torch.utils.tensorboard import SummaryWriter
 
 from models.fatchord_version import WaveRNN
-from trainer.common import Averager, TTSSession, VocSession
+from trainer.common import Averager, VocSession
 from utils import hparams as hp
 from utils.checkpoints import save_checkpoint
-from utils.dataset import get_tts_datasets, get_vocoder_datasets
+from utils.dataset import get_vocoder_datasets
 from utils.decorators import ignore_exception
-from utils.display import stream, simple_table, plot_mel, plot_attention
+from utils.display import stream, simple_table
 from utils.distribution import discretized_mix_logistic_loss
-from utils.dsp import reconstruct_waveform, rescale_mel, np_now, decode_mu_law, label_2_float, raw_melspec
+from utils.dsp import decode_mu_law, label_2_float, raw_melspec
 from utils.files import unpickle_binary, pickle_binary, get_files
 from utils.paths import Paths
 
