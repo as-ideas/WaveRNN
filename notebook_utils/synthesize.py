@@ -54,7 +54,7 @@ def get_wavernn_model(model_path):
 
 def get_melgan_model():
     vocoder = torch.hub.load('seungwonpark/melgan', 'melgan')
-    vocoder.eval()
+    vocoder.cuda().eval()
     return vocoder
 
 
