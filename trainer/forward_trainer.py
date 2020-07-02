@@ -8,7 +8,7 @@ from torch.utils.data.dataset import Dataset
 from torch.utils.tensorboard import SummaryWriter
 
 from models.forward_tacotron import ForwardTacotron
-from trainer.common import Averager, TTSSession, MaskedL1
+from trainer.common import Averager, TTSSession, MaskedL1, MaskedLogL1, LogL1
 from utils import hparams as hp
 from utils.checkpoints import save_checkpoint
 from utils.dataset import get_tts_datasets
@@ -24,6 +24,7 @@ class ForwardTrainer:
         self.paths = paths
         self.writer = SummaryWriter(log_dir=paths.forward_log, comment='v1')
         self.l1_loss = MaskedL1()
+        self.log_l1_loss = LogL1()
 
     def train(self, model: ForwardTacotron, optimizer: Optimizer) -> None:
         for i, session_params in enumerate(hp.forward_schedule, 1):
@@ -65,9 +66,7 @@ class ForwardTrainer:
                 m1_loss = self.l1_loss(m1_hat, m, lens)
                 m2_loss = self.l1_loss(m2_hat, m, lens)
 
-                dur = torch.log(dur + 1.)
-                dur_hat = torch.log(dur_hat + 1.)
-                dur_loss = F.l1_loss(dur_hat, dur)
+                dur_loss = self.log_l1_loss(dur_hat, dur)
 
                 loss = m1_loss + m2_loss + dur_loss
                 optimizer.zero_grad()
@@ -119,7 +118,7 @@ class ForwardTrainer:
                 m1_hat, m2_hat, dur_hat = model(x, m, dur)
                 m1_loss = self.l1_loss(m1_hat, m, lens)
                 m2_loss = self.l1_loss(m2_hat, m, lens)
-                dur_loss = F.l1_loss(dur_hat, dur)
+                dur_loss = self.log_l1_loss(dur_hat, dur)
                 m_val_loss += m1_loss.item() + m2_loss.item()
                 dur_val_loss += dur_loss.item()
         return m_val_loss / len(val_set), dur_val_loss / len(val_set)
