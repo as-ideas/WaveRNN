@@ -2,13 +2,12 @@ import time
 from typing import Tuple
 
 import torch
-import torch.nn.functional as F
 from torch.optim.optimizer import Optimizer
 from torch.utils.data.dataset import Dataset
 from torch.utils.tensorboard import SummaryWriter
 
 from models.forward_tacotron import ForwardTacotron
-from trainer.common import Averager, TTSSession, MaskedL1, MaskedLogL1, LogL1
+from trainer.common import Averager, TTSSession, MaskedL1, LogL1
 from utils import hparams as hp
 from utils.checkpoints import save_checkpoint
 from utils.dataset import get_tts_datasets
