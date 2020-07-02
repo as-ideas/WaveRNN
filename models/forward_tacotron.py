@@ -61,6 +61,7 @@ class DurationPredictor(nn.Module):
         x = x.transpose(1, 2)
         x, _ = self.rnn(x)
         x = self.lin(x)
+        x = torch.relu(x)
         return x / alpha
 
 
