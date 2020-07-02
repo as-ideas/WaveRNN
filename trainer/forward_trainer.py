@@ -64,6 +64,9 @@ class ForwardTrainer:
 
                 m1_loss = self.l1_loss(m1_hat, m, lens)
                 m2_loss = self.l1_loss(m2_hat, m, lens)
+
+                dur = torch.log(dur + 1.)
+                dur_hat = torch.log(dur_hat + 1.)
                 dur_loss = F.l1_loss(dur_hat, dur)
 
                 loss = m1_loss + m2_loss + dur_loss
