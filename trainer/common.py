@@ -74,7 +74,7 @@ class MaskedL1(torch.nn.Module):
 
 class LogL1(torch.nn.Module):
 
-    def forward(self, x, target, lens):
+    def forward(self, x, target):
         target.requires_grad = False
         target = torch.log(target + 1.0)
         x = torch.log(x + 1.0)
