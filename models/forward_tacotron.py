@@ -20,10 +20,10 @@ class LengthRegulator(nn.Module):
 
     def build_index(self, duration, x):
         duration[duration < 0] = 0
-        tot_duration = duration.cumsum(1)
+        tot_duration = duration.cumsum(1).detach().cpu().numpy()
         if not self.training:
             tot_duration = tot_duration + 0.5
-        tot_duration = tot_duration.detach().cpu().numpy().astype('int')
+        tot_duration = tot_duration.astype('int')
         max_duration = int(tot_duration.max().item())
         index = np.zeros([x.shape[0], max_duration, x.shape[2]], dtype='long')
 
