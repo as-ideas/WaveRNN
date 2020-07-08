@@ -19,8 +19,8 @@ does not use any attention. Hence, the required memory grows linearly with text 
 
 
 ## UPDATE (08.07.2020)
-Model is now compatible with [MelGAN](https://github.com/seungwonpark/melgan). Check out out our [Colab Notebook](https://colab.research.google.com/github/as-ideas/ForwardTacotron/blob/master/notebooks/synthesize.ipynb)
-.
+Model is now compatible with the [MelGAN](https://github.com/seungwonpark/melgan) vocoder for faster-than-realtime synthesis on CPU.
+Check out the [Colab Notebook](https://colab.research.google.com/github/as-ideas/ForwardTacotron/blob/master/notebooks/synthesize.ipynb) where you can synthesize text using a pretrained MelGAN or WaveRNN model trained on LJSpeech.
 
 ## 🔈 Samples
 
