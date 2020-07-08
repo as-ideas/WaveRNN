@@ -72,15 +72,6 @@ class MaskedL1(torch.nn.Module):
         return loss / mask.sum()
 
 
-class LogL1(torch.nn.Module):
-
-    def forward(self, x, target):
-        target.requires_grad = False
-        target = torch.log(target + 1.0)
-        x = torch.log(x + 1.0)
-        return F.l1_loss(x, target)
-
-
 # Adapted from https://gist.github.com/jihunchoi/f1434a77df9db1bb337417854b398df1
 def pad_mask(lens, max_len):
     batch_size = lens.size(0)

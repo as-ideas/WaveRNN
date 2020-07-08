@@ -9,7 +9,7 @@ from torch.utils.data.dataset import Dataset
 from torch.utils.tensorboard import SummaryWriter
 
 from models.forward_tacotron import ForwardTacotron
-from trainer.common import Averager, TTSSession, MaskedL1, LogL1
+from trainer.common import Averager, TTSSession, MaskedL1
 from utils import hparams as hp
 from utils.checkpoints import save_checkpoint
 from utils.dataset import get_tts_datasets
@@ -25,7 +25,6 @@ class ForwardTrainer:
         self.paths = paths
         self.writer = SummaryWriter(log_dir=paths.forward_log, comment='v1')
         self.l1_loss = MaskedL1()
-        self.log_l1_loss = LogL1()
 
     def train(self, model: ForwardTacotron, optimizer: Optimizer) -> None:
         for i, session_params in enumerate(hp.forward_schedule, 1):
