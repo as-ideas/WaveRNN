@@ -9,7 +9,6 @@ import argparse
 from utils.text import text_to_sequence, clean_text
 from utils.display import simple_table
 from utils.dsp import reconstruct_waveform, save_wav
-import numpy as np
 
 if __name__ == '__main__':
 
@@ -39,12 +38,16 @@ if __name__ == '__main__':
     gl_parser = subparsers.add_parser('griffinlim', aliases=['gl'])
     gl_parser.add_argument('--iters', type=int, default=32, help='[int] number of griffinlim iterations')
 
+    mg_parser = subparsers.add_parser('melgan', aliases=['mg'])
+
     args = parser.parse_args()
 
     if args.vocoder in ['griffinlim', 'gl']:
         args.vocoder = 'griffinlim'
     elif args.vocoder in ['wavernn', 'wr']:
         args.vocoder = 'wavernn'
+    elif args.vocoder in ['melgan', 'mg']:
+        args.vocoder = 'melgan'
     else:
         raise argparse.ArgumentError('Must provide a valid vocoder type!')
 
@@ -119,10 +122,10 @@ if __name__ == '__main__':
             inputs = [clean_text(l.strip()) for l in f]
         inputs = [text_to_sequence(t) for t in inputs]
 
+    tts_k = tts_model.get_step() // 1000
+
     if args.vocoder == 'wavernn':
         voc_k = voc_model.get_step() // 1000
-        tts_k = tts_model.get_step() // 1000
-
         simple_table([('Forward Tacotron', str(tts_k) + 'k'),
                     ('Vocoder Type', 'WaveRNN'),
                     ('WaveRNN', str(voc_k) + 'k'),
@@ -131,10 +134,13 @@ if __name__ == '__main__':
                     ('Overlap Samples', overlap if batched else 'N/A')])
 
     elif args.vocoder == 'griffinlim':
-        tts_k = tts_model.get_step() // 1000
-        simple_table([('Tacotron', str(tts_k) + 'k'),
-                    ('Vocoder Type', 'Griffin-Lim'),
-                    ('GL Iters', args.iters)])
+        simple_table([('Forward Tacotron', str(tts_k) + 'k'),
+                      ('Vocoder Type', 'Griffin-Lim'),
+                      ('GL Iters', args.iters)])
+
+    elif args.vocoder == 'melgan':
+        simple_table([('Forward Tacotron', str(tts_k) + 'k'),
+                    ('Vocoder Type', 'MelGAN')])
 
     for i, x in enumerate(inputs, 1):
 
@@ -151,15 +157,16 @@ if __name__ == '__main__':
         if input_text:
             save_path = paths.forward_output/f'{input_text[:10]}_{args.alpha}_{v_type}_{tts_k}k.wav'
         else:
-            save_path = paths.forward_output/f'{i}_{v_type}_{tts_k}_alpha{args.alpha}.wav'
+            save_path = paths.forward_output/f'{i}_{v_type}_{tts_k}k_alpha{args.alpha}.wav'
 
         if args.vocoder == 'wavernn':
             m = torch.tensor(m).unsqueeze(0)
             voc_model.generate(m, save_path, batched, hp.voc_target, hp.voc_overlap, hp.mu_law)
+        if args.vocoder == 'melgan':
+            m = torch.tensor(m).unsqueeze(0)
+            torch.save(m, paths.forward_output/f'{i}_{tts_k}_alpha{args.alpha}.mel')
         elif args.vocoder == 'griffinlim':
             wav = reconstruct_waveform(m, n_iter=args.iters)
-            m_t = torch.tensor(m).unsqueeze(0)
-            torch.save(m_t, paths.forward_output/f'{i}_{tts_k}_alpha{args.alpha}.mel')
             save_wav(wav, save_path)
 
     print('\n\nDone.\n')

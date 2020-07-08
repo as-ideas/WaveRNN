@@ -18,10 +18,9 @@ The model has following advantages:
 does not use any attention. Hence, the required memory grows linearly with text size, which makes it possible to synthesize large articles at once.
 
 
-## UPDATE (29.04.2020)
-1. Models now use phonemes, which improves audio quality and reduces pronunciation errors.
-2. Training is now running on a train / val split and can be monitored with tensorboard (see example at the bottom).
-3. Additional monitoring for WaveRNN that helps to cherry-pick the model.
+## UPDATE (08.07.2020)
+Model is now compatible with [MelGAN](https://github.com/seungwonpark/melgan). Check out out our [Colab Notebook](https://colab.research.google.com/github/as-ideas/ForwardTacotron/blob/master/notebooks/synthesize.ipynb)
+.
 
 ## 🔈 Samples
 
@@ -70,6 +69,13 @@ python train_forward.py
 ```
 python gen_forward.py --alpha 1 --input_text "this is whatever you want it to be" griffinlim
 ```
+If you want to use the [MelGAN](https://github.com/seungwonpark/melgan) vocoder, use:
+```
+python gen_forward.py --input_text 'this is whatever you want it to be' melgan
+```
+The above produces .mel files that can be vocoded using the MelGAN repo (see inference example at [MelGAN](https://github.com/seungwonpark/melgan))
+```
+
 As in the original repo you can also use a trained WaveRNN vocoder:
 ```
 python gen_forward.py --input_text 'this is whatever you want it to be' wavernn
@@ -108,7 +114,7 @@ Here is what the ForwardTacotron tensorboard looks like:
 
 You can synthesize text using the pretrained models with
 ```
-python gen_forward.py --input_text 'Hi there!' --hp_file pretrained/pretrained_hparams.py --tts_weights pretrained/forward_190K.pyt' wavernn --voc_weights pretrained/wave_800K.pyt
+python gen_forward.py --input_text 'Hi there!' --hp_file pretrained/pretrained_hparams.py --tts_weights pretrained/forward_400K.pyt' wavernn --voc_weights pretrained/wave_575K.pyt
 
 ```
 
