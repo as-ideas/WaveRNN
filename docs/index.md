@@ -10,17 +10,17 @@ The samples are generated with a model trained 400K steps on [LJSpeech](https://
 
 | normal speed | faster (1.25) | slower (0.85) |
 |:---:|:---:|:---:|
-|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/1_melgan_400k.wav?raw=true" controls preload></audio>|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/1_melgan_400k_1.25.wav?raw=true" controls preload></audio>|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/1_melgan_400k_0.8.wav?raw=true" controls preload></audio>|
+|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/1_melgan_400k.wav?raw=true" controls preload></audio>|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/1_melgan_400k_1.25.wav?raw=true" controls preload></audio>|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/1_melgan_400k_0.85.wav?raw=true" controls preload></audio>|
 
 <p class="text">There’s a way to measure the acute emotional intelligence that has never gone out of style.</p>
 
 |:---:|:---:|:---:|
-|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/2_melgan_400k.wav?raw=true" controls preload></audio>|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/2_melgan_400k_1.25.wav?raw=true" controls preload></audio>|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/2_melgan_400k_0.8.wav?raw=true" controls preload></audio>|
+|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/2_melgan_400k.wav?raw=true" controls preload></audio>|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/2_melgan_400k_1.25.wav?raw=true" controls preload></audio>|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/2_melgan_400k_0.85.wav?raw=true" controls preload></audio>|
 
 <p class="text">President Trump met with other leaders at the Group of 20 conference.</p>
 
 |:---:|:---:|:---:|
-|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/3_melgan_400k.wav?raw=true" controls preload></audio>|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/3_melgan_400k_1.25.wav?raw=true" controls preload></audio>|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/3_melgan_400k_0.8.wav?raw=true" controls preload></audio>|
+|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/3_melgan_400k.wav?raw=true" controls preload></audio>|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/3_melgan_400k_1.25.wav?raw=true" controls preload></audio>|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/3_melgan_400k_0.85.wav?raw=true" controls preload></audio>|
 
 ## ForwardTacotron + WaveRNN Vocoder
 
@@ -28,7 +28,7 @@ The samples are generated with a model trained 100K steps on [LJSpeech](https://
 
 <p class="text">Scientists at the CERN laboratory say they have discovered a new particle.</p> 
 
-| normal speed | faster (1.25) | slower (0.85) |
+| normal speed | faster (1.25) | slower (0.8) |
 |:---:|:---:|:---:|
 |<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/1_wavernn_batched_100k.wav?raw=true" controls preload></audio>|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/1_wavernn_batched_100k_1.25.wav?raw=true" controls preload></audio>|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/1_wavernn_batched_100k_0.8.wav?raw=true" controls preload></audio>|
 
