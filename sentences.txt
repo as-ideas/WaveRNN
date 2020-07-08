@@ -5,4 +5,3 @@ The Senate's bill to repeal and replace the Affordable Care-Act is now imperiled
 Generative adversarial network or variational auto-encoder.
 Basilar membrane and otolaryngology are not auto-correlations.
 Hi, I am a non recurrent neural network.
-Synthetic speech can be created by concatenating pieces of recorded speech that are stored in a database. Systems differ in the size of the stored speech units; a system that stores phones or diphones provides the largest output range, but may lack clarity. For specific usage domains, the storage of entire words or sentences allows for high-quality output. Alternatively, a synthesizer can incorporate a model of the vocal tract and other human voice characteristics to create a completely "synthetic" voice output.
