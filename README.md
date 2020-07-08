@@ -69,11 +69,11 @@ python train_forward.py
 ```
 python gen_forward.py --alpha 1 --input_text "this is whatever you want it to be" griffinlim
 ```
-If you want to use the [MelGAN](https://github.com/seungwonpark/melgan) vocoder, use:
+If you want to use the [MelGAN](https://github.com/seungwonpark/melgan) vocoder, you can produce .mel files with:
 ```
 python gen_forward.py --input_text 'this is whatever you want it to be' melgan
 ```
-The above produces .mel files that can be vocoded using the MelGAN repo (see inference example at [MelGAN](https://github.com/seungwonpark/melgan))
+To vocode the resulting .mel files use the inference.py script from the MelGAN repo and point to the model output folder (see inference example at [MelGAN](https://github.com/seungwonpark/melgan))
 ```
 
 As in the original repo you can also use a trained WaveRNN vocoder:
