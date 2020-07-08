@@ -151,7 +151,7 @@ if __name__ == '__main__':
         if input_text:
             save_path = paths.forward_output/f'{input_text[:10]}_{args.alpha}_{v_type}_{tts_k}k.wav'
         else:
-            save_path = paths.forward_output/f'{i}_{v_type}_{tts_k}ko.wav'
+            save_path = paths.forward_output/f'{i}_{v_type}_{tts_k}_alpha{args.alpha}.wav'
 
         if args.vocoder == 'wavernn':
             m = torch.tensor(m).unsqueeze(0)
@@ -159,7 +159,7 @@ if __name__ == '__main__':
         elif args.vocoder == 'griffinlim':
             wav = reconstruct_waveform(m, n_iter=args.iters)
             m_t = torch.tensor(m).unsqueeze(0)
-            torch.save(m_t, paths.forward_output/f'{i}_{tts_k}k.mel')
+            torch.save(m_t, paths.forward_output/f'{i}_{tts_k}_alpha{args.alpha}.mel')
             save_wav(wav, save_path)
 
     print('\n\nDone.\n')

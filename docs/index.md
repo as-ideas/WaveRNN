@@ -1,11 +1,30 @@
 Inspired by Microsoft's [FastSpeech](https://www.microsoft.com/en-us/research/blog/fastspeech-new-text-to-speech-model-improves-on-speed-accuracy-and-controllability/)
 we modified Tacotron to generate speech in a single forward pass using a duration predictor to align text and generated mel spectrograms.
 
-# 🔈 Samples
 
-The samples are generated with a model trained 100K steps on [LJSpeech](https://keithito.com/LJ-Speech-Dataset/) together with the pretrained WaveRNN vocoder provided by the [WaveRNN repo](https://github.com/fatchord/WaveRNN).
+## ForwardTacotron + MelGAN Vocoder
+
+The samples are generated with a model trained 400K steps on [LJSpeech](https://keithito.com/LJ-Speech-Dataset/) together with the pretrained WaveRNN vocoder provided by the [MelGAN repo](https://github.com/seungwonpark/melgan).
+
+<p class="text">Scientists at the CERN laboratory say they have discovered a new particle.</p> 
+
+| normal speed | faster (1.25) | slower (0.85) |
+|:---:|:---:|:---:|
+|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/1_melgan_400k.wav?raw=true" controls preload></audio>|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/1_melgan_400k_1.25.wav?raw=true" controls preload></audio>|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/1_melgan_400k_0.8.wav?raw=true" controls preload></audio>|
+
+<p class="text">There’s a way to measure the acute emotional intelligence that has never gone out of style.</p>
+
+|:---:|:---:|:---:|
+|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/2_melgan_400k.wav?raw=true" controls preload></audio>|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/2_melgan_400k_1.25.wav?raw=true" controls preload></audio>|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/2_melgan_400k_0.8.wav?raw=true" controls preload></audio>|
+
+<p class="text">President Trump met with other leaders at the Group of 20 conference.</p>
+
+|:---:|:---:|:---:|
+|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/3_melgan_400k.wav?raw=true" controls preload></audio>|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/3_melgan_400k_1.25.wav?raw=true" controls preload></audio>|<audio src="https://github.com/as-ideas/tts_model_outputs/blob/master/ljspeech_forward/3_melgan_400k_0.8.wav?raw=true" controls preload></audio>|
 
 ## ForwardTacotron + WaveRNN Vocoder
+
+The samples are generated with a model trained 100K steps on [LJSpeech](https://keithito.com/LJ-Speech-Dataset/) together with the pretrained WaveRNN vocoder provided by the [WaveRNN repo](https://github.com/fatchord/WaveRNN).
 
 <p class="text">Scientists at the CERN laboratory say they have discovered a new particle.</p> 
 
