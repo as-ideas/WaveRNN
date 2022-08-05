@@ -113,7 +113,7 @@ if __name__ == '__main__':
                  if item_id in wav_ids and len(text) > config['preprocessing']['min_text_len']}
     wav_files = [w for w in wav_files if w.stem in text_dict]
     print(f'Using {len(wav_files)} wav files that are indexed in metafile.\n')
-    print(f'Average text prob: {sum(text_prob.values() / len(text_prob))}')
+    print(f'Average text prob: {sum(text_prob.values()) / len(text_prob)}')
 
     dsp = DSP.from_config(config)
 
