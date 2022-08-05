@@ -87,8 +87,7 @@ class ForwardTacotron(nn.Module):
                  postnet_dropout: float,
                  n_mels: int,
                  semb_dims: int = 256,
-                 padding_value=-11.5129,
-                 speaker_names: list = []):
+                 padding_value=-11.5129):
         super().__init__()
         self.rnn_dims = rnn_dims
         self.padding_value = padding_value
@@ -132,8 +131,6 @@ class ForwardTacotron(nn.Module):
         self.energy_strength = energy_strength
         self.pitch_proj = nn.Conv1d(1, 2 * prenet_dims + semb_dims, kernel_size=3, padding=1)
         self.energy_proj = nn.Conv1d(1, 2 * prenet_dims + semb_dims, kernel_size=3, padding=1)
-        for speaker_name in speaker_names:
-            self.register_buffer(speaker_name, torch.zeros(semb_dims, dtype=torch.float))
 
     def __repr__(self):
         num_params = sum([np.prod(p.size()) for p in self.parameters()])
