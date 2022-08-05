@@ -42,7 +42,7 @@ class TacoTrainer:
                 train_set, val_set = get_tts_datasets(
                     path=self.paths.data, batch_size=bs, r=r, model_type='tacotron',
                     max_mel_len=self.train_cfg['max_mel_len'], filter_attention=False,
-                    filter_min_text_prob=self.train_cfg['min_text_prob']
+                    filter_min_text_prob=self.train_cfg['min_trans_prob']
                 )
                 session = TTSSession(
                     index=i, r=r, lr=lr, max_step=max_step,
