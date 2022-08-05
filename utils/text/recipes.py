@@ -15,7 +15,7 @@ def ljspeech(path: Union[str, Path]):
             for line in f:
                 split = line.split('|')
                 text_dict[split[0]] = split[-1]
-                text_prob[split[0]] = split[1]
+                text_prob[split[0]] = float(split[1])
     return text_dict, text_prob
 
 
