@@ -120,6 +120,7 @@ forward_tacotron:
     checkpoint_every: 10_000      # checkpoints the model every x steps
     plot_every: 5000              # generates samples and plots every x steps
 
+    min_trans_prob: 0.7
     filter_attention: True               # whether to filter data with bad attention scores
     min_attention_sharpness: 0.5         # filter data with bad attention sharpness score, if 0 then no filter
     min_attention_alignment: 0.95        # filter data with bad attention alignment score, if 0 then no filter

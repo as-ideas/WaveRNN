@@ -9,12 +9,14 @@ from typing import Union, Tuple
 def ljspeech(path: Union[str, Path]):
     csv_files = get_files(path, extension='.csv')
     text_dict = {}
+    text_prob = {}
     for csv_file in csv_files:
         with open(str(csv_file), encoding='utf-8') as f:
             for line in f:
                 split = line.split('|')
                 text_dict[split[0]] = split[-1]
-    return text_dict
+                text_prob[split[0]] = split[1]
+    return text_dict, text_prob
 
 
 def vctk(path: Union[str, Path], n_workers, extension='.txt') -> Tuple[dict, dict]:

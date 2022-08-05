@@ -138,6 +138,7 @@ def get_tts_datasets(path: Path,
                      filter_attention=True,
                      filter_min_alignment=0.5,
                      filter_min_sharpness=0.9,
+                     filter_min_text_prob=0.,
                      model_type='tacotron') -> Tuple[DataLoader, DataLoader]:
 
     tokenizer = Tokenizer()
@@ -145,9 +146,16 @@ def get_tts_datasets(path: Path,
     train_data = unpickle_binary(path/'train_dataset.pkl')
     val_data = unpickle_binary(path/'val_dataset.pkl')
     text_dict = unpickle_binary(path/'text_dict.pkl')
+    text_probs = unpickle_binary(path/'text_prob.pkl')
 
     train_data = filter_max_len(train_data, max_mel_len)
     val_data = filter_max_len(val_data, max_mel_len)
+
+    train_len_original = len(train_data)
+    train_data = filter_bad_text_probs(train_data, text_probs, filter_min_text_prob)
+    val_data = filter_bad_text_probs(val_data, text_probs, filter_min_text_prob)
+    print(f'Filtered {train_len_original - len(train_data)} files due to bad text probs!')
+
     train_len_original = len(train_data)
 
     if model_type == 'forward' and filter_attention:
@@ -204,6 +212,16 @@ def filter_max_len(dataset: List[tuple], max_mel_len: int) -> List[tuple]:
         return dataset
     return [(id, len) for id, len in dataset if len <= max_mel_len]
 
+
+def filter_bad_text_probs(dataset: List[tuple],
+                          text_probs: Dict[str, float],
+                          min_text_prob: float) -> List[tuple]:
+    dataset_filtered = []
+    for item_id, mel_len in dataset:
+        text_prob = text_probs[item_id]
+        if text_prob > min_text_prob:
+            dataset_filtered.append((item_id, mel_len))
+    return dataset_filtered
 
 def filter_bad_attentions(dataset: List[tuple],
                           attention_score_dict: Dict[str, tuple],
