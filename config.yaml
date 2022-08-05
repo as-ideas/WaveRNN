@@ -37,7 +37,7 @@ dsp:
 preprocessing:
 
   seed: 42
-  n_val: 500
+  n_val: 50
   language: 'de'
   cleaner_name: 'no_cleaners'   # choices: ['english_cleaners', 'no_cleaners'], expands numbers and abbreviations.
   use_phonemes: False                 # whether to phonemize the text
