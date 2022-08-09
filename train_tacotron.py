@@ -148,7 +148,8 @@ def create_align_features(model: Tacotron,
         align_score = float(align_score[0])
         durs, att_score = duration_extractor(x=x, mel=mel, att=att)
         durs = np_now(durs).astype(np.int)
-        print(item_id, att_score)
+        print(item_id)
+        print(att_score)
         print(durs)
         att_score_dict[item_id] = (align_score, att_score)
         sum_att_score += att_score
