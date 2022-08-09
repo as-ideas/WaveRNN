@@ -24,7 +24,7 @@ def restore_checkpoint(model: Union[FastPitch, ForwardTacotron, Tacotron, WaveRN
                        device: torch.device) -> None:
     if path.is_file():
         checkpoint = torch.load(path, map_location=device)
-        model.load_state_dict(checkpoint['model'])
+        model.load_state_dict(checkpoint['model'], strict=False)
         optim.load_state_dict(checkpoint['optim'])
         print(f'Restored model with step {model.get_step()}\n')
 
