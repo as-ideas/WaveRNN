@@ -122,6 +122,7 @@ def create_align_features(model: Tacotron,
     assert model.r == 1, f'Reduction factor of tacotron must be 1 for creating alignment features! ' \
                          f'Reduction factor was: {model.r}'
     model.eval()
+    model.decoder.prenet.train()
     device = next(model.parameters()).device  # use same device as model parameters
     iters = len(val_set) + len(train_set)
     dataset = itertools.chain(train_set, val_set)
@@ -133,9 +134,8 @@ def create_align_features(model: Tacotron,
     print('Extracting durations using dijkstra...')
     for i, batch in enumerate(dataset, 1):
         batch = to_device(batch, device=device)
-        x, mel = batch['x'], batch['mel']
         with torch.no_grad():
-            _, _, att_batch = model(x, mel)
+            _, _, att_batch = model(batch['x'], batch['mel'], batch['speaker_emb'])
 
         x = batch['x'][0].cpu()
         mel_len = batch['mel_len'][0].cpu()
@@ -148,6 +148,8 @@ def create_align_features(model: Tacotron,
         align_score = float(align_score[0])
         durs, att_score = duration_extractor(x=x, mel=mel, att=att)
         durs = np_now(durs).astype(np.int)
+        print(item_id, att_score)
+        print(durs)
         att_score_dict[item_id] = (align_score, att_score)
         sum_att_score += att_score
 
