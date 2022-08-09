@@ -14,7 +14,7 @@ from utils.checkpoints import restore_checkpoint
 from utils.dataset import get_tts_datasets
 from utils.display import *
 from utils.dsp import DSP
-from utils.duration_extractor import extract_durations_per_count, extract_durations_with_dijkstra
+from utils.duration_extractor import extract_durations_per_count, extract_durations_with_dijkstra, DurationExtractor
 from utils.files import pickle_binary, unpickle_binary, read_config
 from utils.metrics import attention_score
 from utils.paths import Paths
