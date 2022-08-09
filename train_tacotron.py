@@ -44,6 +44,7 @@ def extract_pitch_energy(save_path_pitch: Path,
 
 
     speaker_names = set([v for v in speaker_dict.values() if len(v) > 1])
+    mean, var = 0, 0
     for speaker_name in speaker_names:
         try:
             print(f'normalizing for {speaker_name}')
