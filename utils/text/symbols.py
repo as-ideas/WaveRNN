@@ -23,3 +23,4 @@ phonemes = list(
    + _pulmonic_consonants + _suprasegmentals + _other_symbols + _diacrilics) + _extra_phons
 
 phonemes_set = set(phonemes)
+silent_phonemes_indices = [i for i, p in enumerate(phonemes) if p in _pad + _punctuation]
