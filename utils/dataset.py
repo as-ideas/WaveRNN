@@ -148,6 +148,7 @@ def get_tts_datasets(path: Path,
     val_data = unpickle_binary(path/'val_dataset.pkl')
     text_dict = unpickle_binary(path/'text_dict.pkl')
     text_probs = unpickle_binary(path/'text_prob.pkl')
+    text_sims = unpickle_binary(path/'text_sim.pkl')
 
     train_data = filter_max_len(train_data, max_mel_len)
     val_data = filter_max_len(val_data, max_mel_len)
@@ -158,8 +159,8 @@ def get_tts_datasets(path: Path,
     print(f'Filtered {train_len_original - len(train_data)} files due to bad text probs!')
 
     train_len_original = len(train_data)
-    train_data = filter_bad_text_probs(train_data, text_probs, filter_min_text_sim)
-    val_data = filter_bad_text_probs(val_data, text_probs, filter_min_text_sim)
+    train_data = filter_bad_text_probs(train_data, text_sims, filter_min_text_sim)
+    val_data = filter_bad_text_probs(val_data, text_sims, filter_min_text_sim)
     print(f'Filtered {train_len_original - len(train_data)} files due to bad text sim!')
 
     train_len_original = len(train_data)
