@@ -4,6 +4,7 @@ from multiprocessing import Pool, cpu_count
 from random import Random
 
 import pyworld as pw
+import tqdm
 from resemblyzer import VoiceEncoder, preprocess_wav
 
 from utils.display import *
@@ -142,7 +143,7 @@ if __name__ == '__main__':
                                 lang=config['preprocessing']['language'])
     voice_encoder = VoiceEncoder()
 
-    for i, dp in enumerate(pool.imap_unordered(preprocessor, wav_files), 1):
+    for i, dp in tqdm.tqdm(enumerate(pool.imap_unordered(preprocessor, wav_files), 1), total=len(wav_files)):
         if dp is not None and dp.item_id in text_dict:
             try:
                 wav = preprocess_wav(dp.path)
@@ -153,9 +154,9 @@ if __name__ == '__main__':
             except Exception as e:
                 print(e)
 
-        bar = progbar(i, len(wav_files))
-        message = f'{bar} {i}/{len(wav_files)} '
-        stream(message)
+        #bar = progbar(i, len(wav_files))
+        #message = f'{bar} {i}/{len(wav_files)} '
+        #stream(message)
 
     dataset.sort()
     random = Random(42)
