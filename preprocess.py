@@ -118,6 +118,7 @@ if __name__ == '__main__':
     wav_files = [w for w in wav_files if w.stem in text_dict]
     print(f'Using {len(wav_files)} wav files that are indexed in metafile.\n')
     print(f'Average text prob: {sum(text_prob.values()) / len(text_prob)}')
+    print(f'Average text sim: {sum(text_sim.values()) / len(text_sim)}')
 
     dsp = DSP.from_config(config)
 
