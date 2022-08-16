@@ -31,6 +31,7 @@ class DSP:
                  bits: int,
                  mu_law: bool,
                  voc_mode: str,
+                 normalize_volume: bool
                  ) -> None:
 
         self.n_mels = num_mels
@@ -42,6 +43,7 @@ class DSP:
         self.fmax = fmax
 
         self.should_peak_norm = peak_norm
+        self.should_normalize_volume = normalize_volume
         self.should_trim_start_end_silence = trim_start_end_silence
         self.should_trim_long_silences = trim_long_silences
         self.trim_silence_top_db = trim_silence_top_db
@@ -135,6 +137,17 @@ class DSP:
         audio_mask[:] = binary_dilation(audio_mask[:], np.ones(self.vad_max_silence_length + 1))
         audio_mask = np.repeat(audio_mask, samples_per_window)
         return wav[audio_mask]
+
+    def normalize_volume(self, wav: np.array, target_dBFS=-30, increase_only=False, decrease_only=False):
+        int16_max = (2 ** 15) - 1
+        if increase_only and decrease_only:
+            raise ValueError("Both increase only and decrease only are set")
+        rms = np.sqrt(np.mean((wav * int16_max) ** 2))
+        wave_dBFS = 20 * np.log10(rms / int16_max)
+        dBFS_change = target_dBFS - wave_dBFS
+        if dBFS_change < 0 and increase_only or dBFS_change > 0 and decrease_only:
+            return wav
+        return wav * (10 ** (dBFS_change / 20))
 
     @staticmethod
     def label_2_float(x: np.array, bits: float) -> np.array:

@@ -17,6 +17,7 @@ dsp:
   fmax: 8000
 
   peak_norm: False                      # Normalise to the peak of each wav file
+  normalize_volume: False               # Normalise volume to -30 db
   trim_start_end_silence: True          # Whether to trim leading and trailing silence
   trim_silence_top_db: 60               # Threshold in decibels below reference to consider silence for for trimming
                                         # start and end silences with librosa (no trimming if really high)

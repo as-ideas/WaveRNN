@@ -66,6 +66,9 @@ class Preprocessor:
         peak = np.abs(y).max()
         if self.dsp.should_peak_norm or peak > 1.0:
             y /= peak
+        if self.dsp.should_normalize_volume:
+            y = self.dsp.normalize_volume(y)
+
         mel = self.dsp.wav_to_mel(y)
         pitch, _ = pw.dio(y.astype(np.float64), self.dsp.sample_rate,
                           frame_period=self.dsp.hop_length / self.dsp.sample_rate * 1000)
