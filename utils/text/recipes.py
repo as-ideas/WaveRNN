@@ -4,7 +4,7 @@ from utils.display import progbar, stream
 from utils.files import get_files
 from pathlib import Path
 from typing import Union, Tuple
-
+import pandas as pd
 
 def ljspeech(path: Union[str, Path]):
     csv_files = get_files(path, extension='.csv')
@@ -19,6 +19,23 @@ def ljspeech(path: Union[str, Path]):
                 text_prob[split[0]] = float(split[1])
                 speaker_dict[split[0]] = split[2]
     return text_dict, speaker_dict, text_prob
+
+
+def librivox(path: Union[str, Path]):
+    df = pd.read_csv(path, sep='\t', encoding='utf-8')
+
+    text_dict = {}
+    text_prob = {}
+    text_sim = {}
+    speaker_dict = {}
+
+    for id, speaker_id, t, t_prob, t_sim in zip(df['id'], df['speaker_id'], df['text_phonemized'], df['prob'], df['lev_similarity']):
+        text_dict[id] = t
+        text_prob[id] = t_prob
+        text_sim[id] = t_sim
+        speaker_dict[id] = speaker_id
+
+    return text_dict, speaker_dict, text_prob, text_sim
 
 
 def vctk(path: Union[str, Path], n_workers, extension='.txt') -> Tuple[dict, dict]:

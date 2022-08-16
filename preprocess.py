@@ -11,7 +11,7 @@ from utils.dsp import *
 from utils.files import get_files, pickle_binary, read_config
 from utils.paths import Paths
 from utils.text.cleaners import Cleaner
-from utils.text.recipes import ljspeech, vctk
+from utils.text.recipes import ljspeech, vctk, librivox
 
 
 def valid_n_workers(num):
@@ -95,6 +95,7 @@ class Preprocessor:
 
 parser = argparse.ArgumentParser(description='Preprocessing for WaveRNN and Tacotron')
 parser.add_argument('--path', '-p', help='directly point to dataset path')
+parser.add_argument('--meta_path', '-mp', help='directly point to dataset path')
 parser.add_argument('--num_workers', '-w', metavar='N', type=valid_n_workers, default=cpu_count()-1, help='The number of worker threads to use for preprocessing')
 parser.add_argument('--config', metavar='FILE', default='config.yaml', help='The config containing all hyperparams.')
 args = parser.parse_args()
@@ -111,7 +112,7 @@ if __name__ == '__main__':
 
     n_workers = max(1, args.num_workers)
 
-    text_dict, speaker_dict, text_prob = ljspeech(args.path)
+    text_dict, speaker_dict, text_prob, text_sim = librivox(args.meta_path)
     text_dict = {item_id: text for item_id, text in text_dict.items()
                  if item_id in wav_ids and len(text) > config['preprocessing']['min_text_len']}
     wav_files = [w for w in wav_files if w.stem in text_dict]
@@ -169,6 +170,7 @@ if __name__ == '__main__':
     pickle_binary(text_dict, paths.data/'text_dict.pkl')
     pickle_binary(speaker_dict, paths.data/'speaker_dict.pkl')
     pickle_binary(text_prob, paths.data/'text_prob.pkl')
+    pickle_binary(text_sim, paths.data/'text_sim.pkl')
     pickle_binary(train_dataset, paths.data/'train_dataset.pkl')
     pickle_binary(val_dataset, paths.data/'val_dataset.pkl')
 

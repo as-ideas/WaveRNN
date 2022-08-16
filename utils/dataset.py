@@ -139,6 +139,7 @@ def get_tts_datasets(path: Path,
                      filter_min_alignment=0.5,
                      filter_min_sharpness=0.9,
                      filter_min_text_prob=0.,
+                     filter_min_text_sim=0.,
                      model_type='tacotron') -> Tuple[DataLoader, DataLoader]:
 
     tokenizer = Tokenizer()
@@ -155,6 +156,11 @@ def get_tts_datasets(path: Path,
     train_data = filter_bad_text_probs(train_data, text_probs, filter_min_text_prob)
     val_data = filter_bad_text_probs(val_data, text_probs, filter_min_text_prob)
     print(f'Filtered {train_len_original - len(train_data)} files due to bad text probs!')
+
+    train_len_original = len(train_data)
+    train_data = filter_bad_text_probs(train_data, text_probs, filter_min_text_sim)
+    val_data = filter_bad_text_probs(val_data, text_probs, filter_min_text_sim)
+    print(f'Filtered {train_len_original - len(train_data)} files due to bad text sim!')
 
     train_len_original = len(train_data)
 

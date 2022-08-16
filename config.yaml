@@ -76,6 +76,7 @@ tacotron:
     checkpoint_every: 10000          # checkpoints the model every x steps
     plot_every: 1000                 # generates samples and plots every x steps
     min_trans_prob: 0.7
+    min_trans_sim: 0.9
 
 
 forward_tacotron:
