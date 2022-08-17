@@ -75,7 +75,7 @@ if __name__ == '__main__':
                                           max_mel_len=None,
                                           filter_attention=False)
     dataset = itertools.chain(train_set, val_set)
-    pbar = tqdm(pool.imap_unordered(processor, val_set), total=len(val_set))
+    pbar = tqdm(pool.imap_unordered(processor, dataset), total=len(train_set)+len(val_set))
     att_scores = []
     for res in pbar:
         att_score_dict[res.item_id] = (res.align_score, res.att_score)
