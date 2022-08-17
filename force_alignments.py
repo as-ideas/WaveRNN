@@ -86,7 +86,6 @@ if __name__ == '__main__':
 
     print('Performing model inference...')
     for batch in tqdm(val_set, total=len(val_set)):
-        break
         batch = to_device(batch, device=device)
         with torch.no_grad():
             _, _, att_batch = model(batch['x'], batch['mel'], batch['speaker_emb'])
