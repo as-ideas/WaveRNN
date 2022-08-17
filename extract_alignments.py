@@ -2,17 +2,14 @@
 
 import itertools
 from dataclasses import dataclass
+from multiprocessing import Pool
 from pathlib import Path
 
 import torch
 from dp.utils.io import pickle_binary
-from torch import optim
-from multiprocessing import Pool
 from tqdm import tqdm
 
-from models.tacotron import Tacotron
-from trainer.common import np_now, to_device
-from utils.checkpoints import restore_checkpoint
+from trainer.common import np_now
 from utils.dataset import get_tts_datasets
 from utils.display import *
 from utils.dsp import DSP
@@ -63,38 +60,29 @@ if __name__ == '__main__':
     dsp = DSP.from_config(config)
     paths = Paths(config['data_path'], config['voc_model_id'], config['tts_model_id'])
 
-    print('\nInitialising Tacotron Model...\n')
-    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-    model = Tacotron.from_config(config).to(device)
-    model.decoder.prenet.train()
-
-    optimizer = optim.Adam(model.parameters())
-    restore_checkpoint(model=model, optim=optimizer,
-                       path=paths.taco_checkpoints / 'latest_model.pt',
-                       device=device)
-
     duration_extractor = DurationExtractor(
         silence_threshold=config['preprocessing']['silence_threshold'],
         silence_prob_shift=config['preprocessing']['silence_prob_shift'])
 
-    train_set, val_set = get_tts_datasets(paths.data, 1, model.r,
+    print('Performing duration extraction...')
+    att_score_dict = {}
+    processor = Processor(duration_extractor=duration_extractor,
+                          att_pred_path=paths.att_pred,
+                          alg_path=paths.alg)
+    pool = Pool(processes=12)
+
+    train_set, val_set = get_tts_datasets(paths.data, 1, 1,
                                           max_mel_len=None,
                                           filter_attention=False)
     dataset = itertools.chain(train_set, val_set)
+    pbar = tqdm(pool.imap_unordered(processor, val_set), total=len(val_set))
+    att_scores = []
+    for res in pbar:
+        att_score_dict[res.item_id] = (res.align_score, res.att_score)
+        att_scores.append(res.att_score)
+        pbar.set_description(f'Avg align score: {sum(att_scores) / len(att_scores)}', refresh=True)
 
-    print('Performing model inference...')
-    for batch in tqdm(val_set, total=len(val_set)):
-        batch = to_device(batch, device=device)
-        with torch.no_grad():
-            _, _, att_batch = model(batch['x'], batch['mel'], batch['speaker_emb'])
-        x = batch['x'][0].cpu()
-        mel_len = batch['mel_len'][0].cpu()
-        item_id = batch['item_id'][0]
-        mel = batch['mel'][0, :, :mel_len].cpu()
-        att = att_batch[0, :mel_len, :].cpu()
+    pickle_binary(att_score_dict, paths.data / 'att_score_dict.pkl')
 
-        # we use the standard alignment score and the more accurate attention score from the duration extractor
-        align_score, _ = attention_score(att_batch, batch['mel_len'], r=1)
-        np.save(paths.att_pred / f'{item_id}.npy', att.numpy(), allow_pickle=False)
 
 
