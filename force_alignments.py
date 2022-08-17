@@ -101,6 +101,7 @@ if __name__ == '__main__':
 
     print('Performing duration extraction...')
     att_score_dict = {}
+    torch.multiprocessing.set_start_method('spawn')
     processor = Processor(duration_extractor=duration_extractor,
                           att_pred_path=paths.att_pred,
                           alg_path=paths.alg)
