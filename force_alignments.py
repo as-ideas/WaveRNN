@@ -60,6 +60,7 @@ class Processor:
 
 
 if __name__ == '__main__':
+    torch.multiprocessing.set_start_method('spawn')
 
     config = read_config('config.yaml')
     dsp = DSP.from_config(config)
@@ -102,7 +103,6 @@ if __name__ == '__main__':
 
     print('Performing duration extraction...')
     att_score_dict = {}
-    torch.multiprocessing.set_start_method('spawn')
     processor = Processor(duration_extractor=duration_extractor,
                           att_pred_path=paths.att_pred,
                           alg_path=paths.alg)
