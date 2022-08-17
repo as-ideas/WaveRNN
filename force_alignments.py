@@ -7,7 +7,7 @@ from pathlib import Path
 import torch
 from dp.utils.io import pickle_binary
 from torch import optim
-from torch.multiprocessing import Pool
+from multiprocessing import Pool
 from tqdm import tqdm
 
 from models.tacotron import Tacotron
@@ -35,7 +35,6 @@ class Processor:
                  duration_extractor: DurationExtractor,
                  att_pred_path: Path,
                  alg_path: Path) -> None:
-        self.model = model
         self.duration_extractor = duration_extractor
         self.att_pred_path = att_pred_path
         self.alg_path = alg_path
