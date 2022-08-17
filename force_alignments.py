@@ -105,6 +105,11 @@ if __name__ == '__main__':
                           att_pred_path=paths.att_pred,
                           alg_path=paths.alg)
     pool = Pool(processes=4)
+
+    train_set, val_set = get_tts_datasets(paths.data, 1, model.r,
+                                          max_mel_len=None,
+                                          filter_attention=False)
+    dataset = itertools.chain(train_set, val_set)
     pbar = tqdm(pool.imap_unordered(processor, val_set), total=len(val_set))
     att_scores = []
     for res in pbar:
