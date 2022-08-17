@@ -114,8 +114,7 @@ if __name__ == '__main__':
     for res in pbar:
         att_score_dict[res.item_id] = (res.align_score, res.att_score)
         att_scores.append(res.att_score)
-        pbar.set_description(f'Avg align score: {sum(att_scores) / len(att_scores)}')
-        pbar.refresh()
+        pbar.set_description(f'Avg align score: {sum(att_scores) / len(att_scores)}', refresh=True)
 
     pickle_binary(att_score_dict, paths.data / 'att_score_dict.pkl')
 
