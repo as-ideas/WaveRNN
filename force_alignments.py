@@ -98,6 +98,7 @@ if __name__ == '__main__':
         # we use the standard alignment score and the more accurate attention score from the duration extractor
         align_score, _ = attention_score(att_batch, batch['mel_len'], r=1)
         np.save(paths.att_pred / f'{item_id}.npy', att.numpy(), allow_pickle=False)
+        break
 
     print('Performing duration extraction...')
     att_score_dict = {}
