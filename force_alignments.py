@@ -7,7 +7,7 @@ from pathlib import Path
 import torch
 from dp.utils.io import pickle_binary
 from torch import optim
-from multiprocessing import Pool
+from torch.multiprocessing import Pool
 from tqdm import tqdm
 
 from models.tacotron import Tacotron
@@ -60,8 +60,6 @@ class Processor:
 
 
 if __name__ == '__main__':
-    torch.multiprocessing.set_start_method('spawn')
-
     config = read_config('config.yaml')
     dsp = DSP.from_config(config)
     paths = Paths(config['data_path'], config['voc_model_id'], config['tts_model_id'])
