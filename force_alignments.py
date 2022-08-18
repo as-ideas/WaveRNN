@@ -94,7 +94,8 @@ if __name__ == '__main__':
         att = att_batch[0, :mel_len, :].cpu()
 
         # we use the standard alignment score and the more accurate attention score from the duration extractor
-        align_score, _ = attention_score(att_batch, batch['mel_len'], r=1)
+        align_score, att_score = attention_score(att_batch, batch['mel_len'], r=1)
+        print(att_score)
         np.save(paths.att_pred / f'{item_id}.npy', att.numpy(), allow_pickle=False)
 
 
