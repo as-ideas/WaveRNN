@@ -127,6 +127,7 @@ forward_tacotron:
     plot_every: 1000              # generates samples and plots every x steps
 
     min_trans_prob: 0.7
+    min_trans_sim: 0.9
     filter_attention: True               # whether to filter data with bad attention scores
     min_attention_sharpness: 0.5         # filter data with bad attention sharpness score, if 0 then no filter
     min_attention_alignment: 0.95        # filter data with bad attention alignment score, if 0 then no filter
