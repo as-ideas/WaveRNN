@@ -98,7 +98,7 @@ if __name__ == '__main__':
                        path=paths.forward_checkpoints / 'latest_model.pt',
                        device=device)
 
-    for speaker_name in speaker_names:
+    for speaker_name in tqdm.tqdm(speaker_names, total=len(speaker_names)):
         print(speaker_name)
         print(speaker_emb[speaker_name])
         print(speaker_norm[speaker_name])
@@ -107,10 +107,6 @@ if __name__ == '__main__':
         print(emb)
 
         setattr(model, speaker_name, emb)
-
-    print('model speaker name embs:')
-    for speaker_name in speaker_names:
-        print(speaker_name, getattr(model, speaker_name))
 
     if force_gta:
         print('Creating Ground Truth Aligned Dataset...\n')
