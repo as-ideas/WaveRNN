@@ -67,12 +67,14 @@ if __name__ == '__main__':
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     model = Tacotron.from_config(config).to(device)
 
+
     optimizer = optim.Adam(model.parameters())
     restore_checkpoint(model=model, optim=optimizer,
                        path=paths.taco_checkpoints / 'latest_model.pt',
                        device=device)
-    model.decoder.prenet.train()
 
+    model.eval()
+    model.decoder.prenet.train()
     duration_extractor = DurationExtractor(
         silence_threshold=config['preprocessing']['silence_threshold'],
         silence_prob_shift=config['preprocessing']['silence_prob_shift'])
