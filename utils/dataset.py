@@ -176,7 +176,7 @@ def get_tts_datasets(path: Path,
 
     random = Random(42)
     for id, l in train_data:
-        if speaker_dict[id] == '04_training_metafile':
+        if speaker_dict[id] == 'bild':
             train_data_asvoice.append((id, l))
         else:
             train_data_other.append((id, l))
@@ -185,7 +185,7 @@ def get_tts_datasets(path: Path,
     random.shuffle(train_data_other)
     train_data = train_data_asvoice[:num_asvoice] + train_data_other[:num_other]
 
-    print(f'Using {len(train_data_asvoice[:num_asvoice])} asvoice data and {len(train_data_other[:num_other])} other data.\nFirst bild ids:')
+    print(f'Using {len(train_data_asvoice[:num_asvoice])} bild data and {len(train_data_other[:num_other])} other data.\nFirst bild ids:')
     print(train_data_asvoice[:10])
 
     train_ids, train_lens = zip(*train_data)
