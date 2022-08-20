@@ -88,10 +88,10 @@ if __name__ == '__main__':
 
     train_set, val_set = get_tts_datasets(
         path=paths.data, batch_size=1, r=1, model_type='forward',
-        max_mel_len=config['max_mel_len'],
-        filter_attention=config['filter_attention'],
-        filter_min_alignment=config['min_attention_alignment'],
-        filter_min_sharpness=config['min_attention_sharpness'],
+        max_mel_len=config['forward_tacotron']['training']['max_mel_len'],
+        filter_attention=config['forward_tacotron']['training']['filter_attention'],
+        filter_min_alignment=config['forward_tacotron']['training']['min_attention_alignment'],
+        filter_min_sharpness=config['forward_tacotron']['training']['min_attention_sharpness'],
         num_asvoice=config['preprocessing']['num_asvoice'],
         num_other=config['preprocessing']['num_other'])
 
