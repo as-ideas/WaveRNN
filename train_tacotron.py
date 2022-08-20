@@ -36,17 +36,22 @@ def normalize_values(phoneme_val):
 # 0b27e359a5869cd23294c1707c92f989c0bf201e/PyTorch/SpeechSynthesis/FastPitch/extract_mels.py
 def extract_pitch_energy(save_path_pitch: Path,
                          save_path_energy: Path,
-                         pitch_max_freq: float) -> Tuple[float, float]:
+                         pitch_max_freq: float,
+                         dataset=None) -> Tuple[float, float]:
     speaker_dict = unpickle_binary(paths.data / 'speaker_dict.pkl')
 
+    print(f'normalizing for dataset: {dataset}')
 
     speaker_names = set([v for v in speaker_dict.values() if len(v) > 1])
     for speaker_name in speaker_names:
         try:
             print(f'normalizing for {speaker_name}')
-            train_data = unpickle_binary(paths.data / 'train_dataset.pkl')
-            val_data = unpickle_binary(paths.data / 'val_dataset.pkl')
-            all_data = train_data + val_data
+            if dataset is None:
+                train_data = unpickle_binary(paths.data / 'train_dataset.pkl')
+                val_data = unpickle_binary(paths.data / 'val_dataset.pkl')
+                all_data = train_data + val_data
+            else:
+                all_data = dataset
             all_data = [d for d in all_data if speaker_dict[d[0]] == speaker_name]
             print(f'normalizing {len(all_data)} files.')
             phoneme_pitches = []
@@ -161,6 +166,7 @@ if __name__ == '__main__':
     parser.add_argument('--force_align', '-a', action='store_true', help='Force the model to create attention alignment features')
     parser.add_argument('--extract_pitch', '-p', action='store_true', help='Extracts phoneme-pitch values only')
     parser.add_argument('--config', metavar='FILE', default='config.yaml', help='The config containing all hyperparams.')
+    parser.add_argument('--dataset', metavar='FILE', default=None, help='The config containing all hyperparams.')
 
     args = parser.parse_args()
     config = read_config(args.config)
@@ -171,7 +177,8 @@ if __name__ == '__main__':
         print('Extracting Pitch and Energy Values...')
         mean, var = extract_pitch_energy(save_path_pitch=paths.phon_pitch,
                                          save_path_energy=paths.phon_energy,
-                                         pitch_max_freq=dsp.pitch_max_freq)
+                                         pitch_max_freq=dsp.pitch_max_freq,
+                                         dataset=args.dataset)
         print('\n\nYou can now train ForwardTacotron - use python train_forward.py\n')
         exit()
 
