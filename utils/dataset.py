@@ -1,6 +1,7 @@
 from random import Random
 
 import torch
+import tqdm
 from torch.utils.data.sampler import Sampler
 from torch.utils.data import Dataset, DataLoader
 from typing import List, Dict, Union, Tuple
@@ -270,6 +271,18 @@ class TacoDataset(Dataset):
         return len(self.metadata)
 
 
+def normalize_values(phoneme_val):
+    nonzeros = np.concatenate([v[np.where(v != 0.0)[0]]
+                               for item_id, v in phoneme_val])
+    mean, std = np.mean(nonzeros), np.std(nonzeros)
+    for item_id, v in phoneme_val:
+        zero_idxs = np.where(v == 0.0)[0]
+        v -= mean
+        v /= std
+        v[zero_idxs] = 0.0
+    return mean, std
+
+
 class ForwardDataset(Dataset):
 
     def __init__(self,
@@ -282,6 +295,18 @@ class ForwardDataset(Dataset):
         self.text_dict = text_dict
         self.tokenizer = tokenizer
 
+        print(f'renormalize pitches for dataset with len {dataset_ids}')
+        pitches = []
+        for item_id, _ in tqdm.tqdm(dataset_ids, total=len(dataset_ids)):
+            pitch = np.load(str(self.path/'phon_pitch'/f'{item_id}.npy'))
+            pitches.append(pitch)
+
+        mean, std = normalize_values(pitches)
+
+        self.pitch_mean = mean
+        self.pitch_std = std
+        print(f'mean {mean}, std {std}')        
+
     def __getitem__(self, index: int) -> Dict[str, torch.tensor]:
         item_id = self.metadata[index]
         text = self.text_dict[item_id]
@@ -290,6 +315,13 @@ class ForwardDataset(Dataset):
         mel_len = mel.shape[-1]
         dur = np.load(str(self.path/'alg'/f'{item_id}.npy'))
         pitch = np.load(str(self.path/'phon_pitch'/f'{item_id}.npy'))
+
+        # renormalize pitch according to small dataset
+        zero_idxs = np.where(pitch == 0.0)[0]
+        pitch -= self.pitch_mean
+        pitch /= self.pitch_std
+        pitch[zero_idxs] = 0.0
+        
         energy = np.load(str(self.path/'phon_energy'/f'{item_id}.npy'))
         speaker_emb = np.load(str(self.path/'speaker_emb'/f'{item_id}.npy'))
 
