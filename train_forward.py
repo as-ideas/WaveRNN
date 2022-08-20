@@ -86,8 +86,14 @@ if __name__ == '__main__':
     speaker_emb = {name: np.zeros(256) for name in speaker_names}
     speaker_norm = {name: 0. for name in speaker_names}
 
-    train_set, val_set = get_tts_datasets(path=paths.data, batch_size=1, r=1,
-                               max_mel_len=99999, filter_attention=False, model_type='forward')
+    train_set, val_set = get_tts_datasets(
+        path=paths.data, batch_size=1, r=1, model_type='forward',
+        max_mel_len=config['max_mel_len'],
+        filter_attention=config['filter_attention'],
+        filter_min_alignment=config['min_attention_alignment'],
+        filter_min_sharpness=config['min_attention_sharpness'],
+        num_asvoice=config['preprocessing']['num_asvoice'],
+        num_other=config['preprocessing']['num_other'])
 
     for batch in tqdm.tqdm(train_set, total=len(train_set)):
         item_id = batch['item_id'][0]
