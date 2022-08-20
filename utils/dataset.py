@@ -295,7 +295,7 @@ class ForwardDataset(Dataset):
         self.text_dict = text_dict
         self.tokenizer = tokenizer
 
-        print(f'renormalize pitches for dataset with len {dataset_ids}')
+        print(f'renormalize pitches for dataset with len {len(dataset_ids)}')
         pitches = []
         for item_id in tqdm.tqdm(dataset_ids, total=len(dataset_ids)):
             pitch = np.load(str(self.path/'phon_pitch'/f'{item_id}.npy'))
