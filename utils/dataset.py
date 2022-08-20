@@ -273,9 +273,9 @@ class TacoDataset(Dataset):
 
 def normalize_values(phoneme_val):
     nonzeros = np.concatenate([v[np.where(v != 0.0)[0]]
-                               for item_id, v in phoneme_val])
+                               for v in phoneme_val])
     mean, std = np.mean(nonzeros), np.std(nonzeros)
-    for item_id, v in phoneme_val:
+    for v in phoneme_val:
         zero_idxs = np.where(v == 0.0)[0]
         v -= mean
         v /= std
