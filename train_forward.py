@@ -86,8 +86,11 @@ if __name__ == '__main__':
     speaker_emb = {name: np.zeros(256) for name in speaker_names}
     speaker_norm = {name: 0. for name in speaker_names}
 
-    for f in tqdm.tqdm(sembs, total=len(sembs)):
-        item_id = f.stem
+    dataset = get_tts_datasets(path=paths.data, batch_size=1, r=1,
+                               max_mel_len=99999, filter_attention=False, model_type='forward')
+
+    for batch in tqdm.tqdm(dataset, total=len(dataset)):
+        item_id = batch['item_id'][0]
         speaker_name = speaker_dict[item_id]
         emb = np.load(paths.speaker_emb / f'{item_id}.npy')
         speaker_emb[speaker_name] += emb
