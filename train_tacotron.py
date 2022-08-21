@@ -35,6 +35,7 @@ def normalize_values(phoneme_val):
 # adapted from https://github.com/NVIDIA/DeepLearningExamples/blob/
 # 0b27e359a5869cd23294c1707c92f989c0bf201e/PyTorch/SpeechSynthesis/FastPitch/extract_mels.py
 def extract_pitch_energy(save_path_pitch: Path,
+                         save_path_raw_pitch: Path,
                          save_path_energy: Path,
                          pitch_max_freq: float,
                          dataset=None) -> Tuple[float, float]:
@@ -79,6 +80,9 @@ def extract_pitch_energy(save_path_pitch: Path,
 
             for item_id, phoneme_energy in phoneme_energies:
                 np.save(str(save_path_energy / f'{item_id}.npy'), phoneme_energy, allow_pickle=False)
+
+            for item_id, phoneme_pitch in phoneme_pitches:
+                np.save(str(save_path_raw_pitch / f'{item_id}.npy'), phoneme_pitch, allow_pickle=False)
 
             mean, var = normalize_values(phoneme_pitches)
             for item_id, phoneme_pitch in phoneme_pitches:
@@ -156,6 +160,7 @@ def create_align_features(model: Tacotron,
     pickle_binary(att_score_dict, paths.data / 'att_score_dict.pkl')
     print('Extracting Pitch Values...')
     extract_pitch_energy(save_path_pitch=paths.phon_pitch,
+                         save_path_raw_pitch=paths.raw_phon_pitch,
                          save_path_energy=paths.phon_energy,
                          pitch_max_freq=pitch_max_freq)
 
@@ -176,6 +181,7 @@ if __name__ == '__main__':
     if args.extract_pitch:
         print('Extracting Pitch and Energy Values...')
         mean, var = extract_pitch_energy(save_path_pitch=paths.phon_pitch,
+                                         save_path_raw_pitch=paths.raw_phon_pitch,
                                          save_path_energy=paths.phon_energy,
                                          pitch_max_freq=dsp.pitch_max_freq,
                                          dataset=args.dataset)

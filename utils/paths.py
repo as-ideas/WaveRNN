@@ -16,6 +16,7 @@ class Paths:
         self.speaker_emb = self.data/'speaker_emb'
         self.raw_pitch = self.data/'raw_pitch'
         self.phon_pitch = self.data/'phon_pitch'
+        self.raw_phon_pitch = self.data/'raw_phon_pitch'
         self.phon_energy = self.data/'phon_energy'
 
         self.model_output = self.base / 'model_output'
@@ -41,6 +42,7 @@ class Paths:
         os.makedirs(self.alg, exist_ok=True)
         os.makedirs(self.raw_pitch, exist_ok=True)
         os.makedirs(self.phon_pitch, exist_ok=True)
+        os.makedirs(self.raw_phon_pitch, exist_ok=True)
         os.makedirs(self.phon_energy, exist_ok=True)
         os.makedirs(self.voc_checkpoints, exist_ok=True)
         os.makedirs(self.voc_top_k, exist_ok=True)

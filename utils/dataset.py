@@ -298,7 +298,7 @@ class ForwardDataset(Dataset):
         print(f'renormalize pitches for dataset with len {len(dataset_ids)}')
         pitches = []
         for item_id in tqdm.tqdm(dataset_ids, total=len(dataset_ids)):
-            pitch = np.load(str(self.path/'phon_pitch'/f'{item_id}.npy'))
+            pitch = np.load(str(self.path/'raw_phon_pitch'/f'{item_id}.npy'))
             pitches.append(pitch)
 
         mean, std = normalize_values(pitches)
@@ -314,7 +314,7 @@ class ForwardDataset(Dataset):
         mel = np.load(str(self.path/'mel'/f'{item_id}.npy'))
         mel_len = mel.shape[-1]
         dur = np.load(str(self.path/'alg'/f'{item_id}.npy'))
-        pitch = np.load(str(self.path/'phon_pitch'/f'{item_id}.npy'))
+        pitch = np.load(str(self.path/'raw_phon_pitch'/f'{item_id}.npy'))
 
         # renormalize pitch according to small dataset
         zero_idxs = np.where(pitch == 0.0)[0]
