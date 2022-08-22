@@ -46,8 +46,9 @@ class Processor:
         align_score, _ = attention_score(att.unsqueeze(0), batch['mel_len'], r=1)
         durs, att_score = self.duration_extractor(x=x, mel=mel, att=att)
         durs = np_now(durs).astype(np.int)
-        #np.save(str(self.alg_path / f'{item_id}.npy'), durs, allow_pickle=False)
-        print(item_id, durs)
+        np.save(str(self.alg_path / f'{item_id}.npy'), durs, allow_pickle=False)
+        print(item_id, align_score, att_score)
+        print(durs)
         return ProcessorResult(
             item_id=item_id,
             align_score=align_score,
@@ -75,7 +76,7 @@ if __name__ == '__main__':
                                           max_mel_len=None,
                                           filter_attention=False)
     dataset = itertools.chain(train_set, val_set)
-    pbar = tqdm(pool.imap_unordered(processor, dataset), total=len(train_set)+len(val_set))
+    pbar = tqdm(pool.imap_unordered(processor, dataset), total=len(val_set)+len(train_set))
     att_scores = []
     for res in pbar:
         att_score_dict[res.item_id] = (res.align_score, res.att_score)

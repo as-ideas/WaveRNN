@@ -85,7 +85,7 @@ if __name__ == '__main__':
     dataset = itertools.chain(train_set, val_set)
 
     print('Performing model inference...')
-    for batch in tqdm(dataset, total=len(train_set) + len(val_set)):
+    for batch in tqdm(dataset, total=len(val_set)+len(train_set)):
         batch = to_device(batch, device=device)
         with torch.no_grad():
             _, _, att_batch = model(batch['x'], batch['mel'], batch['speaker_emb'])
