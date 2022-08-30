@@ -292,7 +292,7 @@ class ForwardDataset(Dataset):
         pitch = np.load(str(self.path/'phon_pitch'/f'{item_id}.npy'))
         energy = np.load(str(self.path/'phon_energy'/f'{item_id}.npy'))
         speaker_emb = np.load(str(self.path/'speaker_emb'/f'{item_id}.npy'))
-        flair_emb = np.load(str(self.path/'emb_bert'/f'{item_id}.npy'))
+        flair_emb = np.load(str(self.path/'emb_bert'/f'bild_{item_id}.npy'))
 
         dur_hat = dur.copy()
         pitch_hat = pitch.copy()
