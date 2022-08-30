@@ -149,9 +149,9 @@ def get_tts_datasets(path: Path,
     train_data = unpickle_binary(path/'train_dataset.pkl')
     olen = len(train_data)
 
-    train_data = [t for t in train_data if Path(f'data_bild_librivox/emb_bert/bild_{t[0]}.npy').is_file()]
+    #train_data = [t for t in train_data if Path(f'data_bild_librivox/emb_bert/bild_{t[0]}.npy').is_file()]
 
-    print('Flair size', olen, len(train_data))
+    #print('Flair size', olen, len(train_data))
     val_data = unpickle_binary(path/'val_dataset.pkl')
     text_dict = unpickle_binary(path/'text_dict.pkl')
 
@@ -297,7 +297,9 @@ class ForwardDataset(Dataset):
         pitch = np.load(str(self.path/'phon_pitch'/f'{item_id}.npy'))
         energy = np.load(str(self.path/'phon_energy'/f'{item_id}.npy'))
         speaker_emb = np.load(str(self.path/'speaker_emb'/f'{item_id}.npy'))
-        flair_emb = np.load(str(self.path/'emb_bert'/f'bild_{item_id}.npy'))
+
+        bi = item_id.replace('bild_', '')
+        flair_emb = np.load(str(self.path/'emb_bert'/f'{bi}.npy'))
 
         dur_hat = dur.copy()
         pitch_hat = pitch.copy()
