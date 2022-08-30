@@ -13,11 +13,12 @@ from utils.text.symbols import phonemes
 
 class SeriesPredictor(nn.Module):
 
-    def __init__(self, num_chars, emb_dim=64, conv_dims=256, rnn_dims=64, dropout=0.5, semb_dims=256):
+    def __init__(self, num_chars, emb_dim=64, conv_dims=256, 
+                 rnn_dims=64, dropout=0.5, semb_dims=256, flair_dims=768):
         super().__init__()
         self.embedding = Embedding(num_chars, emb_dim)
         self.convs = torch.nn.ModuleList([
-            BatchNormConv(emb_dim + semb_dims, conv_dims, 5, relu=True),
+            BatchNormConv(emb_dim + semb_dims + flair_dims, conv_dims, 5, relu=True),
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
         ])
@@ -28,11 +29,14 @@ class SeriesPredictor(nn.Module):
     def forward(self,
                 x: torch.Tensor,
                 semb: torch.Tensor,
+                semb_flair: torch.Tensor,
                 alpha: float = 1.0) -> torch.Tensor:
         x = self.embedding(x)
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
-        x = torch.cat([x, speaker_emb], dim=2)
+        speaker_emb_flair = semb_flair[:, None, :]
+        speaker_emb_flair = speaker_emb_flair.repeat(1, x.shape[1], 1)
+        x = torch.cat([x, speaker_emb, speaker_emb_flair], dim=2)
         x = x.transpose(1, 2)
         for conv in self.convs:
             x = conv(x)
@@ -87,6 +91,7 @@ class ForwardTacotron(nn.Module):
                  postnet_dropout: float,
                  n_mels: int,
                  semb_dims: int = 256,
+                 flair_dims = 768,
                  padding_value=-11.5129,
                  speaker_names: list = []):
         super().__init__()
@@ -115,7 +120,7 @@ class ForwardTacotron(nn.Module):
                            proj_channels=[prenet_dims, embed_dims],
                            num_highways=prenet_num_highways,
                            dropout=prenet_dropout)
-        self.lstm = nn.LSTM(2 * prenet_dims + semb_dims,
+        self.lstm = nn.LSTM(2 * prenet_dims + semb_dims + flair_dims,
                             rnn_dims,
                             batch_first=True,
                             bidirectional=True)
@@ -130,8 +135,8 @@ class ForwardTacotron(nn.Module):
         self.post_proj = nn.Linear(2 * postnet_dims, n_mels, bias=False)
         self.pitch_strength = pitch_strength
         self.energy_strength = energy_strength
-        self.pitch_proj = nn.Conv1d(1, 2 * prenet_dims + semb_dims, kernel_size=3, padding=1)
-        self.energy_proj = nn.Conv1d(1, 2 * prenet_dims + semb_dims, kernel_size=3, padding=1)
+        self.pitch_proj = nn.Conv1d(1, 2 * prenet_dims + semb_dims + flair_dims, kernel_size=3, padding=1)
+        self.energy_proj = nn.Conv1d(1, 2 * prenet_dims + semb_dims + flair_dims, kernel_size=3, padding=1)
         for speaker_name in speaker_names:
             self.register_buffer(speaker_name, torch.zeros(semb_dims, dtype=torch.float))
 
@@ -144,6 +149,7 @@ class ForwardTacotron(nn.Module):
         mel = batch['mel']
         dur = batch['dur']
         semb = batch['speaker_emb']
+        semb_flair = batch['flair_emb']
         mel_lens = batch['mel_len']
         pitch = batch['pitch'].unsqueeze(1)
         energy = batch['energy'].unsqueeze(1)
@@ -151,16 +157,18 @@ class ForwardTacotron(nn.Module):
         if self.training:
             self.step += 1
 
-        dur_hat = self.dur_pred(x, semb).squeeze(-1)
-        pitch_hat = self.pitch_pred(x, semb).transpose(1, 2)
-        energy_hat = self.energy_pred(x, semb).transpose(1, 2)
+        dur_hat = self.dur_pred(x, semb, semb_flair).squeeze(-1)
+        pitch_hat = self.pitch_pred(x, semb, semb_flair).transpose(1, 2)
+        energy_hat = self.energy_pred(x, semb, semb_flair).transpose(1, 2)
 
         x = self.embedding(x)
         x = x.transpose(1, 2)
         x = self.prenet(x)
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
-        x = torch.cat([x, speaker_emb], dim=2)
+        emb_flair = semb[:, None, :]
+        emb_flair = emb_flair.repeat(1, x.shape[1], 1)
+        x = torch.cat([x, speaker_emb, emb_flair], dim=2)
 
         pitch_proj = self.pitch_proj(pitch)
         pitch_proj = pitch_proj.transpose(1, 2)
@@ -242,7 +250,9 @@ class ForwardTacotron(nn.Module):
         x = self.prenet(x)
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
-        x = torch.cat([x, speaker_emb], dim=2)
+        emb_flair = semb[:, None, :]
+        emb_flair = emb_flair.repeat(1, x.shape[1], 1)
+        x = torch.cat([x, speaker_emb, emb_flair], dim=2)
 
         pitch_proj = self.pitch_proj(pitch_hat)
         pitch_proj = pitch_proj.transpose(1, 2)
