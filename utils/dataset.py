@@ -149,9 +149,9 @@ def get_tts_datasets(path: Path,
     train_data = unpickle_binary(path/'train_dataset.pkl')
     olen = len(train_data)
 
-    #train_data = [t for t in train_data if Path(f'data_bild_librivox/emb_bert/bild_{t[0]}.npy').is_file()]
+    train_data = [t for t in train_data if Path(f'data_bild_librivox/emb_bert/{t[0].replace("r_", "bild_r_")}.npy').is_file()]
 
-    #print('Flair size', olen, len(train_data))
+    print('Flair size', olen, len(train_data))
     val_data = unpickle_binary(path/'val_dataset.pkl')
     text_dict = unpickle_binary(path/'text_dict.pkl')
 

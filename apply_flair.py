@@ -33,4 +33,5 @@ if __name__ == '__main__':
             embedding_de.embed(sent)
         emb = sent.embedding.detach().numpy()
         print(emb.shape)
+        id = id.replace('bild_', '')
         np.save(f'/Users/cschaefe/workspace/ForwardTacotron/data/emb_bert/{id}.npy', emb, allow_pickle=False)
