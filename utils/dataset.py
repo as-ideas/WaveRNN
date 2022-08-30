@@ -298,7 +298,7 @@ class ForwardDataset(Dataset):
         energy = np.load(str(self.path/'phon_energy'/f'{item_id}.npy'))
         speaker_emb = np.load(str(self.path/'speaker_emb'/f'{item_id}.npy'))
 
-        bi = item_id.replace('bild_', '')
+        bi = item_id.replace('r_', 'bild_r_')
         flair_emb = np.load(str(self.path/'emb_bert'/f'{bi}.npy'))
 
         dur_hat = dur.copy()
