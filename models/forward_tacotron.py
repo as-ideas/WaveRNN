@@ -166,7 +166,7 @@ class ForwardTacotron(nn.Module):
         x = self.prenet(x)
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
-        emb_flair = semb[:, None, :]
+        emb_flair = semb_flair[:, None, :]
         emb_flair = emb_flair.repeat(1, x.shape[1], 1)
         x = torch.cat([x, speaker_emb, emb_flair], dim=2)
 
