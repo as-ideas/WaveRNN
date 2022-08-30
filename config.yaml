@@ -45,8 +45,8 @@ preprocessing:
   min_text_len: 2
   extract_durations_with_dijkstra: True    # slower but much more robust than simply counting attention peaks
 
-  num_asvoice: 100
-  num_other: 999999
+  num_asvoice: 99999
+  num_other: 0
 
 tacotron:
 
