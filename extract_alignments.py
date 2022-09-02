@@ -41,7 +41,7 @@ class Processor:
         x = self.tokenizer(x)
         mel = np.load(self.paths.mel / f'{item_id}.npy')
         mel = torch.from_numpy(mel)
-        x = torch.tensor(x).unsqueeze(0)
+        x = torch.tensor(x)
         att_npy = np.load(str(self.paths.att_pred / f'{item_id}.npy'), mmap_mode='r', allow_pickle=False)
         att = torch.from_numpy(att_npy)
         mel_len = torch.tensor(mel_len).unsqueeze(0)
