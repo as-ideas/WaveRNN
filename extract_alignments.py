@@ -44,6 +44,7 @@ class Processor:
         x = torch.tensor(x).unsqueeze(0)
         att_npy = np.load(str(self.paths.att_pred / f'{item_id}.npy'), mmap_mode='r', allow_pickle=False)
         att = torch.from_numpy(att_npy)
+        mel_len = torch.tensor(mel_len).unsqueeze(0)
         align_score, _ = attention_score(att.unsqueeze(0), mel_len, r=1)
         durs, att_score = self.duration_extractor(x=x, mel=mel, att=att)
         durs_npy = np_now(durs).astype(np.int)
