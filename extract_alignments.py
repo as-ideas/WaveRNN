@@ -73,17 +73,18 @@ if __name__ == '__main__':
     processor = Processor(duration_extractor=duration_extractor,
                           att_pred_path=paths.att_pred,
                           alg_path=paths.alg)
+    pool = Pool(processes=12)
+
     train_set, val_set = get_tts_datasets(paths.data, 1, 1,
                                           max_mel_len=None,
                                           filter_attention=False)
     dataset = itertools.chain(train_set, val_set)
+    pbar = tqdm(pool.imap_unordered(processor, dataset), total=len(val_set)+len(train_set))
     att_scores = []
-    with Pool(processes=12) as p:
-        for res in p.imap_unordered(processor, dataset):
-            att_score_dict[res.item_id] = (res.align_score, res.att_score)
-            att_scores.append(res.att_score)
-            print(f'Avg align score: {sum(att_scores) / len(att_scores)}')
-            #pbar.set_description(f'Avg align score: {sum(att_scores) / len(att_scores)}', refresh=True)
+    for res in pbar:
+        att_score_dict[res.item_id] = (res.align_score, res.att_score)
+        att_scores.append(res.att_score)
+        pbar.set_description(f'Avg align score: {sum(att_scores) / len(att_scores)}', refresh=True)
 
     pickle_binary(att_score_dict, paths.data / 'att_score_dict.pkl')
     print('done.')
