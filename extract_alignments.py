@@ -13,6 +13,7 @@ from utils.metrics import attention_score
 from utils.paths import Paths
 from utils.text.tokenizer import Tokenizer
 
+torch.multiprocessing.set_sharing_strategy('file_system')
 
 @dataclass
 class ProcessorResult:
