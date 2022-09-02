@@ -79,11 +79,11 @@ if __name__ == '__main__':
     dataset = itertools.chain(train_set, val_set)
     att_scores = []
     with Pool(processes=12) as p:
-        pbar = tqdm(p.imap_unordered(processor, dataset), total=len(val_set)+len(train_set))
-        for res in pbar:
+        for res in p.imap_unordered(processor, dataset):
             att_score_dict[res.item_id] = (res.align_score, res.att_score)
             att_scores.append(res.att_score)
-            pbar.set_description(f'Avg align score: {sum(att_scores) / len(att_scores)}', refresh=True)
+            print(f'Avg align score: {sum(att_scores) / len(att_scores)}')
+            #pbar.set_description(f'Avg align score: {sum(att_scores) / len(att_scores)}', refresh=True)
 
     pickle_binary(att_score_dict, paths.data / 'att_score_dict.pkl')
     print('done.')
