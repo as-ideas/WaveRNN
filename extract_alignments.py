@@ -2,7 +2,7 @@
 
 import itertools
 from dataclasses import dataclass
-from multiprocessing import Pool
+from torch.multiprocessing import Pool
 from pathlib import Path
 
 import torch
