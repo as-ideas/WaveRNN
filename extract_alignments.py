@@ -35,26 +35,30 @@ class Processor:
 
     def __call__(self, item: tuple) -> ProcessorResult:
 
-        item_id, mel_len = item
+        try:
+            item_id, mel_len = item
 
-        x = self.text_dict[item_id]
-        x = self.tokenizer(x)
-        mel = np.load(self.paths.mel / f'{item_id}.npy')
-        mel = torch.from_numpy(mel)
-        x = torch.tensor(x)
-        att_npy = np.load(str(self.paths.att_pred / f'{item_id}.npy'), mmap_mode='r', allow_pickle=False)
-        att = torch.from_numpy(att_npy)
-        mel_len = torch.tensor(mel_len).unsqueeze(0)
-        align_score, _ = attention_score(att.unsqueeze(0), mel_len, r=1)
-        durs, att_score = self.duration_extractor(x=x, mel=mel, att=att)
-        durs_npy = np_now(durs).astype(np.int)
-        np.save(str(self.paths.data / f'alg_extr/{item_id}.npy'), durs_npy, allow_pickle=False)
+            x = self.text_dict[item_id]
+            x = self.tokenizer(x)
+            mel = np.load(self.paths.mel / f'{item_id}.npy')
+            mel = torch.from_numpy(mel)
+            x = torch.tensor(x)
+            att_npy = np.load(str(self.paths.att_pred / f'{item_id}.npy'), mmap_mode='r', allow_pickle=False)
+            att = torch.from_numpy(att_npy)
+            mel_len = torch.tensor(mel_len).unsqueeze(0)
+            align_score, _ = attention_score(att.unsqueeze(0), mel_len, r=1)
+            durs, att_score = self.duration_extractor(x=x, mel=mel, att=att)
+            durs_npy = np_now(durs).astype(np.int)
+            np.save(str(self.paths.data / f'alg_extr/{item_id}.npy'), durs_npy, allow_pickle=False)
 
-        return ProcessorResult(
-            item_id=item_id,
-            align_score=align_score,
-            att_score=att_score
-        )
+            return ProcessorResult(
+                item_id=item_id,
+                align_score=align_score,
+                att_score=att_score
+            )
+        except Exception as e:
+            print(e)
+            return  ProcessorResult(item_id=None, align_score=None, att_score=None)
 
 
 if __name__ == '__main__':
@@ -80,8 +84,9 @@ if __name__ == '__main__':
     pbar = tqdm(pool.imap_unordered(processor, dataset), total=len(val_set)+len(train_set))
     att_scores = []
     for res in pbar:
-        att_score_dict[res.item_id] = (res.align_score, res.att_score)
-        att_scores.append(res.att_score)
+        if res.item_id is not None:
+            att_score_dict[res.item_id] = (res.align_score, res.att_score)
+            att_scores.append(res.att_score)
         pbar.set_description(f'Avg align score: {sum(att_scores) / len(att_scores)}', refresh=True)
 
     pickle_binary(att_score_dict, paths.data / 'att_score_dict.pkl')
