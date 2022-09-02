@@ -58,7 +58,7 @@ class Processor:
             )
         except Exception as e:
             print(e)
-            return  ProcessorResult(item_id=None, align_score=None, att_score=None)
+            return  ProcessorResult(item_id=item_id, align_score=0, att_score=0)
 
 
 if __name__ == '__main__':
