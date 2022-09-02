@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 import torch
-from multiprocessing import Pool
+from torch.multiprocessing import Pool
 from tqdm import tqdm
 
 from trainer.common import np_now
