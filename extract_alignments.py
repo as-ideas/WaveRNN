@@ -41,7 +41,7 @@ class Processor:
         mel_len = batch['mel_len'][0]
         item_id = batch['item_id'][0]
         mel = batch['mel'][0, :, :mel_len]
-        att_npy = np.load(str(self.att_pred_path / f'{item_id}.npy'))
+        att_npy = np.load(str(self.att_pred_path / f'{item_id}.npy'), mmap_mode='r', allow_pickle=False)
         att = torch.from_numpy(att_npy)
         del att_npy
 
@@ -73,7 +73,7 @@ if __name__ == '__main__':
     processor = Processor(duration_extractor=duration_extractor,
                           att_pred_path=paths.att_pred,
                           alg_path=paths.alg)
-    pool = Pool(processes=4)
+    pool = Pool(processes=12)
 
     train_set, val_set = get_tts_datasets(paths.data, 1, 1,
                                           max_mel_len=None,
