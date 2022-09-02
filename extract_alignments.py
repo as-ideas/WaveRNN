@@ -41,7 +41,7 @@ class Processor:
         x = self.tokenizer(x)
         mel = np.load(self.paths.mel / f'{item_id}.npy')
         mel = torch.from_numpy(mel).unsqueeze(0)
-        x = torch.from_numpy(x).unsqueeze(0)
+        x = torch.tensor(x).unsqueeze(0)
         att_npy = np.load(str(self.paths.att_pred / f'{item_id}.npy'), mmap_mode='r', allow_pickle=False)
         att = torch.from_numpy(att_npy)
         align_score, _ = attention_score(att.unsqueeze(0), mel_len, r=1)
