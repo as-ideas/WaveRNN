@@ -73,7 +73,7 @@ if __name__ == '__main__':
     processor = Processor(duration_extractor=duration_extractor,
                           att_pred_path=paths.att_pred,
                           alg_path=paths.alg)
-    pool = Pool(processes=12)
+    pool = Pool(processes=4)
 
     train_set, val_set = get_tts_datasets(paths.data, 1, 1,
                                           max_mel_len=None,
