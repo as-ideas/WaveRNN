@@ -47,10 +47,11 @@ class Processor:
 
         align_score, _ = attention_score(att.unsqueeze(0), batch['mel_len'], r=1)
         durs, att_score = self.duration_extractor(x=x, mel=mel, att=att)
-        durs = np_now(durs).astype(np.int)
-        np.save(str(self.alg_path / f'{item_id}.npy'), durs, allow_pickle=False)
-        print(item_id, align_score, att_score)
-        print(durs)
+        durs_npy = np_now(durs).astype(np.int)
+        np.save(str(self.alg_path / f'{item_id}.npy'), durs_npy, allow_pickle=False)
+
+        del durs
+        del durs_npy
         return ProcessorResult(
             item_id=item_id,
             align_score=align_score,
@@ -72,18 +73,17 @@ if __name__ == '__main__':
     processor = Processor(duration_extractor=duration_extractor,
                           att_pred_path=paths.att_pred,
                           alg_path=paths.alg)
-    pool = Pool(processes=12)
-
     train_set, val_set = get_tts_datasets(paths.data, 1, 1,
                                           max_mel_len=None,
                                           filter_attention=False)
     dataset = itertools.chain(train_set, val_set)
-    pbar = tqdm(pool.imap_unordered(processor, dataset), total=len(val_set)+len(train_set))
     att_scores = []
-    for res in pbar:
-        att_score_dict[res.item_id] = (res.align_score, res.att_score)
-        att_scores.append(res.att_score)
-        pbar.set_description(f'Avg align score: {sum(att_scores) / len(att_scores)}', refresh=True)
+    with Pool(processes=12) as p:
+        pbar = tqdm(p.imap_unordered(processor, dataset), total=len(val_set)+len(train_set))
+        for res in pbar:
+            att_score_dict[res.item_id] = (res.align_score, res.att_score)
+            att_scores.append(res.att_score)
+            pbar.set_description(f'Avg align score: {sum(att_scores) / len(att_scores)}', refresh=True)
 
     pickle_binary(att_score_dict, paths.data / 'att_score_dict.pkl')
     print('done.')
