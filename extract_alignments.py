@@ -41,9 +41,10 @@ class Processor:
         mel_len = batch['mel_len'][0]
         item_id = batch['item_id'][0]
         mel = batch['mel'][0, :, :mel_len]
-        with np.load(str(self.att_pred_path / f'{item_id}.npy')) as f:
-            att = f
-            att = torch.from_numpy(att)
+        att_npy = np.load(str(self.att_pred_path / f'{item_id}.npy'))
+        att = torch.from_numpy(att_npy)
+        del att_npy
+
         align_score, _ = attention_score(att.unsqueeze(0), batch['mel_len'], r=1)
         durs, att_score = self.duration_extractor(x=x, mel=mel, att=att)
         durs = np_now(durs).astype(np.int)
