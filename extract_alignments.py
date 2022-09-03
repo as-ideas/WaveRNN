@@ -51,6 +51,11 @@ class Processor:
             durs, att_score = self.duration_extractor(x=x, mel=mel, att=att)
             durs_npy = np_now(durs).astype(np.int)
             np.save(str(self.paths.data / f'alg_extr/{item_id}.npy'), durs_npy, allow_pickle=False)
+            del durs
+            del att
+            del att_npy
+            del mel
+            del x
 
             return ProcessorResult(
                 item_id=item_id,
