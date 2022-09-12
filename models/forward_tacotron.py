@@ -248,9 +248,9 @@ class ForwardTacotron(nn.Module):
         self.eval()
         with torch.no_grad():
             pitch_p_hat = self.pitch_pred_p(x, semb).squeeze(-1)
-            pitch_p_hat = torch.argmax(pitch_p_hat.squeeze(), dim=1).long()
+            pitch_p_hat = torch.argmax(pitch_p_hat.squeeze(), dim=1).long().unsqueeze(0)
             dur_hat = self.dur_pred(x, pitch_p_hat, semb).squeeze(-1)
-            dur_hat = dur_hat.squeeze(2)
+            #dur_hat = dur_hat.squeeze(2)
             if torch.sum(dur_hat.long()) <= 0:
                 torch.fill_(dur_hat, value=2.)
             pitch_hat = self.pitch_pred(x, pitch_p_hat, semb).transpose(1, 2)

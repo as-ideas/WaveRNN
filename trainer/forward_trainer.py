@@ -99,7 +99,8 @@ class ForwardTrainer:
                 loss = m1_loss + m2_loss \
                        + self.train_cfg['dur_loss_factor'] * dur_loss \
                        + self.train_cfg['pitch_loss_factor'] * pitch_loss \
-                       + self.train_cfg['energy_loss_factor'] * energy_loss
+                       + self.train_cfg['energy_loss_factor'] * energy_loss \
+                       + pitch_p_loss
 
                 optimizer.zero_grad()
                 loss.backward()
