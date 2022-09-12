@@ -259,6 +259,7 @@ class ForwardTacotron(nn.Module):
             energy_hat = energy_function(energy_hat)
             return self._generate_mel(x=x, dur_hat=dur_hat,
                                       pitch_hat=pitch_hat,
+                                      pitch_p_hat=pitch_p_hat,
                                       energy_hat=energy_hat, semb=semb)
 
     @torch.jit.export
@@ -285,6 +286,7 @@ class ForwardTacotron(nn.Module):
                       semb: torch.Tensor,
                       dur_hat: torch.Tensor,
                       pitch_hat: torch.Tensor,
+                      pitch_p_hat: torch,
                       energy_hat: torch.Tensor) -> Dict[str, torch.Tensor]:
         x = self.embedding(x)
         x = x.transpose(1, 2)
@@ -313,7 +315,7 @@ class ForwardTacotron(nn.Module):
         x_post = x_post.transpose(1, 2)
 
         return {'mel': x, 'mel_post': x_post, 'dur': dur_hat,
-                'pitch': pitch_hat, 'energy': energy_hat}
+                'pitch': pitch_hat, 'energy': energy_hat, 'pitch_p': pitch_p_hat}
 
     def _pad(self, x: torch.Tensor, max_len: int) -> torch.Tensor:
         x = x[:, :, :max_len]
