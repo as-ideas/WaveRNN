@@ -1,7 +1,7 @@
 
 voc_model_id: 'ljspeech_voc'
-tts_model_id: 'librivox_09_tts'
-data_path: 'data_librivox_new'                                        # output data path
+tts_model_id: 'multi_librivox_bild_welt_pitch_p_tts'
+data_path: 'data_multi_librivox_bild_welt'                                        # output data path
 
 tts_model: 'forward_tacotron'                             # choices: [forward_tacotron, fast_pitch]
 
@@ -124,7 +124,7 @@ forward_tacotron:
     max_mel_len: 1250
     clip_grad_norm: 1.0           # clips the gradient norm to prevent explosion - set to None if not needed
     checkpoint_every: 50_000      # checkpoints the model every x steps
-    plot_every: 5              # generates samples and plots every x steps
+    plot_every: 5000              # generates samples and plots every x steps
 
     min_trans_prob: 0.7
     min_trans_sim: 0.9
