@@ -289,7 +289,7 @@ class ForwardDataset(Dataset):
         mel = np.load(str(self.path/'mel'/f'{item_id}.npy'))
         mel_len = mel.shape[-1]
         dur = np.load(str(self.path/'alg'/f'{item_id}.npy'))
-        pitch = np.load(str(self.path/'phon_pitch'/f'{item_id}.npy'))
+        pitch = np.load(str(self.path/'phon_pitch_mean'/f'{item_id}.npy'))
         energy = np.load(str(self.path/'phon_energy'/f'{item_id}.npy'))
         speaker_emb = np.load(str(self.path/'speaker_emb'/f'{item_id}.npy'))
 
