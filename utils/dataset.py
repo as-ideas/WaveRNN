@@ -1,4 +1,5 @@
 import torch
+from numpy.polynomial import Polynomial
 from torch.utils.data.sampler import Sampler
 from torch.utils.data import Dataset, DataLoader
 from typing import List, Dict, Union, Tuple
@@ -292,6 +293,11 @@ class ForwardDataset(Dataset):
         pitch = np.load(str(self.path/'phon_pitch'/f'{item_id}.npy'))
         energy = np.load(str(self.path/'phon_energy'/f'{item_id}.npy'))
         speaker_emb = np.load(str(self.path/'speaker_emb'/f'{item_id}.npy'))
+        pitch_soft_hat = pitch.copy()
+        pitch_soft_hat[pitch_soft_hat == 0] = 1
+        pitch_soft_hat[pitch_soft_hat < 0] = 2
+        pitch_soft_hat[pitch_soft_hat > 0] = 3
+        pitch_p = pitch_soft_hat
 
         dur_hat = dur.copy()
         pitch_hat = pitch.copy()
@@ -299,6 +305,9 @@ class ForwardDataset(Dataset):
         for i, (t, d) in enumerate(zip(text, dur_hat[:])):
             if t == ',' and i < len(dur_hat) - 1:
                 dur_hat[i+1] = max(dur_hat[i+1], 15)
+
+
+
         #if text.endswith('?'):
         #    if pitch_hat[-3] - pitch_hat[-4] < 0.5:
         #        pitch_hat[-3] = pitch_hat[-4] + 0.5
@@ -309,7 +318,8 @@ class ForwardDataset(Dataset):
 
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
                 'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy,
-                'dur_hat': dur_hat, 'pitch_hat': pitch_hat, 'speaker_emb': speaker_emb}
+                'dur_hat': dur_hat, 'pitch_hat': pitch_hat, 'speaker_emb': speaker_emb,
+                'pitch_p': pitch_p}
 
     def __len__(self):
         return len(self.metadata)
@@ -345,7 +355,7 @@ def collate_tts(batch: List[Dict[str, Union[str, torch.tensor]]], r: int) -> Dic
     speaker_emb = np.stack(speaker_emb)
     speaker_emb = torch.tensor(speaker_emb).float()
 
-    dur, pitch, energy, dur_hat, pitch_hat = None, None, None, None, None
+    dur, pitch, energy, dur_hat, pitch_hat, pitch_p = None, None, None, None, None, None
     if 'pitch_hat' in batch[0]:
         pitch_hat = [pad1d(b['pitch_hat'][:max_x_len], max_x_len) for b in batch]
         pitch_hat = np.stack(pitch_hat)
@@ -362,6 +372,10 @@ def collate_tts(batch: List[Dict[str, Union[str, torch.tensor]]], r: int) -> Dic
         pitch = [pad1d(b['pitch'][:max_x_len], max_x_len) for b in batch]
         pitch = np.stack(pitch)
         pitch = torch.tensor(pitch).float()
+    if 'pitch_p' in batch[0]:
+        pitch_p = [pad1d(b['pitch_p'][:max_x_len], max_x_len) for b in batch]
+        pitch_p = np.stack(pitch_p)
+        pitch_p = torch.tensor(pitch_p).float()
     if 'energy' in batch[0]:
         energy = [pad1d(b['energy'][:max_x_len], max_x_len) for b in batch]
         energy = np.stack(energy)

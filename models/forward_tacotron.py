@@ -13,7 +13,8 @@ from utils.text.symbols import phonemes
 
 class SeriesPredictor(nn.Module):
 
-    def __init__(self, num_chars, emb_dim=64, conv_dims=256, rnn_dims=64, dropout=0.5, semb_dims=256):
+    def __init__(self, num_chars, emb_dim=64, conv_dims=256,
+                 rnn_dims=64, dropout=0.5, semb_dims=256, nout=1):
         super().__init__()
         self.embedding = Embedding(num_chars, emb_dim)
         self.convs = torch.nn.ModuleList([
@@ -22,7 +23,7 @@ class SeriesPredictor(nn.Module):
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
         ])
         self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
-        self.lin = nn.Linear(2 * rnn_dims, 1)
+        self.lin = nn.Linear(2 * rnn_dims, nout)
         self.dropout = dropout
 
     def forward(self,
@@ -33,6 +34,42 @@ class SeriesPredictor(nn.Module):
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
         x = torch.cat([x, speaker_emb], dim=2)
+        x = x.transpose(1, 2)
+        for conv in self.convs:
+            x = conv(x)
+            x = F.dropout(x, p=self.dropout, training=self.training)
+        x = x.transpose(1, 2)
+        x, _ = self.rnn(x)
+        x = self.lin(x)
+        return x / alpha
+
+
+class SeriesPredictorPitch(nn.Module):
+
+    def __init__(self, num_chars, emb_dim=64, emb_dim_p=8, conv_dims=256,
+                 rnn_dims=64, dropout=0.5, semb_dims=256):
+        super().__init__()
+        self.embedding = Embedding(num_chars, emb_dim)
+        self.embedding_p = Embedding(4, emb_dim_p)
+        self.convs = torch.nn.ModuleList([
+            BatchNormConv(emb_dim + emb_dim_p + semb_dims, conv_dims, 5, relu=True),
+            BatchNormConv(conv_dims, conv_dims, 5, relu=True),
+            BatchNormConv(conv_dims, conv_dims, 5, relu=True),
+        ])
+        self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
+        self.lin = nn.Linear(2 * rnn_dims, 1)
+        self.dropout = dropout
+
+    def forward(self,
+                x: torch.Tensor,
+                x_p: torch.Tensor,
+                semb: torch.Tensor,
+                alpha: float = 1.0) -> torch.Tensor:
+        x = self.embedding(x)
+        x_p = self.embedding(x_p)
+        speaker_emb = semb[:, None, :]
+        speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
+        x = torch.cat([x, x_p, speaker_emb], dim=2)
         x = x.transpose(1, 2)
         for conv in self.convs:
             x = conv(x)
@@ -94,16 +131,22 @@ class ForwardTacotron(nn.Module):
         self.padding_value = padding_value
         self.embedding = nn.Embedding(num_chars, embed_dims)
         self.lr = LengthRegulator()
-        self.dur_pred = SeriesPredictor(num_chars=num_chars,
-                                        emb_dim=series_embed_dims,
-                                        conv_dims=durpred_conv_dims,
-                                        rnn_dims=durpred_rnn_dims,
-                                        dropout=durpred_dropout)
-        self.pitch_pred = SeriesPredictor(num_chars=num_chars,
-                                          emb_dim=series_embed_dims,
-                                          conv_dims=pitch_conv_dims,
-                                          rnn_dims=pitch_rnn_dims,
-                                          dropout=pitch_dropout)
+        self.dur_pred = SeriesPredictorPitch(num_chars=num_chars,
+                                             emb_dim=series_embed_dims,
+                                             conv_dims=durpred_conv_dims,
+                                             rnn_dims=durpred_rnn_dims,
+                                             dropout=durpred_dropout)
+        self.pitch_pred_p = SeriesPredictor(num_chars=num_chars,
+                                            emb_dim=series_embed_dims,
+                                            conv_dims=pitch_conv_dims,
+                                            rnn_dims=pitch_rnn_dims,
+                                            dropout=pitch_dropout,
+                                            nout=4)
+        self.pitch_pred = SeriesPredictorPitch(num_chars=num_chars,
+                                               emb_dim=series_embed_dims,
+                                               conv_dims=pitch_conv_dims,
+                                               rnn_dims=pitch_rnn_dims,
+                                               dropout=pitch_dropout,)
         self.energy_pred = SeriesPredictor(num_chars=num_chars,
                                            emb_dim=series_embed_dims,
                                            conv_dims=energy_conv_dims,
@@ -146,13 +189,16 @@ class ForwardTacotron(nn.Module):
         semb = batch['speaker_emb']
         mel_lens = batch['mel_len']
         pitch = batch['pitch'].unsqueeze(1)
+        pitch_p = batch['pitch_p'].unsqueeze(1)
         energy = batch['energy'].unsqueeze(1)
 
         if self.training:
             self.step += 1
 
-        dur_hat = self.dur_pred(x, semb).squeeze(-1)
-        pitch_hat = self.pitch_pred(x, semb).transpose(1, 2)
+        pitch_p_hat = self.pitch_pred(x, semb).squeeze(-1)
+
+        dur_hat = self.dur_pred(x, pitch_p, semb).squeeze(-1)
+        pitch_hat = self.pitch_pred(x, pitch_p, semb).transpose(1, 2)
         energy_hat = self.energy_pred(x, semb).transpose(1, 2)
 
         x = self.embedding(x)
@@ -190,7 +236,8 @@ class ForwardTacotron(nn.Module):
         x = self._pad(x, mel.size(2))
 
         return {'mel': x, 'mel_post': x_post,
-                'dur': dur_hat, 'pitch': pitch_hat, 'energy': energy_hat}
+                'dur': dur_hat, 'pitch': pitch_hat,
+                'energy': energy_hat, 'pitch_p_hat': pitch_p_hat}
 
     def generate(self,
                  x: torch.Tensor,
@@ -200,11 +247,13 @@ class ForwardTacotron(nn.Module):
                  energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, torch.Tensor]:
         self.eval()
         with torch.no_grad():
-            dur_hat = self.dur_pred(x, semb, alpha=alpha)
+            pitch_p_hat = self.pitch_pred(x, semb).squeeze(-1)
+            pitch_p_hat = torch.argmax(pitch_p_hat.squeeze(), dim=1)
+            dur_hat = self.dur_pred(x, pitch_p_hat, semb).squeeze(-1)
             dur_hat = dur_hat.squeeze(2)
             if torch.sum(dur_hat.long()) <= 0:
                 torch.fill_(dur_hat, value=2.)
-            pitch_hat = self.pitch_pred(x, semb).transpose(1, 2)
+            pitch_hat = self.pitch_pred(x, pitch_p_hat, semb).transpose(1, 2)
             pitch_hat = pitch_function(pitch_hat)
             energy_hat = self.energy_pred(x, semb).transpose(1, 2)
             energy_hat = energy_function(energy_hat)
