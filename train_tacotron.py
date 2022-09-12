@@ -22,22 +22,22 @@ from utils.paths import Paths
 
 def normalize_values(phoneme_val):
 
-    nonzeros = np.concatenate([v[np.where(v != 0.0)[0]]
-                               for item_id, v in phoneme_val])
-    mean, std = np.mean(nonzeros), np.std(nonzeros)
-    if not std > 0:
-        print('Std was zero!')
-        std = 1e10
 
     for item_id, v in phoneme_val:
+        nonzeros = v[np.where(v != 0.0)[0]]
         zero_idxs = np.where(v == 0.0)[0]
-        nz = v[np.where(v != 0.0)[0]]
-        mean = np.mean(nz)
-        i_std = np.std(nz)
+        mean = np.mean(nonzeros)
         v -= mean
-        v /= std
         v[zero_idxs] = 0.0
-        print('item_id, pitch mean, std, tot std', item_id, mean, i_std, std)
+        print('item_id, pitch mean', item_id, mean)
+
+    nonzeros = np.concatenate([v[np.where(v != 0.0)[0]]
+                               for item_id, v in phoneme_val])
+    std = np.std(nonzeros)
+
+    for item_id, v in phoneme_val:
+        v /= std
+
     return mean, std
 
 
