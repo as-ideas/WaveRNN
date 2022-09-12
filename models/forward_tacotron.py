@@ -237,7 +237,8 @@ class ForwardTacotron(nn.Module):
 
         return {'mel': x, 'mel_post': x_post,
                 'dur': dur_hat, 'pitch': pitch_hat,
-                'energy': energy_hat, 'pitch_p_hat': pitch_p_hat}
+                'energy': energy_hat, 'pitch_p': pitch_p_hat}
+
 
     def generate(self,
                  x: torch.Tensor,

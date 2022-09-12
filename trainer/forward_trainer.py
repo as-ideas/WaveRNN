@@ -190,7 +190,6 @@ class ForwardTrainer:
         device = next(model.parameters()).device
         batch = session.val_sample
         batch = to_device(batch, device=device)
-        print(batch['pitch_p'])
 
         pred = model(batch)
         m1_hat = np_now(pred['mel'])[0, :600, :]
