@@ -130,6 +130,7 @@ class ForwardTrainer:
 
                 self.writer.add_scalar('Mel_Loss/train', m1_loss + m2_loss, model.get_step())
                 self.writer.add_scalar('Pitch_Loss/train', pitch_loss, model.get_step())
+                self.writer.add_scalar('Pitch_P_Loss/train', pitch_p_loss, model.get_step())
                 self.writer.add_scalar('Energy_Loss/train', energy_loss, model.get_step())
                 self.writer.add_scalar('Duration_Loss/train', dur_loss, model.get_step())
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
