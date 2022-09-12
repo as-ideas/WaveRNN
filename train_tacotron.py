@@ -52,22 +52,25 @@ def extract_pitch_energy(save_path_pitch: Path,
     phoneme_pitches = []
     phoneme_energies = []
     for prog_idx, (item_id, mel_len) in enumerate(all_data, 1):
-        dur = np.load(paths.alg / f'{item_id}.npy')
-        mel = np.load(paths.mel / f'{item_id}.npy')
-        energy = np.linalg.norm(np.exp(mel), axis=0, ord=2)
-        assert np.sum(dur) == mel_len
-        pitch = np.load(paths.raw_pitch / f'{item_id}.npy')
-        durs_cum = np.cumsum(np.pad(dur, (1, 0)))
-        pitch_char = np.zeros((dur.shape[0],), dtype=np.float32)
-        energy_char = np.zeros((dur.shape[0],), dtype=np.float32)
-        for idx, a, b in zip(range(mel_len), durs_cum[:-1], durs_cum[1:]):
-            values = pitch[a:b][np.where(pitch[a:b] != 0.0)[0]]
-            values = values[np.where(values < pitch_max_freq)[0]]
-            pitch_char[idx] = np.mean(values) if len(values) > 0 else 0.0
-            energy_values = energy[a:b]
-            energy_char[idx] = np.mean(energy_values)if len(energy_values) > 0 else 0.0
-        phoneme_pitches.append((item_id, pitch_char))
-        phoneme_energies.append((item_id, energy_char))
+        try:
+            dur = np.load(paths.alg / f'{item_id}.npy')
+            mel = np.load(paths.mel / f'{item_id}.npy')
+            energy = np.linalg.norm(np.exp(mel), axis=0, ord=2)
+            assert np.sum(dur) == mel_len
+            pitch = np.load(paths.raw_pitch / f'{item_id}.npy')
+            durs_cum = np.cumsum(np.pad(dur, (1, 0)))
+            pitch_char = np.zeros((dur.shape[0],), dtype=np.float32)
+            energy_char = np.zeros((dur.shape[0],), dtype=np.float32)
+            for idx, a, b in zip(range(mel_len), durs_cum[:-1], durs_cum[1:]):
+                values = pitch[a:b][np.where(pitch[a:b] != 0.0)[0]]
+                values = values[np.where(values < pitch_max_freq)[0]]
+                pitch_char[idx] = np.mean(values) if len(values) > 0 else 0.0
+                energy_values = energy[a:b]
+                energy_char[idx] = np.mean(energy_values)if len(energy_values) > 0 else 0.0
+            phoneme_pitches.append((item_id, pitch_char))
+            phoneme_energies.append((item_id, energy_char))
+        except Exception as e:
+            print(e)
         bar = progbar(prog_idx, len(all_data))
         msg = f'{bar} {prog_idx}/{len(all_data)} Files '
         stream(msg)
