@@ -316,7 +316,7 @@ class ForwardTacotron(nn.Module):
         x_post = x_post.transpose(1, 2)
 
         return {'mel': x, 'mel_post': x_post, 'dur': dur_hat,
-                'pitch': pitch_hat, 'energy': energy_hat, 'pitch_p': pitch_p_hat}
+                'pitch': pitch_hat, 'energy': energy_hat, 'pitch_p': pitch_p_hat.unsqueeze(1)}
 
     def _pad(self, x: torch.Tensor, max_len: int) -> torch.Tensor:
         x = x[:, :, :max_len]
