@@ -86,7 +86,7 @@ if __name__ == '__main__':
     speaker_emb = {name: np.zeros(256) for name in speaker_names}
     speaker_norm = {name: 0. for name in speaker_names}
 
-    for f in tqdm.tqdm(sembs, total=len(sembs)):
+    for f in tqdm.tqdm(sembs[:10], total=len(sembs)):
         try:
             item_id = f.stem
             speaker_name = speaker_dict[item_id]
