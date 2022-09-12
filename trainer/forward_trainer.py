@@ -90,7 +90,7 @@ class ForwardTrainer:
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
-                pitch_p_loss = self.ce_loss(pred['pitch_p_hat'], pitch_p_target)
+                pitch_p_loss = self.ce_loss(pred['pitch_p_hat'].transpose(1, 2), pitch_p_target)
 
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur_hat'].unsqueeze(1), batch['x_len'])
                 pitch_loss = self.l1_loss(pred['pitch'], pitch_target.unsqueeze(1), batch['x_len'])
@@ -140,6 +140,7 @@ class ForwardTrainer:
             self.writer.add_scalar('Mel_Loss/val', val_out['mel_loss'], model.get_step())
             self.writer.add_scalar('Duration_Loss/val', val_out['dur_loss'], model.get_step())
             self.writer.add_scalar('Pitch_Loss/val', val_out['pitch_loss'], model.get_step())
+            self.writer.add_scalar('Pitch_P_Loss/val', val_out['pitch_p_loss'], model.get_step())
             self.writer.add_scalar('Energy_Loss/val', val_out['energy_loss'], model.get_step())
             save_checkpoint(model=model, optim=optimizer, config=self.config,
                             path=self.paths.forward_checkpoints / 'latest_model.pt')
@@ -154,6 +155,7 @@ class ForwardTrainer:
         m_val_loss = 0
         dur_val_loss = 0
         pitch_val_loss = 0
+        pitch_p_val_loss = 0
         energy_val_loss = 0
         device = next(model.parameters()).device
         for i, batch in enumerate(val_set, 1):
@@ -164,8 +166,11 @@ class ForwardTrainer:
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur_hat'].unsqueeze(1), batch['x_len'])
                 pitch_loss = self.l1_loss(pred['pitch'], batch['pitch_hat'].unsqueeze(1), batch['x_len'])
+                pitch_p_loss = self.ce_loss(pred['pitch_p_hat'].transpose(1, 2), batch['pitch_p'])
+
                 energy_loss = self.l1_loss(pred['energy'], batch['energy'].unsqueeze(1), batch['x_len'])
                 pitch_val_loss += pitch_loss
+                pitch_p_val_loss += pitch_p_loss
                 energy_val_loss += energy_loss
                 m_val_loss += m1_loss.item() + m2_loss.item()
                 dur_val_loss += dur_loss.item()
@@ -173,6 +178,7 @@ class ForwardTrainer:
             'mel_loss': m_val_loss / len(val_set),
             'dur_loss': dur_val_loss / len(val_set),
             'pitch_loss': pitch_val_loss / len(val_set),
+            'pitch_p_loss': pitch_p_val_loss / len(val_set),
             'energy_loss': energy_val_loss / len(val_set)
         }
 
@@ -193,11 +199,15 @@ class ForwardTrainer:
         m_target_fig = plot_mel(m_target)
         pitch_fig = plot_pitch(np_now(batch['pitch'][0]))
         pitch_gta_fig = plot_pitch(np_now(pred['pitch'].squeeze()[0]))
+        pitch_p_fig = plot_pitch(np_now(batch['pitch'][0]))
+        pitch_p_gta_fig = plot_pitch(np_now(pred['pitch'].squeeze()[0]))
         energy_fig = plot_pitch(np_now(batch['energy'][0]))
         energy_gta_fig = plot_pitch(np_now(pred['energy'].squeeze()[0]))
 
         self.writer.add_figure('Pitch/target', pitch_fig, model.step)
         self.writer.add_figure('Pitch/ground_truth_aligned', pitch_gta_fig, model.step)
+        self.writer.add_figure('Pitch_P/target', pitch_p_fig, model.step)
+        self.writer.add_figure('Pitch_P/ground_truth_aligned', pitch_p_gta_fig, model.step)
         self.writer.add_figure('Energy/target', energy_fig, model.step)
         self.writer.add_figure('Energy/ground_truth_aligned', energy_gta_fig, model.step)
         self.writer.add_figure('Ground_Truth_Aligned/target', m_target_fig, model.step)

@@ -375,7 +375,7 @@ def collate_tts(batch: List[Dict[str, Union[str, torch.tensor]]], r: int) -> Dic
     if 'pitch_p' in batch[0]:
         pitch_p = [pad1d(b['pitch_p'][:max_x_len], max_x_len) for b in batch]
         pitch_p = np.stack(pitch_p)
-        pitch_p = torch.tensor(pitch_p).float()
+        pitch_p = torch.tensor(pitch_p).long().squeeze(1)
     if 'energy' in batch[0]:
         energy = [pad1d(b['energy'][:max_x_len], max_x_len) for b in batch]
         energy = np.stack(energy)
@@ -383,7 +383,8 @@ def collate_tts(batch: List[Dict[str, Union[str, torch.tensor]]], r: int) -> Dic
 
     return {'x': text, 'mel': mel, 'item_id': item_id, 'x_len': x_len,
             'mel_len': mel_lens, 'dur': dur, 'pitch': pitch,
-            'energy': energy, 'dur_hat': dur_hat, 'pitch_hat': pitch_hat, 'speaker_emb': speaker_emb}
+            'energy': energy, 'dur_hat': dur_hat, 'pitch_hat': pitch_hat,
+            'speaker_emb': speaker_emb, 'pitch_p': pitch_p}
 
 
 class BinnedLengthSampler(Sampler):

@@ -66,7 +66,7 @@ class SeriesPredictorPitch(nn.Module):
                 semb: torch.Tensor,
                 alpha: float = 1.0) -> torch.Tensor:
         x = self.embedding(x)
-        x_p = self.embedding(x_p)
+        x_p = self.embedding_p(x_p)
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
         x = torch.cat([x, x_p, speaker_emb], dim=2)
@@ -189,13 +189,13 @@ class ForwardTacotron(nn.Module):
         semb = batch['speaker_emb']
         mel_lens = batch['mel_len']
         pitch = batch['pitch'].unsqueeze(1)
-        pitch_p = batch['pitch_p'].unsqueeze(1)
+        pitch_p = batch['pitch_p']
         energy = batch['energy'].unsqueeze(1)
 
         if self.training:
             self.step += 1
 
-        pitch_p_hat = self.pitch_pred(x, semb).squeeze(-1)
+        pitch_p_hat = self.pitch_pred_p(x, semb).squeeze(-1)
 
         dur_hat = self.dur_pred(x, pitch_p, semb).squeeze(-1)
         pitch_hat = self.pitch_pred(x, pitch_p, semb).transpose(1, 2)
@@ -247,8 +247,8 @@ class ForwardTacotron(nn.Module):
                  energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, torch.Tensor]:
         self.eval()
         with torch.no_grad():
-            pitch_p_hat = self.pitch_pred(x, semb).squeeze(-1)
-            pitch_p_hat = torch.argmax(pitch_p_hat.squeeze(), dim=1)
+            pitch_p_hat = self.pitch_pred_p(x, semb).squeeze(-1)
+            pitch_p_hat = torch.argmax(pitch_p_hat.squeeze(), dim=1).long()
             dur_hat = self.dur_pred(x, pitch_p_hat, semb).squeeze(-1)
             dur_hat = dur_hat.squeeze(2)
             if torch.sum(dur_hat.long()) <= 0:
