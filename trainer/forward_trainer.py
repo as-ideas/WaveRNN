@@ -201,8 +201,11 @@ class ForwardTrainer:
         m_target_fig = plot_mel(m_target)
         pitch_fig = plot_pitch(np_now(batch['pitch'][0]))
         pitch_gta_fig = plot_pitch(np_now(pred['pitch'].squeeze()[0]))
+
+        pitch_p = pred['pitch_p'].squeeze()[0]
+        pitch_p = torch.argmax(pitch_p.squeeze(), dim=1).long()
         pitch_p_fig = plot_pitch(np_now(batch['pitch_p'][0]))
-        pitch_p_gta_fig = plot_pitch(np_now(pred['pitch_p'].squeeze()[0]))
+        pitch_p_gta_fig = plot_pitch(np_now(pitch_p))
         energy_fig = plot_pitch(np_now(batch['energy'][0]))
         energy_gta_fig = plot_pitch(np_now(pred['energy'].squeeze()[0]))
 
