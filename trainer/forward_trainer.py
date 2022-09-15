@@ -85,11 +85,16 @@ class ForwardTrainer:
 
                 pred = model(batch)
 
+                pitch_target_stft = torch.stft(batch['pitch'].squeeze(), n_fft=50, win_length=7, hop_length=1)
+                pitch_target_stft = torch.sqrt(pitch_target_stft.pow(2).sum(-1)+(1e-9))
+                pitch_stft = torch.stft(pred['pitch'].squeeze(), n_fft=50, win_length=7, hop_length=1)
+                pitch_stft = torch.sqrt(pitch_stft.pow(2).sum(-1)+(1e-9))
+
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur_hat'].unsqueeze(1), batch['x_len'])
-                pitch_loss = self.l1_loss(pred['pitch'], pitch_target.unsqueeze(1), batch['x_len'])
+                pitch_loss = self.l1_loss(pitch_stft, pitch_target_stft, batch['x_len'])
                 energy_loss = self.l1_loss(pred['energy'], energy_target.unsqueeze(1), batch['x_len'])
 
                 loss = m1_loss + m2_loss \
