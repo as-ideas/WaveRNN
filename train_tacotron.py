@@ -26,7 +26,12 @@ def normalize_values(phoneme_val):
         nonzeros = v[np.where(v != 0.0)[0]]
         zero_idxs = np.where(v == 0.0)[0]
         median = np.median(nonzeros)
+
+        mean = np.mean(nonzeros)
         std = np.std(nonzeros - median)
+
+        print('id mean med std', item_id, mean, median, std)
+
         if not std > 0:
             print('Std was zero!')
             std = 1e10
