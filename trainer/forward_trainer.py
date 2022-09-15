@@ -86,7 +86,7 @@ class ForwardTrainer:
                 pred = model(batch)
 
                 batch_pitch = pred['pitch'].squeeze()
-                pad = torch.zeros((batch_pitch.size(0), 60))
+                pad = torch.zeros((batch_pitch.size(0), 60)).to(device)
                 batch_pitch = torch.cat([batch_pitch, pad], dim=1)
                 target_pitch = batch['pitch'].squeeze()
                 target_pitch = torch.cat([target_pitch, pad], dim=1)
