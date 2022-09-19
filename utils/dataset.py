@@ -167,7 +167,7 @@ def get_tts_datasets(path: Path,
 
     train_data_new = []
     text_dict = unpickle_binary(path/'text_dict.pkl')
-    for item_id, l in train_data_new:
+    for item_id, l in train_data:
         print(item_id, text_dict[item_id])
         if item_id.startswith('bild_r') and text_dict[item_id].endswith('?'):
             train_data_new.append((item_id, l))
