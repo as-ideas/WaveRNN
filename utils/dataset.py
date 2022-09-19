@@ -165,6 +165,14 @@ def get_tts_datasets(path: Path,
 
     train_len_original = len(train_data)
 
+    train_data_new = []
+    text_dict = unpickle_binary(path/'text_dict.pkl')
+    for item_id, l in train_data_new:
+        if item_id.startswith('bild_r') and text_dict[item_id].endswith('?'):
+            train_data_new.append((item_id, l))
+
+    train_data = train_data_new
+
     if model_type == 'forward' and filter_attention:
         attention_score_dict = unpickle_binary(path/'att_score_dict.pkl')
         train_data = filter_bad_attentions(dataset=train_data,
