@@ -140,21 +140,26 @@ class SeriesPredictor(nn.Module):
                  layers: int,
                  conv1_kernel: int,
                  conv2_kernel: int,
+                 semb_dim: int = 256,
                  dropout=0.1):
         super().__init__()
         self.embedding = Embedding(num_chars, d_model)
         self.transformer = ForwardTransformer(heads=n_heads, dropout=dropout,
-                                              d_model=d_model, d_fft=d_fft,
+                                              d_model=d_model+semb_dim, d_fft=d_fft,
                                               conv1_kernel=conv1_kernel,
                                               conv2_kernel=conv2_kernel,
                                               layers=layers)
-        self.lin = nn.Linear(d_model, 1)
+        self.lin = nn.Linear(d_model+semb_dim, 1)
 
     def forward(self,
                 x: torch.Tensor,
+                semb: torch.Tensor,
                 src_pad_mask: Optional[torch.Tensor] = None,
                 alpha: float = 1.0) -> torch.Tensor:
         x = self.embedding(x)
+        speaker_emb = semb[:, None, :]
+        speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
+        x = torch.cat([x, speaker_emb], dim=2)
         x = self.transformer(x, src_pad_mask=src_pad_mask)
         x = self.lin(x)
         return x / alpha
@@ -193,6 +198,7 @@ class FastPitch(nn.Module):
                  postnet_fft: int,
                  postnet_dropout: float,
                  n_mels: int,
+                 semb_dims: int = 256,
                  padding_value=-11.5129):
         super().__init__()
         self.padding_value = padding_value
@@ -227,13 +233,13 @@ class FastPitch(nn.Module):
                                          d_model=d_model, d_fft=prenet_fft, layers=prenet_layers)
         self.postnet = ForwardTransformer(heads=postnet_heads, dropout=postnet_dropout,
                                           conv1_kernel=conv1_kernel, conv2_kernel=conv2_kernel,
-                                          d_model=d_model, d_fft=postnet_fft, layers=postnet_layers)
-        self.lin = torch.nn.Linear(d_model, n_mels)
+                                          d_model=d_model+semb_dims, d_fft=postnet_fft, layers=postnet_layers)
+        self.lin = torch.nn.Linear(d_model+semb_dims, n_mels)
         self.register_buffer('step', torch.zeros(1, dtype=torch.long))
         self.pitch_strength = pitch_strength
         self.energy_strength = energy_strength
-        self.pitch_proj = nn.Conv1d(1, d_model, kernel_size=3, padding=1)
-        self.energy_proj = nn.Conv1d(1, d_model, kernel_size=3, padding=1)
+        self.pitch_proj = nn.Conv1d(1, d_model + semb_dims, kernel_size=3, padding=1)
+        self.energy_proj = nn.Conv1d(1, d_model + semb_dims, kernel_size=3, padding=1)
 
     def __repr__(self):
         num_params = sum([np.prod(p.size()) for p in self.parameters()])
@@ -246,17 +252,22 @@ class FastPitch(nn.Module):
         mel_lens = batch['mel_len']
         pitch = batch['pitch'].unsqueeze(1)
         energy = batch['energy'].unsqueeze(1)
+        semb = batch['speaker_emb']
 
         if self.training:
             self.step += 1
 
         len_mask = make_token_len_mask(x.transpose(0, 1))
-        dur_hat = self.dur_pred(x, src_pad_mask=len_mask).squeeze(-1)
-        pitch_hat = self.pitch_pred(x, src_pad_mask=len_mask).transpose(1, 2)
-        energy_hat = self.energy_pred(x, src_pad_mask=len_mask).transpose(1, 2)
+        dur_hat = self.dur_pred(x, semb, src_pad_mask=len_mask).squeeze(-1)
+        pitch_hat = self.pitch_pred(x, semb, src_pad_mask=len_mask).transpose(1, 2)
+        energy_hat = self.energy_pred(x, semb, src_pad_mask=len_mask).transpose(1, 2)
 
         x = self.embedding(x)
         x = self.prenet(x, src_pad_mask=len_mask)
+
+        speaker_emb = semb[:, None, :]
+        speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
+        x = torch.cat([x, speaker_emb], dim=2)
 
         pitch_proj = self.pitch_proj(pitch)
         pitch_proj = pitch_proj.transpose(1, 2)
@@ -285,6 +296,7 @@ class FastPitch(nn.Module):
 
     def generate(self,
                  x: torch.Tensor,
+                 semb: torch.Tensor,
                  alpha=1.0,
                  pitch_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x,
                  energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, torch.Tensor]:
@@ -300,7 +312,7 @@ class FastPitch(nn.Module):
             energy_hat = energy_function(energy_hat)
             return self._generate_mel(x=x, dur_hat=dur_hat,
                                       pitch_hat=pitch_hat,
-                                      energy_hat=energy_hat)
+                                      energy_hat=energy_hat, semb=semb)
 
     def pad(self, x: torch.Tensor, max_len: int) -> torch.Tensor:
         x = x[:, :, :max_len]
@@ -314,12 +326,16 @@ class FastPitch(nn.Module):
                       x: torch.Tensor,
                       dur_hat: torch.Tensor,
                       pitch_hat: torch.Tensor,
-                      energy_hat: torch.Tensor) -> Dict[str, torch.Tensor]:
+                      energy_hat: torch.Tensor,
+                      semb: torch.Tensor) -> Dict[str, torch.Tensor]:
 
         len_mask = make_token_len_mask(x.transpose(0, 1))
 
         x = self.embedding(x)
         x = self.prenet(x, src_pad_mask=len_mask)
+        speaker_emb = semb[:, None, :]
+        speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
+        x = torch.cat([x, speaker_emb], dim=2)
 
         pitch_proj = self.pitch_proj(pitch_hat)
         pitch_proj = pitch_proj.transpose(1, 2)
