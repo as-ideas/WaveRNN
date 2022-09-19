@@ -87,11 +87,14 @@ if __name__ == '__main__':
     speaker_norm = {name: 0. for name in speaker_names}
 
     for f in tqdm.tqdm(sembs, total=len(sembs)):
-        item_id = f.stem
-        speaker_name = speaker_dict[item_id]
-        emb = np.load(paths.speaker_emb / f'{item_id}.npy')
-        speaker_emb[speaker_name] += emb
-        speaker_norm[speaker_name] += 1
+        try:
+            item_id = f.stem
+            speaker_name = speaker_dict[item_id]
+            emb = np.load(paths.speaker_emb / f'{item_id}.npy')
+            speaker_emb[speaker_name] += emb
+            speaker_norm[speaker_name] += 1
+        except:
+            pass
 
     optimizer = optim.Adam(model.parameters())
     restore_checkpoint(model=model, optim=optimizer,
