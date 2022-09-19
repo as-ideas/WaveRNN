@@ -1,7 +1,7 @@
 
 voc_model_id: 'ljspeech_voc'
-tts_model_id: 'librivox_09_tts'
-data_path: 'data_librivox_new'                                        # output data path
+tts_model_id: 'librivox_bild_welt_fast_pitch_tts'
+data_path: 'data_multi_librivox_bild_welt'                                        # output data path
 
 tts_model: 'fast_pitch'                             # choices: [forward_tacotron, fast_pitch]
 
@@ -173,9 +173,8 @@ fast_pitch:
 
   training:
     schedule:
-      - 1e-5,  5_000,  32         # progressive training schedule
-      - 5e-5,  100_000,  32       # lr, step, batch_size
-      - 2e-5,  300_000,  32
+      - 5e-5,  400_000,  32       # progressive training schedule
+      - 2e-5,  600_000,  32       # lr, step, batch_size
     dur_loss_factor: 0.1
     pitch_loss_factor: 0.1
     energy_loss_factor: 0.1
@@ -184,8 +183,8 @@ fast_pitch:
 
     max_mel_len: 1250
     clip_grad_norm: 1.0           # clips the gradient norm to prevent explosion - set to None if not needed
-    checkpoint_every: 10_000      # checkpoints the model every x steps
-    plot_every: 1000
+    checkpoint_every: 50_000      # checkpoints the model every x steps
+    plot_every: 5000
 
     filter_attention: True               # whether to filter data with bad attention scores
     min_attention_sharpness: 0.5         # filter data with bad attention sharpness score, if 0 then no filter
