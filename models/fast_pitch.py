@@ -302,13 +302,13 @@ class FastPitch(nn.Module):
                  energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, torch.Tensor]:
         self.eval()
         with torch.no_grad():
-            dur_hat = self.dur_pred(x, alpha=alpha)
+            dur_hat = self.dur_pred(x, semb, alpha=alpha)
             dur_hat = dur_hat.squeeze(2)
             if torch.sum(dur_hat.long()) <= 0:
                 torch.fill_(dur_hat, value=2.)
-            pitch_hat = self.pitch_pred(x).transpose(1, 2)
+            pitch_hat = self.pitch_pred(x, semb).transpose(1, 2)
             pitch_hat = pitch_function(pitch_hat)
-            energy_hat = self.energy_pred(x).transpose(1, 2)
+            energy_hat = self.energy_pred(x, semb).transpose(1, 2)
             energy_hat = energy_function(energy_hat)
             return self._generate_mel(x=x, dur_hat=dur_hat,
                                       pitch_hat=pitch_hat,
