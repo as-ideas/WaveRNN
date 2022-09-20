@@ -87,14 +87,14 @@ class ForwardTrainer:
                 pred = model(batch)
 
                 pe = torch.abs((pitch_target.unsqueeze(1) + 1e-8)).detach()
-                batch['pitch'] = batch['pitch'] * pe
-                pred['pitch'] = pred['pitch'] * pe
+                #batch['pitch'] = batch['pitch'] * pe
+                #pred['pitch'] = pred['pitch'] * pe
 
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur_hat'].unsqueeze(1), batch['x_len'])
-                pitch_loss = self.l1_loss(pred['pitch'], pitch_target.unsqueeze(1), batch['x_len'])
+                pitch_loss = self.l1_loss(pred['pitch']*pe, pitch_target.unsqueeze(1)*pe, batch['x_len'])
                 energy_loss = self.l1_loss(pred['energy'], energy_target.unsqueeze(1), batch['x_len'])
 
                 loss = m1_loss + m2_loss \
