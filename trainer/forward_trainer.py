@@ -80,10 +80,15 @@ class ForwardTrainer:
 
                 pitch_target = batch['pitch_hat'].detach().clone()
                 energy_target = batch['energy'].detach().clone()
-                batch['pitch'] = batch['pitch'] * pitch_zoneout_mask.to(device).float()
+
+
                 batch['energy'] = batch['energy'] * energy_zoneout_mask.to(device).float()
 
                 pred = model(batch)
+
+                pe = torch.abs((pitch_target.unsqueeze(1) + 1e-8)).detach()
+                batch['pitch'] = batch['pitch'] * pe
+                pred['pitch'] = pred['pitch'] * pe
 
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
