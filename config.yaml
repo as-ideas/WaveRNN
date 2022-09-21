@@ -1,7 +1,7 @@
 
 voc_model_id: 'ljspeech_voc'
 tts_model_id: 'librivox_bild_welt_09_lively_tts'
-data_path: 'data_multi_librivox_bild_welt'                                        # output data path
+data_path: 'data_librivox_new'                                        # output data path
 
 tts_model: 'forward_tacotron'                             # choices: [forward_tacotron, fast_pitch]
 
