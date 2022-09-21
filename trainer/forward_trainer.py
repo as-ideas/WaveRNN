@@ -81,7 +81,7 @@ class ForwardTrainer:
                 pitch_hat = model.pitch_pred(batch['x'], batch['speaker_emb']).transpose(1, 2)
                 model.step += 1
 
-                pe = torch.abs((pitch_target.unsqueeze(1) + 1e-8)).detach()
+                pe = (torch.abs(pitch_target.unsqueeze(1)) + 1.).detach()
 
                 pitch_loss = self.l1_loss(pitch_hat*pe, pitch_target.unsqueeze(1)*pe, batch['x_len'])
 
