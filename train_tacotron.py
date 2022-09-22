@@ -46,6 +46,7 @@ def extract_pitch_energy(save_path_pitch: Path,
     speaker_names = set([v for v in speaker_dict.values() if len(v) > 1])
     mean, var = 0, 0
     for speaker_name in speaker_names:
+        try:
             print(f'normalizing for {speaker_name}')
             train_data = unpickle_binary(paths.data / 'train_dataset.pkl')
             val_data = unpickle_binary(paths.data / 'val_dataset.pkl')
@@ -86,6 +87,8 @@ def extract_pitch_energy(save_path_pitch: Path,
                 np.save(str(save_path_pitch / f'{item_id}.npy'), phoneme_pitch, allow_pickle=False)
 
             print(f'\nPitch mean: {mean} var: {var}')
+        except Exception as e:
+            print(e)
 
     return mean, var
 
