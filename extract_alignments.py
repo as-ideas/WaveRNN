@@ -86,7 +86,7 @@ if __name__ == '__main__':
 
     print('Performing duration extraction...')
     att_score_dict = {}
-    processor = Processor(duration_extractor=duration_extraxctor,
+    processor = Processor(duration_extractor=duration_extractor,
                           tokenizer=Tokenizer(),
                           text_dict=unpickle_binary(paths.data / 'text_dict.pkl'),
                           paths=paths)
