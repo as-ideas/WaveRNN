@@ -46,30 +46,24 @@ class Processor:
             )
 
         try:
-
-            x = self.text_dict[item_id]
-            x = self.tokenizer(x)
-            mel = np.load(self.paths.mel / f'{item_id}.npy')
-            mel = torch.from_numpy(mel)
-            x = torch.tensor(x)
-            att_npy = np.load(str(self.paths.att_pred / f'{item_id}.npy'))
-            att = torch.from_numpy(att_npy)
-            mel_len = torch.tensor(mel_len).unsqueeze(0)
-            align_score, _ = attention_score(att.unsqueeze(0), mel_len, r=1)
-            durs, att_score = self.duration_extractor(x=x, mel=mel, att=att)
-            durs_npy = np_now(durs).astype(np.int)
-            np.save(str(self.paths.data / f'alg_extr/{item_id}.npy'), durs_npy, allow_pickle=False)
-            del durs
-            del att
-            del att_npy
-            del mel
-            del x
-
-            return ProcessorResult(
-                item_id=item_id,
-                align_score=align_score,
-                att_score=att_score
-            )
+            with torch.no_grad():
+                x = self.text_dict[item_id]
+                x = self.tokenizer(x)
+                mel = np.load(self.paths.mel / f'{item_id}.npy')
+                mel = torch.from_numpy(mel)
+                x = torch.tensor(x)
+                att_npy = np.load(str(self.paths.att_pred / f'{item_id}.npy'))
+                att = torch.from_numpy(att_npy)
+                mel_len = torch.tensor(mel_len).unsqueeze(0)
+                align_score, _ = attention_score(att.unsqueeze(0), mel_len, r=1)
+                durs, att_score = self.duration_extractor(x=x, mel=mel, att=att)
+                durs_npy = np_now(durs).astype(np.int)
+                np.save(str(self.paths.data / f'alg_extr/{item_id}.npy'), durs_npy, allow_pickle=False)
+                return ProcessorResult(
+                    item_id=item_id,
+                    align_score=align_score,
+                    att_score=att_score
+                )
         except BaseException as e:
             print(e)
             return ProcessorResult(item_id=None, align_score=0, att_score=0)
