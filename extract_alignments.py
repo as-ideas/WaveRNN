@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from pathlib import Path
 
 import torch
 from torch.multiprocessing import Pool
@@ -35,9 +36,16 @@ class Processor:
         self.paths = paths
 
     def __call__(self, item: tuple) -> ProcessorResult:
+        item_id, mel_len = item
+
+        if not Path(str(self.paths.att_pred / f'{item_id}.npy')).is_file():
+            return  ProcessorResult(
+                item_id=None,
+                align_score=0,
+                att_score=0
+            )
 
         try:
-            item_id, mel_len = item
 
             x = self.text_dict[item_id]
             x = self.tokenizer(x)
@@ -62,9 +70,9 @@ class Processor:
                 align_score=align_score,
                 att_score=att_score
             )
-        except Exception as e:
+        except BaseException as e:
             print(e)
-            return  ProcessorResult(item_id=item_id, align_score=0, att_score=0)
+            return ProcessorResult(item_id=None, align_score=0, att_score=0)
 
 
 if __name__ == '__main__':
@@ -78,7 +86,7 @@ if __name__ == '__main__':
 
     print('Performing duration extraction...')
     att_score_dict = {}
-    processor = Processor(duration_extractor=duration_extractor,
+    processor = Processor(duration_extractor=duration_extraxctor,
                           tokenizer=Tokenizer(),
                           text_dict=unpickle_binary(paths.data / 'text_dict.pkl'),
                           paths=paths)
