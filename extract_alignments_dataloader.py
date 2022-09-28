@@ -108,7 +108,7 @@ class DurationExtractorPipeline:
         for i, batch in enumerate(pbar, 1):
             batch = to_device(batch, device=device)
             with torch.no_grad():
-                _, _, att_batch = self.model(batch['x'], batch['mel'], batch['speaker_emb'])
+                _, _, att_batch = model(batch['x'], batch['mel'], batch['speaker_emb'])
             _, att_score = attention_score(att_batch, batch['mel_len'], r=1)
             sum_att_score += att_score.sum()
             for b in range(batch['x_len'].size(0)):
@@ -129,15 +129,16 @@ class DurationExtractorPipeline:
         print(f'Found {len(train_ids)} / {len_orig} alignment files in {self.paths.att_pred}')
         att_score_dict = {}
         sum_att_score = 0
+
         dataset = DurationDataset(
             duration_extractor=duration_extractor,
             paths=paths, dataset_ids=train_ids,
             text_dict=text_dict, tokenizer=Tokenizer())
-
         dataset = DataLoader(dataset=dataset,
                              batch_size=1,
                              shuffle=False,
                              pin_memory=False,
+                             collate_fn=DurationCollator(),
                              num_workers=num_workers)
 
         pbar = tqdm(dataset, total=len(dataset))
