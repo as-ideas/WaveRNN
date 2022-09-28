@@ -81,21 +81,19 @@ class DurationExtractorPipeline:
     def __init__(self,
                  paths: Paths,
                  config: Dict[str, Any],
-                 model: Tacotron,
                  duration_extractor: DurationExtractor):
         self.paths = paths
         self.config = config
-        self.model = model
         self.duration_extractor = duration_extractor
 
-    def __call__(self,
-                 batch_size: int = 1,
-                 num_workers: int = 0):
+    def extract_attention(self,
+                          model: Tacotron,
+                          batch_size: int = 1):
 
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-        self.model.eval()
-        self.model.decoder.prenet.train()
-        self.model.to(device)
+        model.eval()
+        model.decoder.prenet.train()
+        model.to(device)
 
         print('Extracting attention from tacotron...')
         sum_att_score = 0
@@ -113,7 +111,7 @@ class DurationExtractorPipeline:
                 _, _, att_batch = self.model(batch['x'], batch['mel'], batch['speaker_emb'])
             _, att_score = attention_score(att_batch, batch['mel_len'], r=1)
             sum_att_score += att_score.sum()
-            for b in range(batch_size):
+            for b in range(batch['x_len'].size(0)):
                 x_len = batch['x_len'][b].cpu()
                 mel_len = batch['mel_len'][b].cpu()
                 item_id = batch['item_id'][b]
@@ -121,20 +119,26 @@ class DurationExtractorPipeline:
                 np.save(paths.att_pred / f'{item_id}.npy', att.numpy(), allow_pickle=False)
             pbar.set_description(f'Avg attention score: {sum_att_score / (i * batch_size)}', refresh=True)
 
+    def extract_durations(self,
+                          num_workers: int = 0) -> None:
         print('Extracting durations from attention matrices...')
         text_dict = unpickle_binary(paths.data / 'text_dict.pkl')
         train_ids = list(text_dict.keys())
         len_orig = len(train_ids)
         train_ids = [t for t in train_ids if (self.paths.att_pred / f'{t}.npy').is_file()]
         print(f'Found {len(train_ids)} / {len_orig} alignment files in {self.paths.att_pred}')
-
         att_score_dict = {}
         sum_att_score = 0
-
         dataset = DurationDataset(
             duration_extractor=duration_extractor,
             paths=paths, dataset_ids=train_ids,
             text_dict=text_dict, tokenizer=Tokenizer())
+
+        dataset = DataLoader(dataset=dataset,
+                             batch_size=1,
+                             shuffle=False,
+                             pin_memory=False,
+                             num_workers=num_workers)
 
         pbar = tqdm(dataset, total=len(dataset))
         for i, res in enumerate(pbar, 1):
@@ -142,6 +146,8 @@ class DurationExtractorPipeline:
             att_score_dict[res.item_id] = (res.align_score, res.att_score)
             sum_att_score += res.att_score
             np.save(paths.data / f'alg_extr/{res.item_id}.npy', res.durs, allow_pickle=False)
+
+
 
 
 if __name__ == '__main__':
@@ -167,7 +173,7 @@ if __name__ == '__main__':
 
     dur_pipeline = DurationExtractorPipeline(paths=paths,
                                              config=config,
-                                             model=model,
                                              duration_extractor=duration_extractor)
 
-    dur_pipeline(batch_size=8, num_workers=8)
+    #dur_pipeline.extract_attention(batch_size=8, model=model)
+    dur_pipeline.extract_durations(num_workers=8)
