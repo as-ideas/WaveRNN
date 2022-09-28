@@ -1,18 +1,18 @@
+import argparse
 import itertools
 from dataclasses import dataclass
-from pathlib import Path
+from typing import List, Dict, Any
+
 import numpy as np
-from tqdm import tqdm
 import torch
 from torch import optim
 from torch.utils.data import DataLoader, Dataset
-from typing import List, Dict, Union, Any
+from tqdm import tqdm
 
 from models.tacotron import Tacotron
 from trainer.common import to_device
 from utils.checkpoints import restore_checkpoint
 from utils.dataset import get_tts_datasets
-from utils.dsp import DSP
 from utils.duration_extractor import DurationExtractor
 from utils.files import read_config, unpickle_binary
 from utils.metrics import attention_score
@@ -81,27 +81,27 @@ class DurationExtractorPipeline:
     def __init__(self,
                  paths: Paths,
                  config: Dict[str, Any],
-                 duration_extractor: DurationExtractor):
+                 duration_extractor: DurationExtractor) -> None:
         self.paths = paths
         self.config = config
         self.duration_extractor = duration_extractor
 
-    def extract_attention(self,
-                          model: Tacotron,
-                          batch_size: int = 1):
+    def extract_attentions(self,
+                           model: Tacotron,
+                           batch_size: int = 1) -> None:
 
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         model.eval()
         model.decoder.prenet.train()
         model.to(device)
 
-        print('Extracting attention from tacotron...')
         sum_att_score = 0
         train_set, val_set = get_tts_datasets(path=paths.data,
                                               batch_size=batch_size,
                                               r=1,
                                               max_mel_len=None,
                                               filter_attention=False)
+
         dataset = itertools.chain(train_set, val_set)
 
         pbar = tqdm(dataset, total=len(val_set) + len(train_set))
@@ -121,7 +121,6 @@ class DurationExtractorPipeline:
 
     def extract_durations(self,
                           num_workers: int = 0) -> None:
-        print('Extracting durations from attention matrices...')
         text_dict = unpickle_binary(paths.data / 'text_dict.pkl')
         train_ids = list(text_dict.keys())
         len_orig = len(train_ids)
@@ -134,6 +133,7 @@ class DurationExtractorPipeline:
             duration_extractor=duration_extractor,
             paths=paths, dataset_ids=train_ids,
             text_dict=text_dict, tokenizer=Tokenizer())
+
         dataset = DataLoader(dataset=dataset,
                              batch_size=1,
                              shuffle=False,
@@ -142,6 +142,7 @@ class DurationExtractorPipeline:
                              num_workers=num_workers)
 
         pbar = tqdm(dataset, total=len(dataset))
+
         for i, res in enumerate(pbar, 1):
             pbar.set_description(f'Avg tuned attention score: {sum_att_score / i}', refresh=True)
             att_score_dict[res.item_id] = (res.align_score, res.att_score)
@@ -149,11 +150,11 @@ class DurationExtractorPipeline:
             np.save(paths.data / f'alg_extr/{res.item_id}.npy', res.durs, allow_pickle=False)
 
 
-
-
 if __name__ == '__main__':
-    config = read_config('config.yaml')
-    dsp = DSP.from_config(config)
+    parser = argparse.ArgumentParser(description='Train ForwardTacotron TTS')
+    parser.add_argument('--config', metavar='FILE', default='config.yaml', help='The config containing all hyperparams.')
+    args = parser.parse_args()
+    config = read_config(args.config)
     paths = Paths(config['data_path'], config['voc_model_id'], config['tts_model_id'])
 
     print('\nInitialising Tacotron Model...\n')
@@ -176,5 +177,7 @@ if __name__ == '__main__':
                                              config=config,
                                              duration_extractor=duration_extractor)
 
-    #dur_pipeline.extract_attention(batch_size=8, model=model)
-    dur_pipeline.extract_durations(num_workers=8)
+    print('Extracting attention from tacotron...')
+    dur_pipeline.extract_attentions(batch_size=1, model=model)
+    print('Extracting durations from attention matrices...')
+    dur_pipeline.extract_durations(num_workers=12)
