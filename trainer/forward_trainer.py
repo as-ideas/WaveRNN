@@ -82,6 +82,10 @@ class ForwardTrainer:
                 model.step += 1
 
                 pe = (torch.abs(pitch_target.unsqueeze(1)) + 1.).detach()
+                for b in range(pitch_hat.size(0)):
+                    x_len = int(batch['x_len'][b])
+                    x_len = max(x_len-10, 1)
+                    pe[b, :, :x_len] = 1.
 
                 pitch_loss = self.l1_loss(pitch_hat*pe, pitch_target.unsqueeze(1)*pe, batch['x_len'])
 

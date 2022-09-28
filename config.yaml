@@ -1,7 +1,7 @@
 
 voc_model_id: 'ljspeech_voc'
-tts_model_id: 'librivox_bild_welt_09_lively_tts'
-data_path: 'data_librivox_new'                                        # output data path
+tts_model_id: 'librivox_bild_welt_09_lively_end_tts'
+data_path: 'data_multi_librivox_bild_welt'                                        # output data path
 
 tts_model: 'forward_tacotron'                             # choices: [forward_tacotron, fast_pitch]
 
@@ -94,8 +94,8 @@ forward_tacotron:
     pitch_dropout: 0.5
     pitch_strength: 1.              # set to 0 if you want no pitch conditioning
 
-    energy_conv_dims: 256
-    energy_rnn_dims: 64
+    energy_conv_dims: 32
+    energy_rnn_dims: 16
     energy_dropout: 0.5
     energy_strength: 0.             # set to 0 if you want no energy conditioning
 

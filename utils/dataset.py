@@ -230,6 +230,7 @@ def filter_bad_text_probs(dataset: List[tuple],
             dataset_filtered.append((item_id, mel_len))
     return dataset_filtered
 
+
 def filter_bad_attentions(dataset: List[tuple],
                           attention_score_dict: Dict[str, tuple],
                           min_alignment: float,
