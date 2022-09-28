@@ -67,7 +67,7 @@ class Averager:
 
 
 class MaskedL1(torch.nn.Module):
-
+    
     def forward(self, x, target, lens):
         target.requires_grad = False
         max_len = target.size(2)

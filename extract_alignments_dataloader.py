@@ -1,10 +1,17 @@
+import itertools
+from dataclasses import dataclass
 from pathlib import Path
 import numpy as np
-import tqdm
+from tqdm import tqdm
 import torch
+from torch import optim
 from torch.utils.data import DataLoader, Dataset
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Any
 
+from models.tacotron import Tacotron
+from trainer.common import to_device
+from utils.checkpoints import restore_checkpoint
+from utils.dataset import get_tts_datasets
 from utils.dsp import DSP
 from utils.duration_extractor import DurationExtractor
 from utils.files import read_config, unpickle_binary
@@ -12,6 +19,21 @@ from utils.metrics import attention_score
 from utils.paths import Paths
 from utils.text.tokenizer import Tokenizer
 
+
+@dataclass
+class DurationResult:
+    item_id: str
+    att_score: float
+    align_score: float
+    durs: np.array
+
+
+class DurationCollator:
+
+    def __call__(self, x: List[DurationResult]) -> DurationResult:
+        if len(x) > 1:
+            raise ValueError(f'Batch size should be 1! Found dataset output wiht len: {len(x)}')
+        return x[0]
 
 
 class DurationDataset(Dataset):
@@ -29,8 +51,7 @@ class DurationDataset(Dataset):
         self.duration_extractor = duration_extractor
         self.paths = paths
 
-    def __getitem__(self, index: int) -> tuple:
-
+    def __getitem__(self, index: int) -> DurationResult:
         item_id = self.metadata[index]
         x = self.text_dict[item_id]
         x = self.tokenizer(x)
@@ -42,14 +63,85 @@ class DurationDataset(Dataset):
         mel_len = mel.shape[-1]
         mel_len = torch.tensor(mel_len).unsqueeze(0)
         align_score, _ = attention_score(att.unsqueeze(0), mel_len, r=1)
+        align_score = float(align_score)
         durs, att_score = self.duration_extractor(x=x, mel=mel, att=att)
-        #durs_npy = durs.cpu().numpy()
-        print(item_id, att_score, durs)
-        return item_id, att_score, align_score, durs.cpu()
+        att_score = float(att_score)
+        durs_npy = durs.cpu().numpy()
+        if np.sum(durs_npy) != mel_len:
+            print(f'WARNINNG: Sum of durations did not match mel length for item {item_id}!')
+        return DurationResult(item_id=item_id, att_score=att_score,
+                              align_score=align_score, durs=durs_npy)
 
     def __len__(self):
         return len(self.metadata)
 
+
+class DurationExtractorPipeline:
+
+    def __init__(self,
+                 paths: Paths,
+                 config: Dict[str, Any],
+                 model: Tacotron,
+                 duration_extractor: DurationExtractor):
+        self.paths = paths
+        self.config = config
+        self.model = model
+        self.duration_extractor = duration_extractor
+
+    def __call__(self,
+                 batch_size: int = 1,
+                 num_workers: int = 0):
+
+        device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+        self.model.eval()
+        self.model.decoder.prenet.train()
+        self.model.to(device)
+
+        print('Extracting attention from tacotron...')
+        sum_att_score = 0
+        train_set, val_set = get_tts_datasets(path=paths.data,
+                                              batch_size=batch_size,
+                                              r=1,
+                                              max_mel_len=None,
+                                              filter_attention=False)
+        dataset = itertools.chain(train_set, val_set)
+
+        pbar = tqdm(dataset, total=len(val_set) + len(train_set))
+        for i, batch in enumerate(pbar, 1):
+            batch = to_device(batch, device=device)
+            with torch.no_grad():
+                _, _, att_batch = self.model(batch['x'], batch['mel'], batch['speaker_emb'])
+            _, att_score = attention_score(att_batch, batch['mel_len'], r=1)
+            sum_att_score += att_score.sum()
+            for b in range(batch_size):
+                x_len = batch['x_len'][b].cpu()
+                mel_len = batch['mel_len'][b].cpu()
+                item_id = batch['item_id'][b]
+                att = att_batch[b, :mel_len, :x_len].cpu()
+                np.save(paths.att_pred / f'{item_id}.npy', att.numpy(), allow_pickle=False)
+            pbar.set_description(f'Avg attention score: {sum_att_score / (i * batch_size)}', refresh=True)
+
+        print('Extracting durations from attention matrices...')
+        text_dict = unpickle_binary(paths.data / 'text_dict.pkl')
+        train_ids = list(text_dict.keys())
+        len_orig = len(train_ids)
+        train_ids = [t for t in train_ids if (self.paths.att_pred / f'{t}.npy').is_file()]
+        print(f'Found {len(train_ids)} / {len_orig} alignment files in {self.paths.att_pred}')
+
+        att_score_dict = {}
+        sum_att_score = 0
+
+        dataset = DurationDataset(
+            duration_extractor=duration_extractor,
+            paths=paths, dataset_ids=train_ids,
+            text_dict=text_dict, tokenizer=Tokenizer())
+
+        pbar = tqdm(dataset, total=len(dataset))
+        for i, res in enumerate(pbar, 1):
+            pbar.set_description(f'Avg tuned attention score: {sum_att_score / i}', refresh=True)
+            att_score_dict[res.item_id] = (res.align_score, res.att_score)
+            sum_att_score += res.att_score
+            np.save(paths.data / f'alg_extr/{res.item_id}.npy', res.durs, allow_pickle=False)
 
 
 if __name__ == '__main__':
@@ -57,20 +149,25 @@ if __name__ == '__main__':
     dsp = DSP.from_config(config)
     paths = Paths(config['data_path'], config['voc_model_id'], config['tts_model_id'])
 
-    text_dict = unpickle_binary(paths.data / 'text_dict.pkl')
-    train_ids = list(text_dict.keys())
-    train_ids = [t for t in train_ids if (paths.att_pred / f'{t}.npy').is_file()]
+    print('\nInitialising Tacotron Model...\n')
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    model = Tacotron.from_config(config).to(device)
 
-    duration_extractor = DurationExtractor(silence_prob_shift=config['preprocessing']['silence_prob_shift'],
-                                           silence_threshold=config['preprocessing']['silence_threshold'])
-    train_dataset = DurationDataset(
-        duration_extractor=duration_extractor,
-        paths=paths, dataset_ids=train_ids,
-        text_dict=text_dict, tokenizer=Tokenizer())
+    optimizer = optim.Adam(model.parameters())
+    restore_checkpoint(model=model, optim=optimizer,
+                       path=paths.taco_checkpoints / 'latest_model.pt',
+                       device=device)
 
-    train_set = DataLoader(train_dataset, batch_size=1, num_workers=0,
-                           pin_memory=True, collate_fn=None)
-    for item_id, att_score, align_score, durs in tqdm.tqdm(train_set, total=len(train_set)):
-        print(item_id, att_score, align_score, durs)
-        np.save(paths.data / f'alg_extr/{item_id}.npy', durs.numpy(), allow_pickle=False)
+    model.eval()
+    model.decoder.prenet.train()
 
+    duration_extractor = DurationExtractor(
+        silence_threshold=config['preprocessing']['silence_threshold'],
+        silence_prob_shift=config['preprocessing']['silence_prob_shift'])
+
+    dur_pipeline = DurationExtractorPipeline(paths=paths,
+                                             config=config,
+                                             model=model,
+                                             duration_extractor=duration_extractor)
+
+    dur_pipeline(batch_size=8, num_workers=8)
