@@ -3,7 +3,7 @@ from typing import Tuple
 
 import torch
 
-from utils.duration_extractor import DurationExtractor
+from duration_extraction.duration_extractor import DurationExtractor
 
 
 def new_diagonal_att(dims: Tuple[int, int]) -> torch.Tensor:
