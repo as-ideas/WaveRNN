@@ -143,7 +143,7 @@ class DurationExtractorPipeline:
                              shuffle=False,
                              pin_memory=False,
                              collate_fn=DurationCollator(),
-                             sampler=BinnedLengthSampler(lengths=mel_lens, batch_size=1, bin_size=128),
+                             sampler=BinnedLengthSampler(lengths=mel_lens, batch_size=1, bin_size=num_workers * 8),
                              num_workers=num_workers)
 
         pbar = tqdm(dataset, total=len(dataset))
