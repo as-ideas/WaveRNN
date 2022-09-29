@@ -165,6 +165,6 @@ class DurationExtractionPipeline:
             pbar.set_description(f'Avg tuned attention score: {sum_att_score / i}', refresh=True)
             att_score_dict[res.item_id] = (res.align_score, res.att_score)
             sum_att_score += res.att_score
-            np.save(self.paths.alg / f'{res.item_id}.npy', res.durs, allow_pickle=False)
+            np.save(self.paths.alg / f'{res.item_id}.npy', res.durs.astype(int), allow_pickle=False)
 
         return att_score_dict
