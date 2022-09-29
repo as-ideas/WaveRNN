@@ -41,6 +41,16 @@ preprocessing:
   # Duration Extraction from Attention
   extract_durations_with_dijkstra: True    # slower but much more robust than simply counting attention peaks
 
+duration_extraction:
+
+  silence_threshold: -11             # normalized mel value below which the voice is considered silent
+    # minimum mel value = -11.512925465 for zeros in the wav array (=log(1e-5),
+  # where 1e-5 is a cutoff value)
+  silence_prob_shift: 0.25           # Increase probability for silent characters in periods of silence
+  # for better durations during non voiced periods
+  batch_size: 1                     # batch size for tacotron inference to obtain attention matrices
+  num_workers: 1                    # number of processes for costly dijkstra duration extraction
+
 
 vocoder:
   model:

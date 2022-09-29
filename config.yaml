@@ -52,7 +52,7 @@ duration_extraction:
                                      # where 1e-5 is a cutoff value)
   silence_prob_shift: 0.25           # Increase probability for silent characters in periods of silence
                                      # for better durations during non voiced periods
-  batch_size: 16                     # batch size for tacotron inference to obtain attention matrices
+  batch_size: 1                      # batch size for tacotron inference to obtain attention matrices
   num_workers: 12                    # number of processes for costly dijkstra duration extraction
 
 

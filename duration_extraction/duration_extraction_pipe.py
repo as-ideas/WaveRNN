@@ -91,8 +91,6 @@ class DurationExtractionPipeline:
                            batch_size: int = 1) -> None:
 
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-        model.eval()
-        model.decoder.prenet.train()
         model.to(device)
 
         sum_att_score = 0
