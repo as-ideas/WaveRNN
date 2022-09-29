@@ -122,7 +122,8 @@ def create_align_features(model: Tacotron,
 
     num_workers = durex_conf['num_workers']
     print(f'Extracting durations from attention matrices (num workers={num_workers})...')
-    att_score_dict = duration_extraction_pipe.extract_durations(num_workers=durex_conf['num_workers'])
+    att_score_dict = duration_extraction_pipe.extract_durations(num_workers=num_workers,
+                                                                sampler_bin_size=num_workers*4)
     pickle_binary(att_score_dict, paths.data / 'att_score_dict.pkl')
 
     print('Extracting Pitch Values...')

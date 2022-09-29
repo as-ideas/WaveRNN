@@ -88,7 +88,12 @@ class DurationExtractionPipeline:
 
     def extract_attentions(self,
                            model: Tacotron,
-                           batch_size: int = 1) -> None:
+                           batch_size: int = 1) -> float:
+
+        """
+        Performs tacotron inference and stores the attention matrices as npy arrays in paths.data.att_pred.
+        Returns average attention score.
+        """
 
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         model.to(device)
@@ -118,8 +123,11 @@ class DurationExtractionPipeline:
                 np.save(self.paths.att_pred / f'{item_id}.npy', att.numpy(), allow_pickle=False)
             pbar.set_description(f'Avg attention score: {sum_att_score / (i * batch_size)}', refresh=True)
 
+        return sum_att_score / (len(train_set) + len(val_set))
+
     def extract_durations(self,
-                          num_workers: int = 0) -> Dict[str, Tuple[float, float]]:
+                          num_workers: int = 0,
+                          sampler_bin_size: int = 1) -> Dict[str, Tuple[float, float]]:
 
         """
         Extracts durations from saved attention matrices, saves the durations as npy arrays
@@ -148,7 +156,7 @@ class DurationExtractionPipeline:
                              shuffle=False,
                              pin_memory=False,
                              collate_fn=DurationCollator(),
-                             sampler=BinnedLengthSampler(lengths=mel_lens, batch_size=1, bin_size=num_workers * 8),
+                             sampler=BinnedLengthSampler(lengths=mel_lens, batch_size=1, bin_size=sampler_bin_size),
                              num_workers=num_workers)
 
         pbar = tqdm(dataset, total=len(dataset))
