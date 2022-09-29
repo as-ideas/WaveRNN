@@ -121,18 +121,21 @@ class DurationExtractorPipeline:
 
     def extract_durations(self,
                           num_workers: int = 0) -> None:
+        train_set = unpickle_binary(paths.data / 'train_dataset.pkl')
+        val_set = unpickle_binary(paths.data / 'val_dataset.pkl')
         text_dict = unpickle_binary(paths.data / 'text_dict.pkl')
-        train_ids = list(text_dict.keys())
-        len_orig = len(train_ids)
-        train_ids = [t for t in train_ids if (self.paths.att_pred / f'{t}.npy').is_file()]
-        train_lens = [len(text_dict[x]) for x in train_ids]
-        print(f'Found {len(train_ids)} / {len_orig} alignment files in {self.paths.att_pred}')
+        dataset = train_set + val_set
+        dataset = [(file_id, mel_len) for file_id, mel_len in dataset
+                   if (self.paths.att_pred / f'{file_id}.npy').is_file()]
+        len_orig = len(dataset)
+        data_ids, mel_lens = list(zip(*dataset))
+        print(f'Found {len(data_ids)} / {len_orig} alignment files in {self.paths.att_pred}')
         att_score_dict = {}
         sum_att_score = 0
 
         dataset = DurationDataset(
             duration_extractor=duration_extractor,
-            paths=paths, dataset_ids=train_ids,
+            paths=paths, dataset_ids=data_ids,
             text_dict=text_dict, tokenizer=Tokenizer())
 
         dataset = DataLoader(dataset=dataset,
@@ -140,7 +143,7 @@ class DurationExtractorPipeline:
                              shuffle=False,
                              pin_memory=False,
                              collate_fn=DurationCollator(),
-                             sampler=BinnedLengthSampler(lengths=train_lens, batch_size=1, bin_size=128),
+                             sampler=BinnedLengthSampler(lengths=mel_lens, batch_size=1, bin_size=128),
                              num_workers=num_workers)
 
         pbar = tqdm(dataset, total=len(dataset))
