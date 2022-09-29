@@ -18,10 +18,10 @@ class TestDSP(unittest.TestCase):
     def test_melspectrogram(self) -> None:
         config = read_config(self.resource_path / 'test_config.yaml')
         dsp = DSP.from_config(config)
-        file = librosa.util.example_audio_file()
+        file = librosa.util.example('brahms')
         y = dsp.load_wav(file)[:10000]
         mel = dsp.wav_to_mel(y)
-        expected = np.load(self.resource_path / 'test_mel.npy')
+        expected = np.load(str(self.resource_path / 'test_mel.npy'))
         np.testing.assert_allclose(expected, mel)
 
 

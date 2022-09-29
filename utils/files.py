@@ -19,8 +19,8 @@ def unpickle_binary(file: Union[str, Path]) -> Any:
         return pickle.load(f)
 
 
-def read_config(path: str) -> Dict[str, Any]:
-    with open(path, 'r') as stream:
+def read_config(path: Union[Path, str]) -> Dict[str, Any]:
+    with open(str(path), 'r') as stream:
         config = yaml.load(stream, Loader=yaml.FullLoader)
     return config
 
