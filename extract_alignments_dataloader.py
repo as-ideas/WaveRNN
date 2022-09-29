@@ -12,7 +12,7 @@ from tqdm import tqdm
 from models.tacotron import Tacotron
 from trainer.common import to_device
 from utils.checkpoints import restore_checkpoint
-from utils.dataset import get_tts_datasets
+from utils.dataset import get_tts_datasets, BinnedLengthSampler
 from utils.duration_extractor import DurationExtractor
 from utils.files import read_config, unpickle_binary
 from utils.metrics import attention_score
@@ -125,6 +125,7 @@ class DurationExtractorPipeline:
         train_ids = list(text_dict.keys())
         len_orig = len(train_ids)
         train_ids = [t for t in train_ids if (self.paths.att_pred / f'{t}.npy').is_file()]
+        train_lens = [len(text_dict[x]) for x in train_ids]
         print(f'Found {len(train_ids)} / {len_orig} alignment files in {self.paths.att_pred}')
         att_score_dict = {}
         sum_att_score = 0
@@ -139,6 +140,7 @@ class DurationExtractorPipeline:
                              shuffle=False,
                              pin_memory=False,
                              collate_fn=DurationCollator(),
+                             sampler=BinnedLengthSampler(lengths=train_lens, batch_size=1, bin_size=128),
                              num_workers=num_workers)
 
         pbar = tqdm(dataset, total=len(dataset))
@@ -178,6 +180,6 @@ if __name__ == '__main__':
                                              duration_extractor=duration_extractor)
 
     print('Extracting attention from tacotron...')
-    dur_pipeline.extract_attentions(batch_size=1, model=model)
+    #dur_pipeline.extract_attentions(batch_size=1, model=model)
     print('Extracting durations from attention matrices...')
     dur_pipeline.extract_durations(num_workers=12)
