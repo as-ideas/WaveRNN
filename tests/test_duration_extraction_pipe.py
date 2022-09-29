@@ -1,17 +1,15 @@
+import os
 import shutil
 import unittest
-import os
+from pathlib import Path
+from typing import Tuple
 from unittest.mock import patch
 
 import numpy as np
-from pathlib import Path
-from typing import Tuple, Dict, Any
-
 import torch
 
 from duration_extraction.duration_extraction_pipe import DurationExtractionPipeline
 from duration_extraction.duration_extractor import DurationExtractor
-from models.forward_tacotron import ForwardTacotron
 from models.tacotron import Tacotron
 from utils.files import read_config, pickle_binary
 from utils.paths import Paths
