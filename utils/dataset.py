@@ -298,7 +298,7 @@ class ForwardDataset(Dataset):
 
         pitch_diff = np.diff(pitch, prepend=0)
         pitch_soft_hat[pitch_diff < 0] = 1
-        pitch_soft_hat[pitch_diff > 0] = 3
+        pitch_soft_hat[pitch_diff > 0] = 1
         pitch_soft_hat[pitch == 0] = 2
         pitch_p = pitch_soft_hat
 
