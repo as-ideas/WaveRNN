@@ -262,9 +262,14 @@ class ForwardTacotron(nn.Module):
         x, _ = self.lstm(x)
 
         x = self.lin(x)
+        speaker_emb = semb[:, None, :]
+        speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
+        x_in = torch.cat([x, speaker_emb], dim=2)
+        x = x.transpose(1, 2)
+        x_in = x_in.transpose(1, 2)
         x = x.transpose(1, 2)
 
-        x_post = self.postnet(x)
+        x_post = self.postnet(x_in)
         x_post = self.post_proj(x_post)
         x_post = x_post.transpose(1, 2)
 
