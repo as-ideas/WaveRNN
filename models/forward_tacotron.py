@@ -122,9 +122,9 @@ class ForwardTacotron(nn.Module):
         self.lin = torch.nn.Linear(2 * rnn_dims, n_mels)
         self.register_buffer('step', torch.zeros(1, dtype=torch.long))
         self.postnet = CBHG(K=postnet_k,
-                            in_channels=n_mels,
+                            in_channels=n_mels + semb_dims,
                             channels=postnet_dims,
-                            proj_channels=[postnet_dims, n_mels],
+                            proj_channels=[postnet_dims, n_mels + semb_dims],
                             num_highways=postnet_num_highways,
                             dropout=postnet_dropout)
         self.post_proj = nn.Linear(2 * postnet_dims, n_mels, bias=False)
@@ -180,9 +180,14 @@ class ForwardTacotron(nn.Module):
         x, _ = pad_packed_sequence(x, padding_value=self.padding_value, batch_first=True)
 
         x = self.lin(x)
-        x = x.transpose(1, 2)
 
-        x_post = self.postnet(x)
+        speaker_emb = semb[:, None, :]
+        speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
+        x_in = torch.cat([x, speaker_emb], dim=2)
+        x = x.transpose(1, 2)
+        x_in = x_in.transpose(1, 2)
+
+        x_post = self.postnet(x_in)
         x_post = self.post_proj(x_post)
         x_post = x_post.transpose(1, 2)
 
