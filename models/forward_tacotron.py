@@ -72,10 +72,10 @@ class SeriesPredictor(nn.Module):
         x = x.transpose(1, 2)
         x, _ = self.rnn(x)
 
-        rnn = self.get_gru_cell(self.decoder)
+        device = next(self.parameters()).device  # use same device as parameters
+        rnn = self.get_gru_cell(self.decoder).to(device)
         b_size, seq_len, _ = x.size()
 
-        device = next(self.parameters()).device  # use same device as parameters
         h = torch.zeros(b_size, self.rnn_dims, device=device)
         o = torch.zeros(b_size, 1, device=device, dtype=torch.long)
 
