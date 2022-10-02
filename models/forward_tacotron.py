@@ -273,6 +273,7 @@ class ForwardTacotron(nn.Module):
             print(dur_hat.squeeze()[:10])
             if torch.sum(dur_hat.long()) <= 0:
                 torch.fill_(dur_hat, value=2.)
+            dur_hat = torch.clamp(dur_hat, max=20)
             pitch_hat = self.pitch_pred.generate(x, semb).unsqueeze(0).transpose(1, 2)
             pitch_hat = (pitch_hat - 256.) / 32.
             pitch_hat = pitch_function(pitch_hat)
