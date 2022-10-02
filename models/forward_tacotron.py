@@ -13,22 +13,27 @@ from utils.text.symbols import phonemes
 
 class SeriesPredictor(nn.Module):
 
-    def __init__(self, num_chars, emb_dim=64, conv_dims=256, rnn_dims=64, dropout=0.5, semb_dims=256):
+    def __init__(self, num_chars, emb_dim=64, conv_dims=256,
+                 rnn_dims=64, dropout=0.5, semb_dims=256, out_dims=512, p_dim=4):
         super().__init__()
         self.embedding = Embedding(num_chars, emb_dim)
+        self.p_embedding = Embedding(out_dims, p_dim)
         self.convs = torch.nn.ModuleList([
             BatchNormConv(emb_dim + semb_dims, conv_dims, 5, relu=True),
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
         ])
         self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
-        self.lin = nn.Linear(2 * rnn_dims, 1)
+        self.decoder = nn.GRU(2*rnn_dims + p_dim, rnn_dims, batch_first=True, bidirectional=False)
+        self.lin = nn.Linear(rnn_dims, out_dims)
+        self.rnn_dims = rnn_dims
         self.dropout = dropout
+        self.n_classes = out_dims
 
     def forward(self,
                 x: torch.Tensor,
                 semb: torch.Tensor,
-                alpha: float = 1.0) -> torch.Tensor:
+                p_in: torch.Tensor) -> torch.Tensor:
         x = self.embedding(x)
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
@@ -39,8 +44,58 @@ class SeriesPredictor(nn.Module):
             x = F.dropout(x, p=self.dropout, training=self.training)
         x = x.transpose(1, 2)
         x, _ = self.rnn(x)
-        x = self.lin(x)
-        return x / alpha
+
+        p_in = self.p_embedding(p_in.long())
+        x_dec_in = torch.cat([x, p_in], dim=-1)
+        x_out, _ = self.decoder(x_dec_in)
+        x_out = self.lin(x_out)
+        return x_out
+
+    def get_gru_cell(self, gru):
+        gru_cell = nn.GRUCell(gru.input_size, gru.hidden_size)
+        gru_cell.weight_hh.data = gru.weight_hh_l0.data
+        gru_cell.weight_ih.data = gru.weight_ih_l0.data
+        gru_cell.bias_hh.data = gru.bias_hh_l0.data
+        gru_cell.bias_ih.data = gru.bias_ih_l0.data
+        return gru_cell
+
+    def generate(self, x, semb):
+        x = self.embedding(x)
+        #torch.fill_(semb, 0)
+        speaker_emb = semb[:, None, :]
+        speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
+        x = torch.cat([x, speaker_emb], dim=2)
+        x = x.transpose(1, 2)
+        for conv in self.convs:
+            x = conv(x)
+            x = F.dropout(x, p=self.dropout, training=self.training)
+        x = x.transpose(1, 2)
+        x, _ = self.rnn(x)
+
+        rnn = self.get_gru_cell(self.decoder)
+        b_size, seq_len, _ = x.size()
+
+        device = next(self.parameters()).device  # use same device as parameters
+        h = torch.zeros(b_size, self.rnn_dims, device=device)
+        o = torch.zeros(b_size, 1, device=device, dtype=torch.long)
+
+        output = []
+
+        with torch.no_grad():
+            for i in range(seq_len):
+                x_i = x[0, i:i+1, :]
+                p_in = self.p_embedding(o.long()).squeeze(0)
+                x_i = torch.cat([x_i, p_in], dim=-1)
+                h = rnn(x_i, h)
+                logits = self.lin(h)
+                posterior = F.softmax(logits, dim=1)
+                distrib = torch.distributions.Categorical(posterior)
+                sample = distrib.sample().float()
+                output.append(sample)
+                o = sample.unsqueeze(0)
+
+        output = torch.stack(output)
+        return output
 
 
 class BatchNormConv(nn.Module):
@@ -145,15 +200,28 @@ class ForwardTacotron(nn.Module):
         dur = batch['dur']
         semb = batch['speaker_emb']
         mel_lens = batch['mel_len']
-        pitch = batch['pitch'].unsqueeze(1)
-        energy = batch['energy'].unsqueeze(1)
+        pitch = batch['pitch']
+        pitch_target = batch['pitch_target']
+        energy = batch['energy']
+
+        device = next(self.parameters()).device  # use same device as parameters
+        b, x_len = x.size()
+        zeros = torch.zeros((b, 1), device=device)
+        dur_in = torch.cat([zeros, dur[:, :-1]], dim=1)
+        pitch_in = torch.cat([zeros, pitch_target[:, :-1]], dim=1)
+        energy_in = torch.cat([zeros, energy[:, :-1]], dim=1)
+        pitch_in = torch.clamp(pitch_in, max=511)
+        energy_in = torch.clamp(energy_in, max=511)
 
         if self.training:
             self.step += 1
 
-        dur_hat = self.dur_pred(x, semb).squeeze(-1)
-        pitch_hat = self.pitch_pred(x, semb).transpose(1, 2)
-        energy_hat = self.energy_pred(x, semb).transpose(1, 2)
+        dur_hat = self.dur_pred(x, semb, dur_in).squeeze(-1)
+        pitch_hat = self.pitch_pred(x, semb, pitch_in).transpose(1, 2)
+        energy_hat = self.energy_pred(x, semb, energy_in).transpose(1, 2)
+
+        pitch = pitch.unsqueeze(1)
+        energy = energy.unsqueeze(1)
 
         x = self.embedding(x)
         x = x.transpose(1, 2)
@@ -200,14 +268,17 @@ class ForwardTacotron(nn.Module):
                  energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, torch.Tensor]:
         self.eval()
         with torch.no_grad():
-            dur_hat = self.dur_pred(x, semb, alpha=alpha)
-            dur_hat = dur_hat.squeeze(2)
+            dur_hat = self.dur_pred.generate(x, semb).unsqueeze(0).squeeze(2)
+            print('gen dur')
+            print(dur_hat.squeeze()[:10])
             if torch.sum(dur_hat.long()) <= 0:
                 torch.fill_(dur_hat, value=2.)
-            pitch_hat = self.pitch_pred(x, semb).transpose(1, 2)
+            pitch_hat = self.pitch_pred.generate(x, semb).unsqueeze(0).transpose(1, 2)
+            pitch_hat = (pitch_hat - 256.) / 32.
             pitch_hat = pitch_function(pitch_hat)
-            energy_hat = self.energy_pred(x, semb).transpose(1, 2)
-            energy_hat = energy_function(energy_hat)
+            print('gen pitch')
+            print(pitch_hat.squeeze()[:10])
+            energy_hat = self.energy_pred.generate(x, semb).unsqueeze(0).transpose(1, 2)
             return self._generate_mel(x=x, dur_hat=dur_hat,
                                       pitch_hat=pitch_hat,
                                       energy_hat=energy_hat, semb=semb)

@@ -31,6 +31,7 @@ class ForwardTrainer:
         self.train_cfg = config[model_type]['training']
         self.writer = SummaryWriter(log_dir=paths.forward_log, comment='v1')
         self.l1_loss = MaskedL1()
+        self.ce_loss = torch.nn.CrossEntropyLoss(ignore_index=511)
 
     def train(self, model: Union[ForwardTacotron, FastPitch], optimizer: Optimizer) -> None:
         forward_schedule = self.train_cfg['schedule']
@@ -78,7 +79,8 @@ class ForwardTrainer:
                 pitch_zoneout_mask = torch.rand(batch['x'].size()) > self.train_cfg['pitch_zoneout']
                 energy_zoneout_mask = torch.rand(batch['x'].size()) > self.train_cfg['energy_zoneout']
 
-                pitch_target = batch['pitch_hat'].detach().clone()
+
+                pitch_target = batch['pitch_target'].detach().clone()
                 energy_target = batch['energy'].detach().clone()
                 batch['pitch'] = batch['pitch'] * pitch_zoneout_mask.to(device).float()
                 batch['energy'] = batch['energy'] * energy_zoneout_mask.to(device).float()
@@ -88,9 +90,9 @@ class ForwardTrainer:
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
-                dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur_hat'].unsqueeze(1), batch['x_len'])
-                pitch_loss = self.l1_loss(pred['pitch'], pitch_target.unsqueeze(1), batch['x_len'])
-                energy_loss = self.l1_loss(pred['energy'], energy_target.unsqueeze(1), batch['x_len'])
+                dur_loss = self.ce_loss(pred['dur'].transpose(1, 2), batch['dur_hat'].long())
+                pitch_loss = self.ce_loss(pred['pitch'], pitch_target.long())
+                energy_loss = self.ce_loss(pred['energy'], energy_target.long())
 
                 loss = m1_loss + m2_loss \
                        + self.train_cfg['dur_loss_factor'] * dur_loss \
@@ -158,9 +160,11 @@ class ForwardTrainer:
                 pred = model(batch)
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
-                dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur_hat'].unsqueeze(1), batch['x_len'])
-                pitch_loss = self.l1_loss(pred['pitch'], batch['pitch_hat'].unsqueeze(1), batch['x_len'])
-                energy_loss = self.l1_loss(pred['energy'], batch['energy'].unsqueeze(1), batch['x_len'])
+                dur_loss = self.ce_loss(pred['dur'].transpose(1, 2), batch['dur_hat'].long())
+                pitch_target = batch['pitch_target'].detach().clone()
+                energy_target = batch['energy'].detach().clone()
+                pitch_loss = self.ce_loss(pred['pitch'], pitch_target.long())
+                energy_loss = self.ce_loss(pred['energy'], energy_target.long())
                 pitch_val_loss += pitch_loss
                 energy_val_loss += energy_loss
                 m_val_loss += m1_loss.item() + m2_loss.item()
