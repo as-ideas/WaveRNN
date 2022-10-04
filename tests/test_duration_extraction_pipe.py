@@ -16,7 +16,7 @@ from utils.paths import Paths
 
 
 def new_diagonal_att(dims: Tuple[int, int, int]) -> torch.Tensor:
-    """ We assume an almost square matrix of shape about (1, M, M) """
+    """ Returns perfect diagonal attention matrix, assuming that the dimensions are almost square (1, M, M) """
     att = torch.zeros(dims).float()
     for i in range(dims[1]):
         j = min(i, dims[2]-1)
@@ -76,5 +76,6 @@ class TestDurationExtractionPipe(unittest.TestCase):
 
         for dur_file in dur_files:
             dur = np.load(dur_file)
-            expected = np.ones(len(dur)) # All ones because we created diagonal attentions
+            # We expect durations of one since due to the diagonal attention
+            expected = np.ones(len(dur))
             np.testing.assert_allclose(expected, dur, rtol=1e-8)
