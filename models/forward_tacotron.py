@@ -22,6 +22,7 @@ class SeriesPredictor(nn.Module):
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
         ])
         self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
+        self.lin_res = nn.Linear(conv_dims, 2 * rnn_dims)
         self.lin = nn.Linear(2 * rnn_dims, 1)
         self.dropout = dropout
 
@@ -37,8 +38,11 @@ class SeriesPredictor(nn.Module):
         for conv in self.convs:
             x = conv(x)
             x = F.dropout(x, p=self.dropout, training=self.training)
+
         x = x.transpose(1, 2)
+        x_res = self.lin_res(x)
         x, _ = self.rnn(x)
+        x = x + x_res
         x = self.lin(x)
         return x / alpha
 
