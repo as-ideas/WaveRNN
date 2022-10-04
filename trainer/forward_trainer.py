@@ -126,6 +126,7 @@ class ForwardTrainer:
                     self.generate_plots(model, session)
 
                 self.writer.add_scalar('Pitch_Loss/train', pitch_loss, model.get_step())
+                self.writer.add_scalar('Duration_Loss/train', dur_loss, model.get_step())
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
                 self.writer.add_scalar('Params/learning_rate', session.lr, model.get_step())
                 self.writer.add_scalar('Dur_Diff/mean', dur_diff_mean, model.get_step())
@@ -135,7 +136,7 @@ class ForwardTrainer:
 
             val_out = self.evaluate(model, session.val_set)
             self.writer.add_scalar('Pitch_Loss/val', val_out['pitch_loss'], model.get_step())
-            self.writer.add_scalar('Dur_Loss/val', val_out['dur_loss'], model.get_step())
+            self.writer.add_scalar('Duration_Loss/val', val_out['dur_loss'], model.get_step())
             save_checkpoint(model=model, optim=optimizer, config=self.config,
                             path=self.paths.forward_checkpoints / 'latest_model.pt')
 
