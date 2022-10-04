@@ -81,8 +81,8 @@ class ForwardTrainer:
                 dur_hat = model.dur_pred(batch['x'], batch['speaker_emb'])
                 pitch_hat = model.pitch_pred(batch['x'], batch['speaker_emb']).transpose(1, 2)
 
-                dur_mean = 0
-                dur_mean_target = 0
+                dur_diff_mean = 0
+                dur_diff_median = 0
 
                 model.step += 1
 
@@ -91,10 +91,9 @@ class ForwardTrainer:
                     x_len = int(batch['x_len'][b])
                     x_len = max(x_len-10, 1)
                     pe[b, :, :x_len] = 1.
-                    dur_mean += torch.mean(dur_hat[b, :x_len, 0])
-                    dur_mean_target += torch.mean(batch['dur_hat'][b, :x_len])
-
-                dur_diff = dur_mean - dur_mean_target
+                    dur_diff = dur_hat[b, :x_len, 0] - batch['dur_hat'][b, :x_len]
+                    dur_diff_mean += torch.mean(dur_diff)
+                    dur_diff_median += torch.median(dur_diff)
 
                 dur_loss = self.l1_loss(dur_hat.transpose(1, 2), batch['dur'].unsqueeze(1), batch['x_len'])
                 pitch_loss = self.l1_loss(pitch_hat*pe, pitch_target.unsqueeze(1)*pe, batch['x_len'])
@@ -129,7 +128,8 @@ class ForwardTrainer:
                 self.writer.add_scalar('Pitch_Loss/train', pitch_loss, model.get_step())
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
                 self.writer.add_scalar('Params/learning_rate', session.lr, model.get_step())
-                self.writer.add_scalar('Dur_Diff/train', dur_diff, model.get_step())
+                self.writer.add_scalar('Dur_Diff/mean', dur_diff_mean, model.get_step())
+                self.writer.add_scalar('Dur_Diff/median', dur_diff_median, model.get_step())
 
                 stream(msg)
 
