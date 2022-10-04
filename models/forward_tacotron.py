@@ -14,7 +14,8 @@ from utils.text.symbols import phonemes
 class SeriesPredictor(nn.Module):
 
     def __init__(self, num_chars, emb_dim=64, conv_dims=256,
-                 rnn_dims=64, dropout=0.5, semb_dims=256, out_dims=512, p_dim=4):
+                 rnn_dims=64, dropout=0.5, semb_dims=256, out_dims=512, p_dim=4,
+                 rescale: bool = False):
         super().__init__()
         self.embedding = Embedding(num_chars, emb_dim)
         self.p_embedding = Embedding(out_dims, p_dim)
@@ -31,6 +32,7 @@ class SeriesPredictor(nn.Module):
         self.rnn_dims = rnn_dims
         self.dropout = dropout
         self.n_classes = out_dims
+        self.rescale = rescale
 
     def forward(self,
                 x: torch.Tensor,
@@ -96,7 +98,8 @@ class SeriesPredictor(nn.Module):
                 posterior = F.softmax(logits, dim=1)
                 distrib = torch.distributions.Categorical(posterior)
                 sample = distrib.sample().float()
-                sample = (sample - 256.) / 32.
+                if self.rescale:
+                    sample = (sample - 256.) / 32.
                 output.append(sample)
                 o = sample.unsqueeze(0)
 
@@ -164,7 +167,8 @@ class ForwardTacotron(nn.Module):
                                           emb_dim=series_embed_dims,
                                           conv_dims=pitch_conv_dims,
                                           rnn_dims=pitch_rnn_dims,
-                                          dropout=pitch_dropout)
+                                          dropout=pitch_dropout,
+                                          rescale=True)
         self.energy_pred = SeriesPredictor(num_chars=num_chars,
                                            emb_dim=series_embed_dims,
                                            conv_dims=energy_conv_dims,
