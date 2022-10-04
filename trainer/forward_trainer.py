@@ -78,18 +78,29 @@ class ForwardTrainer:
                 pitch_target = batch['pitch_hat'].detach().clone()
 
                 #pred = model(batch)
+                dur_hat = model.dur_pred(batch['x'], batch['speaker_emb'])
                 pitch_hat = model.pitch_pred(batch['x'], batch['speaker_emb']).transpose(1, 2)
+
+                dur_mean = 0
+                dur_mean_target = 0
+
                 model.step += 1
 
-                pe = (torch.abs(pitch_target.unsqueeze(1)) + 1.).detach()
+                pe = (torch.abs(pitch_target.unsqueeze(1))).detach()
                 for b in range(pitch_hat.size(0)):
                     x_len = int(batch['x_len'][b])
                     x_len = max(x_len-10, 1)
                     pe[b, :, :x_len] = 1.
+                    dur_mean += torch.mean(dur_hat[b, :x_len, 0])
+                    dur_mean_target += torch.mean(dur_hat[b, :x_len])
 
+                dur_diff = dur_mean - dur_mean_target
+
+                dur_loss = self.l1_loss(dur_hat.transpose(1, 2), batch['dur'].unsqueeze(1), batch['x_len'])
                 pitch_loss = self.l1_loss(pitch_hat*pe, pitch_target.unsqueeze(1)*pe, batch['x_len'])
 
-                loss = self.train_cfg['pitch_loss_factor'] * pitch_loss
+                loss = self.train_cfg['pitch_loss_factor'] * pitch_loss \
+                       + self.train_cfg['dur_loss_factor'] * dur_loss
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -118,11 +129,13 @@ class ForwardTrainer:
                 self.writer.add_scalar('Pitch_Loss/train', pitch_loss, model.get_step())
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
                 self.writer.add_scalar('Params/learning_rate', session.lr, model.get_step())
+                self.writer.add_scalar('Dur_Diff/train', dur_diff, model.get_step())
 
                 stream(msg)
 
             val_out = self.evaluate(model, session.val_set)
             self.writer.add_scalar('Pitch_Loss/val', val_out['pitch_loss'], model.get_step())
+            self.writer.add_scalar('Dur_Loss/val', val_out['dur_loss'], model.get_step())
             save_checkpoint(model=model, optim=optimizer, config=self.config,
                             path=self.paths.forward_checkpoints / 'latest_model.pt')
 
@@ -134,15 +147,20 @@ class ForwardTrainer:
     def evaluate(self, model: Union[ForwardTacotron, FastPitch], val_set: DataLoader) -> Dict[str, float]:
         model.eval()
         pitch_val_loss = 0
+        dur_val_loss = 0
         device = next(model.parameters()).device
         for i, batch in enumerate(val_set, 1):
             batch = to_device(batch, device=device)
             with torch.no_grad():
                 pitch_hat = model.pitch_pred(batch['x'], batch['speaker_emb']).transpose(1, 2)
+                dur_hat = model.dur_pred(batch['x'], batch['speaker_emb'])
                 pitch_loss = self.l1_loss(pitch_hat, batch['pitch_hat'].unsqueeze(1), batch['x_len'])
+                dur_loss = self.l1_loss(dur_hat.transpose(1, 2), batch['dur_hat'].unsqueeze(1), batch['x_len'])
                 pitch_val_loss += pitch_loss
+                dur_val_loss += dur_loss
         return {
             'pitch_loss': pitch_val_loss / len(val_set),
+            'dur_loss': dur_val_loss / len(val_set),
         }
 
     @ignore_exception
