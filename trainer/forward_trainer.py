@@ -92,7 +92,7 @@ class ForwardTrainer:
                     x_len = max(x_len-10, 1)
                     pe[b, :, :x_len] = 1.
                     dur_mean += torch.mean(dur_hat[b, :x_len, 0])
-                    dur_mean_target += torch.mean(dur_hat[b, :x_len])
+                    dur_mean_target += torch.mean(batch['dur_hat'][b, :x_len])
 
                 dur_diff = dur_mean - dur_mean_target
 
