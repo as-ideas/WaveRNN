@@ -153,7 +153,8 @@ class ForwardTacotron(nn.Module):
                                         emb_dim=series_embed_dims,
                                         conv_dims=durpred_conv_dims,
                                         rnn_dims=durpred_rnn_dims,
-                                        dropout=durpred_dropout)
+                                        dropout=durpred_dropout,
+                                        out_dims=22)
         self.pitch_pred = SeriesPredictor(num_chars=num_chars,
                                           emb_dim=series_embed_dims,
                                           conv_dims=pitch_conv_dims,
@@ -198,6 +199,7 @@ class ForwardTacotron(nn.Module):
         x = batch['x']
         mel = batch['mel']
         dur = batch['dur']
+        dur_target = batch['dur_target']
         semb = batch['speaker_emb']
         mel_lens = batch['mel_len']
         pitch = batch['pitch']
@@ -207,11 +209,11 @@ class ForwardTacotron(nn.Module):
         device = next(self.parameters()).device  # use same device as parameters
         b, x_len = x.size()
         zeros = torch.zeros((b, 1), device=device)
-        dur_in = torch.cat([zeros, dur[:, :-1]], dim=1)
+        dur_in = torch.cat([zeros, dur_target[:, :-1]], dim=1)
         pitch_in = torch.cat([zeros, pitch_target[:, :-1]], dim=1)
         energy_in = torch.cat([zeros, energy[:, :-1]], dim=1)
-        pitch_in = torch.clamp(pitch_in, max=511)
-        energy_in = torch.clamp(energy_in, max=511)
+        #pitch_in = torch.clamp(pitch_in, max=511)
+        #energy_in = torch.clamp(energy_in, max=511)
 
         if self.training:
             self.step += 1
