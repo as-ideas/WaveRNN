@@ -86,11 +86,11 @@ forward_tacotron:
     series_embed_dims: 128           # embedding dimension for series predictor
 
     durpred_conv_dims: 256
-    durpred_rnn_dims: 64
+    durpred_rnn_dims: 256
     durpred_dropout: 0.5
 
     pitch_conv_dims: 256
-    pitch_rnn_dims: 64
+    pitch_rnn_dims: 256
     pitch_dropout: 0.5
     pitch_strength: 1.              # set to 0 if you want no pitch conditioning
 
