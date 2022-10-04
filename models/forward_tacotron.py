@@ -24,7 +24,9 @@ class SeriesPredictor(nn.Module):
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
         ])
         self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
-        self.decoder = nn.GRU(2*rnn_dims + p_dim, rnn_dims, batch_first=True, bidirectional=False)
+        self.I = nn.Linear(2 * rnn_dims + 1, rnn_dims)
+        self.decoder = nn.GRU(rnn_dims, rnn_dims, batch_first=True, bidirectional=False)
+        self.lin_enc = nn.Linear(2 * rnn_dims, rnn_dims)
         self.lin = nn.Linear(rnn_dims, out_dims)
         self.rnn_dims = rnn_dims
         self.dropout = dropout
@@ -44,11 +46,12 @@ class SeriesPredictor(nn.Module):
             x = F.dropout(x, p=self.dropout, training=self.training)
         x = x.transpose(1, 2)
         x, _ = self.rnn(x)
-
-        p_in = self.p_embedding(p_in.long())
-        x_dec_in = torch.cat([x, p_in], dim=-1)
-        x_out, _ = self.decoder(x_dec_in)
-        x_out = self.lin(x_out)
+        x_res = self.lin_enc(x)
+        x_dec_in = torch.cat([x, p_in.unsqueeze(-1)], dim=-1)
+        x_dec_in = self.I(x_dec_in)
+        x, _ = self.decoder(x_dec_in)
+        x = x_res + x
+        x_out = self.lin(x)
         return x_out
 
     def get_gru_cell(self, gru):
@@ -61,8 +64,8 @@ class SeriesPredictor(nn.Module):
 
     def generate(self, x, semb):
         x = self.embedding(x)
-        #torch.fill_(semb, 0)
         speaker_emb = semb[:, None, :]
+        #speaker_emb = torch.fill_(speaker_emb, 0)
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
         x = torch.cat([x, speaker_emb], dim=2)
         x = x.transpose(1, 2)
@@ -71,6 +74,7 @@ class SeriesPredictor(nn.Module):
             x = F.dropout(x, p=self.dropout, training=self.training)
         x = x.transpose(1, 2)
         x, _ = self.rnn(x)
+        x_res = self.lin_enc(x)
 
         device = next(self.parameters()).device  # use same device as parameters
         rnn = self.get_gru_cell(self.decoder).to(device)
@@ -84,13 +88,15 @@ class SeriesPredictor(nn.Module):
         with torch.no_grad():
             for i in range(seq_len):
                 x_i = x[0, i:i+1, :]
-                p_in = self.p_embedding(o.long()).squeeze(0)
-                x_i = torch.cat([x_i, p_in], dim=-1)
-                h = rnn(x_i, h)
-                logits = self.lin(h)
+                x_dec_in = torch.cat([x_i, o], dim=-1)
+                x_dec_in = self.I(x_dec_in)
+                h = rnn(x_dec_in, h)
+                x_out = x_res[0, i:i+1, :] + h
+                logits = self.lin(x_out)
                 posterior = F.softmax(logits, dim=1)
                 distrib = torch.distributions.Categorical(posterior)
                 sample = distrib.sample().float()
+                sample = (sample - 256.) / 32.
                 output.append(sample)
                 o = sample.unsqueeze(0)
 
@@ -153,8 +159,7 @@ class ForwardTacotron(nn.Module):
                                         emb_dim=series_embed_dims,
                                         conv_dims=durpred_conv_dims,
                                         rnn_dims=durpred_rnn_dims,
-                                        dropout=durpred_dropout,
-                                        out_dims=22)
+                                        dropout=durpred_dropout)
         self.pitch_pred = SeriesPredictor(num_chars=num_chars,
                                           emb_dim=series_embed_dims,
                                           conv_dims=pitch_conv_dims,
@@ -199,21 +204,20 @@ class ForwardTacotron(nn.Module):
         x = batch['x']
         mel = batch['mel']
         dur = batch['dur']
-        dur_target = batch['dur_target']
         semb = batch['speaker_emb']
         mel_lens = batch['mel_len']
         pitch = batch['pitch']
-        pitch_target = batch['pitch_target']
+        #pitch_target = batch['pitch_target']
         energy = batch['energy']
 
         device = next(self.parameters()).device  # use same device as parameters
         b, x_len = x.size()
         zeros = torch.zeros((b, 1), device=device)
-        dur_in = torch.cat([zeros, dur_target[:, :-1]], dim=1)
-        pitch_in = torch.cat([zeros, pitch_target[:, :-1]], dim=1)
+        dur_in = torch.cat([zeros, dur[:, :-1]], dim=1)
+        pitch_in = torch.cat([zeros, pitch[:, :-1]], dim=1)
         energy_in = torch.cat([zeros, energy[:, :-1]], dim=1)
-        #pitch_in = torch.clamp(pitch_in, max=511)
-        #energy_in = torch.clamp(energy_in, max=511)
+        pitch_in = torch.clamp(pitch_in, max=511)
+        energy_in = torch.clamp(energy_in, max=511)
 
         if self.training:
             self.step += 1
@@ -277,7 +281,6 @@ class ForwardTacotron(nn.Module):
                 torch.fill_(dur_hat, value=2.)
             dur_hat = torch.clamp(dur_hat, max=20)
             pitch_hat = self.pitch_pred.generate(x, semb).unsqueeze(0).transpose(1, 2)
-            pitch_hat = (pitch_hat - 256.) / 32.
             pitch_hat = pitch_function(pitch_hat)
             print('gen pitch')
             print(pitch_hat.squeeze()[:10])
