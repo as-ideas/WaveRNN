@@ -1,20 +1,19 @@
-import argparse
 import itertools
+import logging
 from dataclasses import dataclass
+from logging import INFO
 from typing import List, Dict, Any, Tuple
 
 import numpy as np
 import torch
-from torch import optim
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 
 from duration_extraction.duration_extractor import DurationExtractor
 from models.tacotron import Tacotron
 from trainer.common import to_device
-from utils.checkpoints import restore_checkpoint
 from utils.dataset import get_tts_datasets, BinnedLengthSampler
-from utils.files import read_config, unpickle_binary
+from utils.files import unpickle_binary
 from utils.metrics import attention_score
 from utils.paths import Paths
 from utils.text.tokenizer import Tokenizer
@@ -32,7 +31,7 @@ class DurationCollator:
 
     def __call__(self, x: List[DurationResult]) -> DurationResult:
         if len(x) > 1:
-            raise ValueError(f'Batch size should be 1! Found dataset output wiht len: {len(x)}')
+            raise ValueError(f'Batch size must be 1! Found batch size: {len(x)}')
         return x[0]
 
 
@@ -85,11 +84,11 @@ class DurationExtractionPipeline:
         self.paths = paths
         self.config = config
         self.duration_extractor = duration_extractor
+        self.logger = logging.Logger(__name__, level=INFO)
 
     def extract_attentions(self,
                            model: Tacotron,
                            batch_size: int = 1) -> float:
-
         """
         Performs tacotron inference and stores the attention matrices as npy arrays in paths.data.att_pred.
         Returns average attention score.
@@ -142,7 +141,8 @@ class DurationExtractionPipeline:
                    if (self.paths.att_pred / f'{file_id}.npy').is_file()]
         len_orig = len(dataset)
         data_ids, mel_lens = list(zip(*dataset))
-        print(f'Found {len(data_ids)} / {len_orig} alignment files in {self.paths.att_pred}')
+        self.logger.info(f'Found {len(data_ids)} / {len_orig} '
+                         f'alignment files in {self.paths.att_pred}')
         att_score_dict = {}
         sum_att_score = 0
 
