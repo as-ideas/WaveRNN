@@ -296,10 +296,10 @@ class ForwardDataset(Dataset):
 
         dur_hat = dur.copy()
         pitch_hat = pitch.copy()
-        text = self.tokenizer.decode([int(t) for t in x])
-        for i, (t, d) in enumerate(zip(text, dur_hat[:])):
-            if t == ',' and i < len(dur_hat) - 1:
-                dur_hat[i+1] = max(dur_hat[i+1], 15)
+        #text = self.tokenizer.decode([int(t) for t in x])
+        #for i, (t, d) in enumerate(zip(text, dur_hat[:])):
+        #    if t == ',' and i < len(dur_hat) - 1:
+        #        dur_hat[i+1] = max(dur_hat[i+1], 15)
         #if text.endswith('?'):
         #    if pitch_hat[-3] - pitch_hat[-4] < 0.5:
         #        pitch_hat[-3] = pitch_hat[-4] + 0.5
