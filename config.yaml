@@ -1,7 +1,7 @@
 
 voc_model_id: 'ljspeech_voc'
-tts_model_id: 'bild_acroexpanded_rp_new_tts'
-data_path: 'data_librivox_new'                                        # output data path
+tts_model_id: 'bild_final_tts'
+data_path: 'data_bild_final'                                        # output data path
 
 tts_model: 'forward_tacotron'                             # choices: [forward_tacotron, fast_pitch]
 
@@ -53,7 +53,7 @@ duration_extraction:
   silence_prob_shift: 0.25           # Increase probability for silent characters in periods of silence
                                      # for better durations during non voiced periods
   batch_size: 1                      # batch size for tacotron inference to obtain attention matrices
-  num_workers: 12                    # number of processes for costly dijkstra duration extraction
+  num_workers: 6                    # number of processes for costly dijkstra duration extraction
 
 
 tacotron:

@@ -66,6 +66,7 @@ class DurationExtractor:
         cols = path_probs.shape[1]
         mel_text = {}
         durations = torch.zeros(x.shape[0])
+        dur_probs = torch.zeros(x.shape[0])
 
         att_scores = []
 
@@ -79,9 +80,15 @@ class DurationExtractor:
         for j in mel_text.values():
             durations[j] += 1
 
+        for i, j in mel_text.items():
+            dur_probs[j] += att[i, j]
+
+        for i in range(len(dur_probs)):
+            dur_probs[i] /= max(durations[i], 1)
+
         att_score = sum(att_scores) / len(att_scores)
 
-        return durations, att_score, torch.tensor(att_scores)
+        return durations, att_score, dur_probs
 
     @staticmethod
     def _to_node_index(i: int, j: int, cols: int) -> int:

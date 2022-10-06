@@ -2,10 +2,12 @@ import time
 from typing import Tuple, Dict, Any, Union
 
 import torch
+import torch.nn.functional as F
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
+from models.common_layers import LengthRegulator
 from models.fast_pitch import FastPitch
 from models.forward_tacotron import ForwardTacotron
 from trainer.common import Averager, TTSSession, MaskedL1, to_device, np_now
@@ -67,6 +69,9 @@ class ForwardTrainer:
         duration_avg = Averager()
         pitch_loss_avg = Averager()
         device = next(model.parameters()).device  # use same device as model parameters
+
+        lr = LengthRegulator()
+
         for e in range(1, epochs + 1):
             for i, batch in enumerate(session.train_set, 1):
                 batch = to_device(batch, device=device)
@@ -81,12 +86,16 @@ class ForwardTrainer:
                 batch['pitch'] = batch['pitch'] * pitch_zoneout_mask.to(device).float()
                 batch['energy'] = batch['energy'] * energy_zoneout_mask.to(device).float()
 
+                mp = lr(batch['dur_probs'], batch['dur']).unsqueeze(1)
+                mp = F.pad(mp, [0, batch['mel'].size(2) - mp.size(2), 0, 0], 'constant', 0)
+                dp = batch['dur_probs'].unsqueeze(1)
+
                 pred = model(batch)
 
-                m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
-                m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
+                m1_loss = self.l1_loss(pred['mel'] * mp, batch['mel'] * mp, batch['mel_len'])
+                m2_loss = self.l1_loss(pred['mel_post'] * mp, batch['mel'] * mp, batch['mel_len'])
 
-                dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
+                dur_loss = self.l1_loss(pred['dur'].unsqueeze(1) * dp, batch['dur'].unsqueeze(1) * dp, batch['x_len'])
                 pitch_loss = self.l1_loss(pred['pitch'], pitch_target.unsqueeze(1), batch['x_len'])
                 energy_loss = self.l1_loss(pred['energy'], energy_target.unsqueeze(1), batch['x_len'])
 

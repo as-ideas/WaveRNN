@@ -170,4 +170,12 @@ class DurationExtractionPipeline:
             np.save(self.paths.alg / f'{res.item_id}.npy', res.durs.astype(int), allow_pickle=False)
             np.save(self.paths.alg_probs / f'{res.item_id}.npy', res.dur_probs.astype(int), allow_pickle=False)
 
+            text = text_dict[res.item_id]
+            #print(res.item_id)
+            #for t, d, p in zip(text, res.durs, res.dur_probs):
+            #    print(t, d, p)
+            #print(res.item_id, res.dur_probs)
+
         return att_score_dict
+
+
