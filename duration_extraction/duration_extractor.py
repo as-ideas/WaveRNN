@@ -66,7 +66,7 @@ class DurationExtractor:
         cols = path_probs.shape[1]
         mel_text = {}
         durations = torch.zeros(x.shape[0])
-        dur_probs = torch.zeros(x.shape[0], dtype=float)
+        dur_probs = torch.zeros(x.shape[0]).float()
 
         att_scores = []
 
@@ -87,7 +87,7 @@ class DurationExtractor:
             dur_probs[i] /= max(durations[i], 1)
 
         att_score = sum(att_scores) / len(att_scores)
-
+        print(dur_probs)
         return durations, att_score, dur_probs
 
     @staticmethod
