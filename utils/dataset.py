@@ -262,10 +262,12 @@ class ForwardDataset(Dataset):
         mel = np.load(str(self.path/'mel'/f'{item_id}.npy'))
         mel_len = mel.shape[-1]
         dur = np.load(str(self.path/'alg'/f'{item_id}.npy'))
+        dur_probs = np.load(str(self.path/'alg_probs'/f'{item_id}.npy'))
         pitch = np.load(str(self.path/'phon_pitch'/f'{item_id}.npy'))
         energy = np.load(str(self.path/'phon_energy'/f'{item_id}.npy'))
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
-                'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy}
+                'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy,
+                'dur_probs': dur_probs}
 
     def __len__(self):
         return len(self.metadata)
@@ -297,11 +299,15 @@ def collate_tts(batch: List[Dict[str, Union[str, torch.tensor]]], r: int) -> Dic
     mel_lens = [b['mel_len'] for b in batch]
     mel_lens = torch.tensor(mel_lens)
 
-    dur, pitch, energy = None, None, None
+    dur, pitch, energy, dur_probs = None, None, None, None
     if 'dur' in batch[0]:
         dur = [pad1d(b['dur'][:max_x_len], max_x_len) for b in batch]
         dur = np.stack(dur)
         dur = torch.tensor(dur).float()
+    if 'dur_probs' in batch[0]:
+        dur_probs = [pad1d(b['dur_probs'][:max_x_len], max_x_len) for b in batch]
+        dur_probs = np.stack(dur_probs)
+        dur_probs = torch.tensor(dur_probs).float()
     if 'pitch' in batch[0]:
         pitch = [pad1d(b['pitch'][:max_x_len], max_x_len) for b in batch]
         pitch = np.stack(pitch)
@@ -312,7 +318,8 @@ def collate_tts(batch: List[Dict[str, Union[str, torch.tensor]]], r: int) -> Dic
         energy = torch.tensor(energy).float()
 
     return {'x': text, 'mel': mel, 'item_id': item_id, 'x_len': x_len,
-            'mel_len': mel_lens, 'dur': dur, 'pitch': pitch, 'energy': energy}
+            'mel_len': mel_lens, 'dur': dur, 'pitch': pitch, 'energy': energy,
+            'dur_probs': dur_probs}
 
 
 class BinnedLengthSampler(Sampler):
