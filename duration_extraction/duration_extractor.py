@@ -23,7 +23,7 @@ class DurationExtractor:
     def __call__(self,
                  x: torch.Tensor,
                  mel: torch.Tensor,
-                 att: torch.Tensor) -> Tuple[torch.tensor, float]:
+                 att: torch.Tensor) -> Tuple[torch.tensor, float, torch.tensor]:
         """
         Extracts durations from the attention matrix by finding the shortest monotonic path from
         top left to bottom right.
@@ -81,7 +81,7 @@ class DurationExtractor:
 
         att_score = sum(att_scores) / len(att_scores)
 
-        return durations, att_score
+        return durations, att_score, torch.tensor(att_scores)
 
     @staticmethod
     def _to_node_index(i: int, j: int, cols: int) -> int:

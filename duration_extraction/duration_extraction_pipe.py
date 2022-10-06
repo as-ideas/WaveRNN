@@ -25,6 +25,7 @@ class DurationResult:
     att_score: float
     align_score: float
     durs: np.array
+    dur_probs: np.array
 
 
 class DurationCollator:
@@ -63,13 +64,14 @@ class DurationDataset(Dataset):
         mel_len = torch.tensor(mel_len).unsqueeze(0)
         align_score, _ = attention_score(att.unsqueeze(0), mel_len, r=1)
         align_score = float(align_score)
-        durs, att_score = self.duration_extractor(x=x, mel=mel, att=att)
+        durs, att_score, dur_probs = self.duration_extractor(x=x, mel=mel, att=att)
         att_score = float(att_score)
         durs_npy = durs.cpu().numpy()
+        dur_probs_npy = dur_probs.cpu().numpy()
         if np.sum(durs_npy) != mel_len:
             print(f'WARNINNG: Sum of durations did not match mel length for item {item_id}!')
         return DurationResult(item_id=item_id, att_score=att_score,
-                              align_score=align_score, durs=durs_npy)
+                              align_score=align_score, durs=durs_npy, dur_probs=dur_probs_npy)
 
     def __len__(self):
         return len(self.metadata)
@@ -166,5 +168,6 @@ class DurationExtractionPipeline:
             att_score_dict[res.item_id] = (res.align_score, res.att_score)
             sum_att_score += res.att_score
             np.save(self.paths.alg / f'{res.item_id}.npy', res.durs.astype(int), allow_pickle=False)
+            np.save(self.paths.alg_probs / f'{res.item_id}.npy', res.dur_probs.astype(int), allow_pickle=False)
 
         return att_score_dict
