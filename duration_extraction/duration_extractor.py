@@ -66,7 +66,7 @@ class DurationExtractor:
         cols = path_probs.shape[1]
         mel_text = {}
         durations = torch.zeros(x.shape[0])
-        dur_probs = torch.zeros(x.shape[0])
+        dur_probs = torch.zeros(x.shape[0], dtype=float)
 
         att_scores = []
 
