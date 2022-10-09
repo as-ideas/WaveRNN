@@ -234,12 +234,16 @@ class ForwardTrainer:
 
         pitch_gen_fig = plot_pitch(np_now(gen['pitch'].squeeze()))
         energy_gen_fig = plot_pitch(np_now(gen['energy'].squeeze()))
+        dur_vec_fig = plot_mel(np_now(pred['dur_vec'][0]))
+        pitch_vec_fig = plot_mel(np_now(pred['pitch_vec'][0]))
 
         self.writer.add_figure('Pitch/generated', pitch_gen_fig, model.step)
         self.writer.add_figure('Energy/generated', energy_gen_fig, model.step)
         self.writer.add_figure('Generated/target', m_target_fig, model.step)
         self.writer.add_figure('Generated/linear', m1_hat_fig, model.step)
         self.writer.add_figure('Generated/postnet', m2_hat_fig, model.step)
+        self.writer.add_figure('Generated/dur_vec', dur_vec_fig, model.step)
+        self.writer.add_figure('Generated/pitch_vec', pitch_vec_fig, model.step)
 
         m2_hat_wav = self.dsp.griffinlim(m2_hat)
 
