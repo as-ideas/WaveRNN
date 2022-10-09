@@ -21,22 +21,27 @@ class SeriesPredictor(nn.Module):
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
         ])
-        self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
-        self.lin = nn.Linear(2 * rnn_dims, 1)
+        self.rnn = nn.GRU(emb_dim, rnn_dims, batch_first=True, bidirectional=True)
+        self.lin_o = nn.Linear(conv_dims, 1)
+        self.lin_h = nn.Linear(2 * rnn_dims, 1)
         self.dropout = dropout
 
     def forward(self,
                 x: torch.Tensor,
                 alpha: float = 1.0) -> torch.Tensor:
-        x = self.embedding(x)
-        x = x.transpose(1, 2)
+        x_e = self.embedding(x)
+        x = x_e.transpose(1, 2)
         for conv in self.convs:
             x = conv(x)
             x = F.dropout(x, p=self.dropout, training=self.training)
         x = x.transpose(1, 2)
-        x, _ = self.rnn(x)
-        x = self.lin(x)
-        return x / alpha
+        x_o = self.lin_o(x)
+
+        x_h, _ = self.rnn(x_e)
+        x_h = torch.tanh(x_h)
+
+        x_o = x_o * x_h
+        return x_o / alpha
 
 
 class BatchNormConv(nn.Module):
