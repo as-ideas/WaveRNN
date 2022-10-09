@@ -41,7 +41,7 @@ class SeriesPredictor(nn.Module):
 
         x_h, _ = self.rnn_2(x_e)
         x_h = self.lin_h(x_h)
-        x_h = torch.relu(x_h)
+        #x_h = torch.relu(x_h)
 
         x_o = x_o * x_h
 
