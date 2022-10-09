@@ -39,6 +39,7 @@ class SeriesPredictor(nn.Module):
 
         x_h, _ = self.rnn(x_e)
         x_h = torch.tanh(x_h)
+        x_h = self.lin_h(x_h)
 
         x_o = x_o * x_h
         return x_o / alpha
