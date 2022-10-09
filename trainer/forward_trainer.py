@@ -234,8 +234,8 @@ class ForwardTrainer:
 
         pitch_gen_fig = plot_pitch(np_now(gen['pitch'].squeeze()))
         energy_gen_fig = plot_pitch(np_now(gen['energy'].squeeze()))
-        dur_vec_fig = plot_mel(np_now(pred['dur_vec'][0].transpose(1, 2)))
-        pitch_vec_fig = plot_mel(np_now(pred['pitch_vec'][0].transpose(1, 2)))
+        dur_vec_fig = plot_mel(np_now(pred['dur_vec'][0].transpose(0, 1)))
+        pitch_vec_fig = plot_mel(np_now(pred['pitch_vec'][0].transpose(0, 1)))
 
         self.writer.add_figure('Pitch/generated', pitch_gen_fig, model.step)
         self.writer.add_figure('Energy/generated', energy_gen_fig, model.step)
