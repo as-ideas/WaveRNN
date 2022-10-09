@@ -22,7 +22,7 @@ class SeriesPredictor(nn.Module):
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
         ])
         self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
-        self.lin = nn.Linear(2 * rnn_dims, 1)
+        self.lin = nn.Linear(2 * rnn_dims, 32)
         self.dropout = dropout
 
     def forward(self,
@@ -37,6 +37,37 @@ class SeriesPredictor(nn.Module):
         x, _ = self.rnn(x)
         x = self.lin(x)
         return x / alpha
+
+
+
+class SeriesAutoencoder(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+        self.lin_1 = nn.Linear(1, 32)
+        self.lin_2 = nn.Linear(32, 1)
+
+    def forward(self,
+                x: torch.Tensor,
+                alpha: float = 1.0) -> tuple:
+        x_vec = self.lin_1(x)
+        x_vec = torch.tanh(x_vec)
+        x = self.lin_2(x_vec)
+        return x
+
+    def encode(self,
+                x: torch.Tensor,
+                alpha: float = 1.0) -> torch.Tensor:
+        with torch.no_grad():
+            x_vec = self.lin_1(x)
+            x_vec = torch.tanh(x_vec)
+        return x_vec
+
+    def decode(self,
+                x_vec: torch.Tensor,
+                alpha: float = 1.0) -> torch.Tensor:
+        x = self.lin_2(x_vec)
+        return x
 
 
 class BatchNormConv(nn.Module):
@@ -126,10 +157,22 @@ class ForwardTacotron(nn.Module):
         self.energy_strength = energy_strength
         self.pitch_proj = nn.Conv1d(1, 2 * prenet_dims, kernel_size=3, padding=1)
         self.energy_proj = nn.Conv1d(1, 2 * prenet_dims, kernel_size=3, padding=1)
+        self.dur_auto = SeriesAutoencoder()
+        self.pitch_auto = SeriesAutoencoder()
+        self.energy_auto = SeriesAutoencoder()
 
     def __repr__(self):
         num_params = sum([np.prod(p.size()) for p in self.parameters()])
         return f'ForwardTacotron, num params: {num_params}'
+
+    def forward_auto(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        dur = batch['dur']
+        pitch = batch['pitch'].unsqueeze(1)
+        energy = batch['energy'].unsqueeze(1)
+        dur_auto = self.dur_auto(dur.unsqueeze(-1))
+        pitch_auto = self.pitch_auto(pitch.transpose(1, 2))
+        energy_auto = self.energy_auto(energy.transpose(1, 2))
+        return {'dur_auto': dur_auto, 'energy_auto': energy_auto, 'pitch_auto': pitch_auto}
 
     def forward(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         x = batch['x']
@@ -141,6 +184,10 @@ class ForwardTacotron(nn.Module):
 
         if self.training:
             self.step += 1
+
+        dur_vec = self.dur_auto.encode(dur.unsqueeze(-1))
+        pitch_vec = self.pitch_auto.encode(pitch.transpose(1, 2))
+        energy_vec = self.energy_auto.encode(energy.transpose(1, 2))
 
         dur_hat = self.dur_pred(x).squeeze(-1)
         pitch_hat = self.pitch_pred(x).transpose(1, 2)
@@ -178,7 +225,8 @@ class ForwardTacotron(nn.Module):
         x = self._pad(x, mel.size(2))
 
         return {'mel': x, 'mel_post': x_post,
-                'dur': dur_hat, 'pitch': pitch_hat, 'energy': energy_hat}
+                'dur': dur_hat, 'pitch': pitch_hat, 'energy': energy_hat,
+                'dur_vec': dur_vec, 'pitch_vec': pitch_vec, 'energy_vec': energy_vec}
 
     def generate(self,
                  x: torch.Tensor,
@@ -187,14 +235,15 @@ class ForwardTacotron(nn.Module):
                  energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, torch.Tensor]:
         self.eval()
         with torch.no_grad():
-            dur_hat = self.dur_pred(x, alpha=alpha)
+            dur_vec = self.dur_pred(x, alpha=alpha)
+            dur_hat = self.dur_auto.decode(dur_vec)
             dur_hat = dur_hat.squeeze(2)
             if torch.sum(dur_hat.long()) <= 0:
                 torch.fill_(dur_hat, value=2.)
-            pitch_hat = self.pitch_pred(x).transpose(1, 2)
-            pitch_hat = pitch_function(pitch_hat)
-            energy_hat = self.energy_pred(x).transpose(1, 2)
-            energy_hat = energy_function(energy_hat)
+            pitch_vec = self.pitch_pred(x)
+            pitch_hat = self.pitch_auto.decode(pitch_vec).transpose(1, 2)
+            energy_vec = self.energy_pred(x)
+            energy_hat = self.energy_auto.decode(energy_vec).transpose(1, 2)
             return self._generate_mel(x=x, dur_hat=dur_hat,
                                       pitch_hat=pitch_hat,
                                       energy_hat=energy_hat)

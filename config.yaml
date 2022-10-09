@@ -1,7 +1,7 @@
 
 voc_model_id: 'ljspeech_voc'
-tts_model_id: 'ljspeech_tts'
-data_path: 'data/'                                        # output data path
+tts_model_id: 'bild_final_auto_tts'
+data_path: 'data_bild_final'                                        # output data path
 
 tts_model: 'forward_tacotron'                             # choices: [forward_tacotron, fast_pitch]
 
@@ -38,9 +38,9 @@ preprocessing:
 
   seed: 42
   n_val: 200
-  language: 'en-us'
-  cleaner_name: 'english_cleaners'   # choices: ['english_cleaners', 'no_cleaners'], expands numbers and abbreviations.
-  use_phonemes: True                 # whether to phonemize the text
+  language: 'de'
+  cleaner_name: 'no_cleaners'   # choices: ['english_cleaners', 'no_cleaners'], expands numbers and abbreviations.
+  use_phonemes: False                 # whether to phonemize the text
                                      # if set to False, you have to provide the phonemized text yourself
   min_text_len: 2
   silence_threshold: -11             # normalized mel value below which the voice is considered silent
@@ -121,7 +121,7 @@ forward_tacotron:
     max_mel_len: 1250
     clip_grad_norm: 1.0           # clips the gradient norm to prevent explosion - set to None if not needed
     checkpoint_every: 10_000      # checkpoints the model every x steps
-    plot_every: 1000              # generates samples and plots every x steps
+    plot_every: 1              # generates samples and plots every x steps
 
     filter_attention: True               # whether to filter data with bad attention scores
     min_attention_sharpness: 0.5         # filter data with bad attention sharpness score, if 0 then no filter
