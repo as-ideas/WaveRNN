@@ -51,7 +51,8 @@ class SeriesAutoencoder(nn.Module):
                 x: torch.Tensor,
                 alpha: float = 1.0) -> tuple:
         x_vec = self.lin_1(x)
-        x_vec = torch.tanh(x_vec)
+        x_vec = torch.relu(x_vec)
+        x_vec = x_vec / torch.linalg.norm(x_vec, dim=2, keepdim=True, ord=2)
         x = self.lin_2(x_vec)
         return x
 
@@ -60,7 +61,8 @@ class SeriesAutoencoder(nn.Module):
                 alpha: float = 1.0) -> torch.Tensor:
         with torch.no_grad():
             x_vec = self.lin_1(x)
-            x_vec = torch.tanh(x_vec)
+            x_vec = torch.relu(x_vec)
+            x_vec = x_vec / torch.linalg.norm(x_vec, dim=2, keepdim=True, ord=2)
         return x_vec
 
     def decode(self,
