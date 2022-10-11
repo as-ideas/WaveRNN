@@ -145,7 +145,7 @@ class SeriesPredictor(nn.Module):
         super().__init__()
         self.embedding = Embedding(num_chars, d_model)
         self.transformer = ForwardTransformer(heads=n_heads, dropout=dropout,
-                                              d_model=d_model+semb_dim, d_fft=d_fft,
+                                              d_model=d_model, d_fft=d_fft,
                                               conv1_kernel=conv1_kernel,
                                               conv2_kernel=conv2_kernel,
                                               layers=layers)
