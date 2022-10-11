@@ -149,7 +149,8 @@ class SeriesPredictor(nn.Module):
                                               conv1_kernel=conv1_kernel,
                                               conv2_kernel=conv2_kernel,
                                               layers=layers)
-        self.lin = nn.Linear(d_model+semb_dim, 1)
+        self.lin_pre = nn.Linear(d_model+semb_dim, d_model)
+        self.lin = nn.Linear(d_model, 1)
 
     def forward(self,
                 x: torch.Tensor,
@@ -160,6 +161,7 @@ class SeriesPredictor(nn.Module):
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
         x = torch.cat([x, speaker_emb], dim=2)
+        x = self.lin_pre(x)
         x = self.transformer(x, src_pad_mask=src_pad_mask)
         x = self.lin(x)
         return x / alpha
