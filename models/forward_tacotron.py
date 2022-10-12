@@ -17,7 +17,7 @@ class SeriesPredictor(nn.Module):
         super().__init__()
         self.embedding = Embedding(num_chars, emb_dim)
         self.convs = torch.nn.ModuleList([
-            BatchNormConv(emb_dim + semb_dims + 2, conv_dims, 5, relu=True),
+            BatchNormConv(emb_dim + semb_dims, conv_dims, 5, relu=True),
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
         ])
@@ -32,8 +32,8 @@ class SeriesPredictor(nn.Module):
                 std: torch.Tensor,
                 alpha: float = 1.0) -> torch.Tensor:
         x = self.embedding(x)
-        speaker_emb = torch.cat([semb, mean.unsqueeze(1), std.unsqueeze(1)], dim=-1)
-        speaker_emb = speaker_emb[:, None, :]
+        #speaker_emb = torch.cat([semb, mean.unsqueeze(1), std.unsqueeze(1)], dim=-1)
+        speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
         x = torch.cat([x, speaker_emb], dim=2)
         x = x.transpose(1, 2)

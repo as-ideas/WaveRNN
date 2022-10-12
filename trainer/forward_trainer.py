@@ -92,10 +92,20 @@ class ForwardTrainer:
                 pitch_loss = self.l1_loss(pred['pitch'], pitch_target.unsqueeze(1), batch['x_len'])
                 energy_loss = self.l1_loss(pred['energy'], energy_target.unsqueeze(1), batch['x_len'])
 
+                dur_mean_loss = (pred['dur'].mean() - batch['dur'].mean()) ** 2
+                dur_std_loss = (torch.std(pred['dur']) - torch.std(batch['dur'])) ** 2
+
+                pitch_mean_loss = (pred['pitch'].mean() - batch['pitch'].mean()) ** 2
+                pitch_std_loss = (torch.std(pred['pitch']) - torch.std(batch['pitch'])) ** 2
+
                 loss = m1_loss + m2_loss \
                        + self.train_cfg['dur_loss_factor'] * dur_loss \
                        + self.train_cfg['pitch_loss_factor'] * pitch_loss \
-                       + self.train_cfg['energy_loss_factor'] * energy_loss
+                       + self.train_cfg['energy_loss_factor'] * energy_loss \
+                        + self.train_cfg['dur_loss_factor'] * dur_mean_loss \
+                        + self.train_cfg['dur_loss_factor'] * dur_std_loss \
+                        + self.train_cfg['pitch_loss_factor'] * pitch_mean_loss \
+                        + self.train_cfg['pitch_loss_factor'] * pitch_std_loss \
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -129,6 +139,8 @@ class ForwardTrainer:
                 self.writer.add_scalar('Duration_Loss/train', dur_loss, model.get_step())
                 self.writer.add_scalar('DurMean/train_pred', pred['dur'].mean(), model.get_step())
                 self.writer.add_scalar('DurMean/train_target', batch['dur'].mean(), model.get_step())
+                self.writer.add_scalar('DurMeanLoss/train_target', dur_mean_loss, model.get_step())
+                self.writer.add_scalar('PitchMeanLoss/train_target', pitch_mean_loss, model.get_step())
                 self.writer.add_scalar('DurStd/train_pred', torch.std(pred['dur']), model.get_step())
                 self.writer.add_scalar('DurStd/train_target', torch.std(batch['dur']), model.get_step())
                 self.writer.add_scalar('PitchMean/train_pred', pred['pitch'].mean(), model.get_step())
@@ -219,6 +231,7 @@ class ForwardTrainer:
             global_step=model.step, sample_rate=self.dsp.sample_rate)
 
         speaker_names = list(self.config['speaker_names'])[:10]
+        speaker_names = {'bild', 'welt'}
         for speaker_name in speaker_names:
             speaker_emb = getattr(model, speaker_name).unsqueeze(0)
             dur = batch['dur'][0:1, :batch['x_len'][0]]
@@ -227,6 +240,7 @@ class ForwardTrainer:
             dur_mean = torch.mean(dur, dim=1)
             pitch_mean = torch.mean(pitch, dim=1)
             energy_mean = torch.mean(energy, dim=1)
+
             dur_std = torch.std(dur, dim=1)
             pitch_std = torch.std(pitch, dim=1)
             energy_std = torch.std(energy, dim=1)
