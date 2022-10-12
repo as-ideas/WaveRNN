@@ -92,11 +92,14 @@ class ForwardTrainer:
                 pitch_loss = self.l1_loss(pred['pitch'], pitch_target.unsqueeze(1), batch['x_len'])
                 energy_loss = self.l1_loss(pred['energy'], energy_target.unsqueeze(1), batch['x_len'])
 
-                dur_mean_loss = (pred['dur'].mean() - batch['dur'].mean()) ** 2
-                dur_std_loss = (torch.std(pred['dur']) - torch.std(batch['dur'])) ** 2
 
-                pitch_mean_loss = (pred['pitch'].mean() - batch['pitch'].mean()) ** 2
-                pitch_std_loss = (torch.std(pred['pitch']) - torch.std(batch['pitch'])) ** 2
+                dp = batch['dur'] != 0
+                pp = batch['pitch'] != 0
+                dur_mean_loss = (pred['dur'][dp].mean() - batch['dur'][dp].mean()) ** 2
+                dur_std_loss = (torch.std(pred['dur'][dp]) - torch.std(batch['dur'][dp])) ** 2
+
+                pitch_mean_loss = (pred['pitch'][pp].mean() - batch['pitch'][pp].mean()) ** 2
+                pitch_std_loss = (torch.std(pred['pitch'][pp]) - torch.std(batch['pitch'][pp])) ** 2
 
                 loss = m1_loss + m2_loss \
                        + self.train_cfg['dur_loss_factor'] * dur_loss \
