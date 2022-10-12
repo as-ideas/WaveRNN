@@ -127,6 +127,14 @@ class ForwardTrainer:
                 self.writer.add_scalar('Pitch_Loss/train', pitch_loss, model.get_step())
                 self.writer.add_scalar('Energy_Loss/train', energy_loss, model.get_step())
                 self.writer.add_scalar('Duration_Loss/train', dur_loss, model.get_step())
+                self.writer.add_scalar('DurMean/train_pred', pred['dur'].mean(), model.get_step())
+                self.writer.add_scalar('DurMean/train_target', batch['dur'].mean(), model.get_step())
+                self.writer.add_scalar('DurStd/train_pred', torch.std(pred['dur']), model.get_step())
+                self.writer.add_scalar('DurStd/train_target', torch.std(batch['dur']), model.get_step())
+                self.writer.add_scalar('PitchMean/train_pred', pred['pitch'].mean(), model.get_step())
+                self.writer.add_scalar('PitchMean/train_target', batch['pitch'].mean(), model.get_step())
+                self.writer.add_scalar('PitchStd/train_pred', torch.std(pred['pitch']), model.get_step())
+                self.writer.add_scalar('PitchStd/train_target', torch.std(batch['pitch']), model.get_step())
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
                 self.writer.add_scalar('Params/learning_rate', session.lr, model.get_step())
 
@@ -213,7 +221,24 @@ class ForwardTrainer:
         speaker_names = list(self.config['speaker_names'])[:10]
         for speaker_name in speaker_names:
             speaker_emb = getattr(model, speaker_name).unsqueeze(0)
-            gen = model.generate(batch['x'][0:1, :batch['x_len'][0]], semb=speaker_emb)
+            dur = batch['dur'][0:1, :batch['x_len'][0]]
+            pitch = batch['pitch'][0:1, :batch['x_len'][0]]
+            energy = batch['energy'][0:1, :batch['x_len'][0]]
+            dur_mean = torch.mean(dur, dim=1)
+            pitch_mean = torch.mean(pitch, dim=1)
+            energy_mean = torch.mean(energy, dim=1)
+            dur_std = torch.std(dur, dim=1)
+            pitch_std = torch.std(pitch, dim=1)
+            energy_std = torch.std(energy, dim=1)
+            gen = model.generate(batch['x'][0:1, :batch['x_len'][0]],
+                                 dur_mean=dur_mean,
+                                 dur_std=dur_std,
+                                 pitch_mean=pitch_mean,
+                                 pitch_std=pitch_std,
+                                 energy_mean=energy_mean,
+                                 energy_std=energy_std,
+                                 semb=speaker_emb)
+
             m1_hat = np_now(gen['mel'].squeeze())
             m2_hat = np_now(gen['mel_post'].squeeze())
 

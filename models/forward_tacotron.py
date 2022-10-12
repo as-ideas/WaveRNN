@@ -17,7 +17,7 @@ class SeriesPredictor(nn.Module):
         super().__init__()
         self.embedding = Embedding(num_chars, emb_dim)
         self.convs = torch.nn.ModuleList([
-            BatchNormConv(emb_dim + semb_dims, conv_dims, 5, relu=True),
+            BatchNormConv(emb_dim + semb_dims + 2, conv_dims, 5, relu=True),
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
         ])
@@ -28,9 +28,12 @@ class SeriesPredictor(nn.Module):
     def forward(self,
                 x: torch.Tensor,
                 semb: torch.Tensor,
+                mean: torch.Tensor,
+                std: torch.Tensor,
                 alpha: float = 1.0) -> torch.Tensor:
         x = self.embedding(x)
-        speaker_emb = semb[:, None, :]
+        speaker_emb = torch.cat([semb, mean.unsqueeze(1), std.unsqueeze(1)], dim=-1)
+        speaker_emb = speaker_emb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
         x = torch.cat([x, speaker_emb], dim=2)
         x = x.transpose(1, 2)
@@ -148,12 +151,19 @@ class ForwardTacotron(nn.Module):
         pitch = batch['pitch'].unsqueeze(1)
         energy = batch['energy'].unsqueeze(1)
 
+        dur_mean = torch.mean(dur, dim=1)
+        pitch_mean = torch.mean(pitch.squeeze(1), dim=1)
+        energy_mean = torch.mean(energy.squeeze(1), dim=1)
+        dur_std = torch.std(dur, dim=1)
+        pitch_std = torch.std(pitch.squeeze(1), dim=1)
+        energy_std = torch.std(energy.squeeze(1), dim=1)
+
         if self.training:
             self.step += 1
 
-        dur_hat = self.dur_pred(x, semb).squeeze(-1)
-        pitch_hat = self.pitch_pred(x, semb).transpose(1, 2)
-        energy_hat = self.energy_pred(x, semb).transpose(1, 2)
+        dur_hat = self.dur_pred(x, semb, dur_mean, dur_std).squeeze(-1)
+        pitch_hat = self.pitch_pred(x, semb, pitch_mean, pitch_std).transpose(1, 2)
+        energy_hat = self.energy_pred(x, semb, energy_mean, energy_std).transpose(1, 2)
 
         x = self.embedding(x)
         x = x.transpose(1, 2)
@@ -195,18 +205,24 @@ class ForwardTacotron(nn.Module):
     def generate(self,
                  x: torch.Tensor,
                  semb: torch.Tensor,
+                 dur_mean=None,
+                 pitch_mean=None,
+                 energy_mean=None,
+                 dur_std=None,
+                 pitch_std=None,
+                 energy_std=None,
                  alpha=1.0,
                  pitch_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x,
                  energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, torch.Tensor]:
         self.eval()
         with torch.no_grad():
-            dur_hat = self.dur_pred(x, semb, alpha=alpha)
+            dur_hat = self.dur_pred(x, semb, dur_mean, dur_std, alpha=alpha)
             dur_hat = dur_hat.squeeze(2)
             if torch.sum(dur_hat.long()) <= 0:
                 torch.fill_(dur_hat, value=2.)
-            pitch_hat = self.pitch_pred(x, semb).transpose(1, 2)
+            pitch_hat = self.pitch_pred(x, semb, pitch_mean, pitch_std).transpose(1, 2)
             pitch_hat = pitch_function(pitch_hat)
-            energy_hat = self.energy_pred(x, semb).transpose(1, 2)
+            energy_hat = self.energy_pred(x, semb, energy_mean, energy_std).transpose(1, 2)
             energy_hat = energy_function(energy_hat)
             return self._generate_mel(x=x, dur_hat=dur_hat,
                                       pitch_hat=pitch_hat,
