@@ -35,7 +35,7 @@ class DurationCollator:
         return x[0]
 
 
-class DurationDataset(Dataset):
+class DurationExtractionDataset(Dataset):
 
     def __init__(self,
                  duration_extractor: DurationExtractor,
@@ -127,9 +127,8 @@ class DurationExtractionPipeline:
     def extract_durations(self,
                           num_workers: int = 0,
                           sampler_bin_size: int = 1) -> Dict[str, Tuple[float, float]]:
-
         """
-        Extracts durations from saved attention matrices, saves the durations as npy arrays
+        Extracts durations from saved attention matrices, saves the durations as numpy arrays
         and returns a dictionary with entries {file_id: (attention_alignment_score, attention_sharpness score)}
         """
 
@@ -146,7 +145,7 @@ class DurationExtractionPipeline:
         att_score_dict = {}
         sum_att_score = 0
 
-        dataset = DurationDataset(
+        dataset = DurationExtractionDataset(
             duration_extractor=self.duration_extractor,
             paths=self.paths, dataset_ids=data_ids,
             text_dict=text_dict, tokenizer=Tokenizer())
@@ -162,7 +161,7 @@ class DurationExtractionPipeline:
         pbar = tqdm(dataset, total=len(dataset))
 
         for i, res in enumerate(pbar, 1):
-            pbar.set_description(f'Avg tuned attention score: {sum_att_score / i}', refresh=True)
+            pbar.set_description(f'Avg attention score: {sum_att_score / i}', refresh=True)
             att_score_dict[res.item_id] = (res.align_score, res.att_score)
             sum_att_score += res.att_score
             np.save(self.paths.alg / f'{res.item_id}.npy', res.durs.astype(int), allow_pickle=False)
