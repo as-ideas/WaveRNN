@@ -41,7 +41,7 @@ class TestDurationExtractionPipe(unittest.TestCase):
         self.val_dataset = [('id_4', 6), ('id_5', 12)]
         pickle_binary(self.train_dataset, self.paths.data / 'train_dataset.pkl')
         pickle_binary(self.val_dataset, self.paths.data / 'val_dataset.pkl')
-        self.text_dict = {id: 'a' * l for id, l in self.train_dataset + self.val_dataset}
+        self.text_dict = {file_id: 'a' * length for file_id, length in self.train_dataset + self.val_dataset}
         pickle_binary(self.text_dict, self.paths.data / 'text_dict.pkl')
         for id, mel_len in self.train_dataset + self.val_dataset:
             np.save(self.paths.mel / f'{id}.npy', np.ones((5, mel_len)), allow_pickle=False)
