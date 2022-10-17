@@ -21,10 +21,8 @@ class SeriesPredictor(nn.Module):
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
         ])
-        self.rnn_1 = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
-        self.rnn_2 = nn.GRU(emb_dim, rnn_dims, batch_first=True, bidirectional=True)
-        self.lin_o = nn.Linear(2 * rnn_dims, 1)
-        self.lin_h = nn.Linear(2 * rnn_dims, 1)
+        self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
+        self.lin_o = nn.Linear(conv_dims, 1)
         self.dropout = dropout
 
     def forward(self,
@@ -36,12 +34,11 @@ class SeriesPredictor(nn.Module):
             x = conv(x)
             x = F.dropout(x, p=self.dropout, training=self.training)
         x = x.transpose(1, 2)
-        x_o, _ = self.rnn_1(x)
-        x_o = self.lin_o(x_o)
+        x_o = self.lin_o(x)
 
-        x_h, _ = self.rnn_2(x_e)
+        x_h, _ = self.rnn(x)
         x_h = self.lin_h(x_h)
-        #x_h = torch.relu(x_h)
+        x_h = torch.tanh(x_h) + 1.
 
         x_o = x_o * x_h
 
