@@ -1,8 +1,7 @@
 import os
-import shutil
 import unittest
 from pathlib import Path
-from tempfile import NamedTemporaryFile, TemporaryDirectory
+from tempfile import TemporaryDirectory
 from typing import Tuple
 from unittest.mock import patch
 
