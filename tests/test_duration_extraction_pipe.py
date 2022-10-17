@@ -27,6 +27,7 @@ def new_diagonal_att(dims: Tuple[int, int, int]) -> torch.Tensor:
 class MockTacotron(torch.nn.Module):
 
     def __call__(self, x: torch.Tensor, mel: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """ We just use the mock model to get the returned diagonal attention matrix. """
         return x, x, new_diagonal_att((1, mel.size(-1), x.size(-1)))
 
 
@@ -77,6 +78,6 @@ class TestDurationExtractionPipe(unittest.TestCase):
 
         for dur_file in dur_files:
             dur = np.load(dur_file)
-            # We expect durations of one since due to the diagonal attention
+            # We expect durations of one due to the diagonal attention.
             expected = np.ones(len(dur))
             np.testing.assert_allclose(expected, dur, rtol=1e-8)
