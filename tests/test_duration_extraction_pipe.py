@@ -2,6 +2,7 @@ import os
 import shutil
 import unittest
 from pathlib import Path
+from tempfile import NamedTemporaryFile, TemporaryDirectory
 from typing import Tuple
 from unittest.mock import patch
 
@@ -36,7 +37,8 @@ class TestDurationExtractionPipe(unittest.TestCase):
         test_path = os.path.dirname(os.path.abspath(__file__))
         self.resource_path = Path(test_path) / 'resources'
         self.config = read_config(self.resource_path / 'test_config.yaml')
-        self.paths = Paths(data_path='tmp_resources/data_test', voc_id='voc_test_id', tts_id='tts_test_id')
+        self.temp_dir = TemporaryDirectory(prefix='forwardtaco_data_test_temp')
+        self.paths = Paths(data_path=self.temp_dir.name + '/data', voc_id='voc_test_id', tts_id='tts_test_id')
         self.train_dataset = [('id_1', 5), ('id_2', 10), ('id_3', 15)]
         self.val_dataset = [('id_4', 6), ('id_5', 12)]
         pickle_binary(self.train_dataset, self.paths.data / 'train_dataset.pkl')
@@ -47,7 +49,7 @@ class TestDurationExtractionPipe(unittest.TestCase):
             np.save(self.paths.mel / f'{id}.npy', np.ones((5, mel_len)), allow_pickle=False)
 
     def tearDown(self) -> None:
-        shutil.rmtree(self.paths.data.parent)
+        self.temp_dir.cleanup()
 
     @patch.object(Tacotron, '__call__', new_callable=MockTacotron)
     def test_extract_attentions_durations(self, mock_tacotron: Tacotron) -> None:

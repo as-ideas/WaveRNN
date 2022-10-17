@@ -92,6 +92,13 @@ class DurationExtractionPipeline:
         """
         Performs tacotron inference and stores the attention matrices as npy arrays in paths.data.att_pred.
         Returns average attention score.
+
+        Args:
+            model: Tacotron model to use for attention extraction.
+            batch_size: Batch size to use for tacotron inference.
+
+        Returns: Mean attention score. The attention matrices are saved as numpy arrays in paths.att_pred.
+
         """
 
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -128,8 +135,15 @@ class DurationExtractionPipeline:
                           num_workers: int = 0,
                           sampler_bin_size: int = 1) -> Dict[str, Tuple[float, float]]:
         """
-        Extracts durations from saved attention matrices, saves the durations as numpy arrays
-        and returns a dictionary with entries {file_id: (attention_alignment_score, attention_sharpness score)}
+        Extracts durations from saved attention matrices.
+
+        Args:
+            num_workers: Number of workers for multiprocessing.
+            sampler_bin_size: Bin size of BinnedLengthSampler.
+            Should be greater than one (but much less than length of dataset) for optimal performance.
+
+        Returns: Dictionary containing the attention scores for each item id.
+        The durations are saved as numpy arrays in paths.alg.
         """
 
         train_set = unpickle_binary(self.paths.data / 'train_dataset.pkl')
