@@ -88,7 +88,7 @@ class ForwardTrainer:
 
                 pe = torch.sqrt((torch.abs(pitch_target.unsqueeze(1)))).detach() + 0.1
 
-                pe_dur = (torch.abs(dur_hat.unsqueeze(1))).detach()
+                #pe_dur = (torch.abs(dur_hat.unsqueeze(1))).detach()
 
                 for b in range(pitch_hat.size(0)):
                     x_len = int(batch['x_len'][b])
@@ -99,7 +99,7 @@ class ForwardTrainer:
                     dur_diff_mean += torch.mean(dur_diff)
                     dur_diff_median += torch.median(dur_diff)
 
-                dur_loss = self.l1_loss(dur_hat.transpose(1, 2)*pe_dur, batch['dur'].unsqueeze(1)*pe_dur, batch['x_len'])
+                dur_loss = self.l1_loss(dur_hat.transpose(1, 2), batch['dur'].unsqueeze(1), batch['x_len'])
                 pitch_loss = self.l1_loss(pitch_hat*pe, pitch_target.unsqueeze(1)*pe, batch['x_len'])
 
                 loss = self.train_cfg['pitch_loss_factor'] * pitch_loss \
