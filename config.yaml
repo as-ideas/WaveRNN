@@ -120,7 +120,7 @@ forward_tacotron:
 
     max_mel_len: 1250
     clip_grad_norm: 1.0           # clips the gradient norm to prevent explosion - set to None if not needed
-    checkpoint_every: 10_000      # checkpoints the model every x steps
+    checkpoint_every: 50_000      # checkpoints the model every x steps
     plot_every: 1000              # generates samples and plots every x steps
 
     filter_attention: True               # whether to filter data with bad attention scores
