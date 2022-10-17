@@ -23,6 +23,7 @@ class SeriesPredictor(nn.Module):
         ])
         self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
         self.lin_o = nn.Linear(conv_dims, 1)
+        self.lin_h = nn.Linear(2*rnn_dims, 1)
         self.dropout = dropout
 
     def forward(self,
