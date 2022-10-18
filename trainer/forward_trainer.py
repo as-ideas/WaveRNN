@@ -186,6 +186,8 @@ class ForwardTrainer:
         m1_hat_fig = plot_mel(m1_hat)
         m2_hat_fig = plot_mel(m2_hat)
         m_target_fig = plot_mel(m_target)
+        dur_fig = plot_pitch(np_now(batch['dur'][0]))
+        dur_gta_fig = plot_pitch(np_now(pred['dur'][0]))
         pitch_fig = plot_pitch(np_now(batch['pitch'][0]))
         pitch_gta_fig = plot_pitch(np_now(pred['pitch'].squeeze()[0]))
         energy_fig = plot_pitch(np_now(batch['energy'][0]))
@@ -198,6 +200,8 @@ class ForwardTrainer:
         self.writer.add_figure('Ground_Truth_Aligned/target', m_target_fig, model.step)
         self.writer.add_figure('Ground_Truth_Aligned/linear', m1_hat_fig, model.step)
         self.writer.add_figure('Ground_Truth_Aligned/postnet', m2_hat_fig, model.step)
+        self.writer.add_figure('Dur/target', dur_fig, model.step)
+        self.writer.add_figure('Dur/ground_truth_aligned', dur_gta_fig, model.step)
 
         m2_hat_wav = self.dsp.griffinlim(m2_hat)
         target_wav = self.dsp.griffinlim(m_target)
