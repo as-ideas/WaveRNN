@@ -40,7 +40,7 @@ class SeriesPredictor(nn.Module):
         x = x.transpose(1, 2)
         x, _ = self.rnn(x)
         x = self.lin(x)
-        x = torch.sign(x) + torch.exp(x)
+        #x = torch.sign(x) + torch.exp(x)
         return x / alpha
 
 
