@@ -106,7 +106,7 @@ class ForwardTrainer:
 
                 loss = self.train_cfg['pitch_loss_factor'] * pitch_loss \
                        + self.train_cfg['dur_loss_factor'] * dur_loss \
-                       + self.train_cfg['dur_loss_factor'] * dur_diff_mean / pitch_hat.size(0)
+                       + self.train_cfg['dur_loss_factor'] * dur_diff_mean ** 2 / pitch_hat.size(0)
 
                 optimizer.zero_grad()
                 loss.backward()
