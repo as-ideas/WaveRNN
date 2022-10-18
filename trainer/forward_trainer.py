@@ -102,7 +102,7 @@ class ForwardTrainer:
                 dur_loss = self.l1_loss(dur_hat.transpose(1, 2), batch['dur'].unsqueeze(1), batch['x_len'])
 
 
-                pitch_loss = self.l1_loss(pitch_hat*pe, pitch_target.unsqueeze(1)*pe, batch['x_len'])
+                pitch_loss = self.l1_loss(pitch_hat, pitch_target.unsqueeze(1), batch['x_len'])
 
                 loss = self.train_cfg['pitch_loss_factor'] * pitch_loss \
                        + self.train_cfg['dur_loss_factor'] * dur_loss
