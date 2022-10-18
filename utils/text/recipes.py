@@ -21,7 +21,7 @@ def ljspeech(path: Union[str, Path]):
     return text_dict, speaker_dict, text_prob
 
 
-def librivox(path: Union[str, Path]):
+def multispeaker(path: Union[str, Path]):
     df = pd.read_csv(path, sep='\t', encoding='utf-8')
 
     text_dict = {}
@@ -29,11 +29,12 @@ def librivox(path: Union[str, Path]):
     text_sim = {}
     speaker_dict = {}
 
-    for id, speaker_id, t, t_prob, t_sim in zip(df['id'], df['speaker_id'], df['text_phonemized'], df['prob'], df['lev_similarity']):
-        text_dict[id] = t
-        text_prob[id] = t_prob
-        text_sim[id] = t_sim
-        speaker_dict[id] = speaker_id
+    for index, row in df.iterrows():
+        id = row['file_id']
+        text_dict[id] = row['text_phonemized']
+        text_prob[id] = row.get('transcription_probability', 1)
+        text_sim[id] = row.get('levenshtein_similarity', 1)
+        speaker_dict[id] = row['speaker_id'] + '_' + row['book_id']
 
     return text_dict, speaker_dict, text_prob, text_sim
 
@@ -58,3 +59,4 @@ def read_line(file: Path) -> Tuple[Path, str]:
     with open(str(file), encoding='utf-8') as f:
         line = f.readlines()[0]
     return file, line
+

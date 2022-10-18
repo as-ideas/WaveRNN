@@ -79,13 +79,16 @@ if __name__ == '__main__':
     model = init_tts_model(config).to(device)
     print(f'\nInitialized tts model: {model}\n')
 
-    print('Loading semb')
     sembs = list(paths.speaker_emb.glob('*.npy'))
 
-    print(f'Speaker names: {speaker_names}')
+    print(f'Speaker names:')
+    for speaker_name in speaker_names:
+        print(speaker_name)
+
     speaker_emb = {name: np.zeros(256) for name in speaker_names}
     speaker_norm = {name: 0. for name in speaker_names}
 
+    print(f'Loading speaker embeddings...')
     for f in tqdm.tqdm(sembs, total=len(sembs)):
         try:
             item_id = f.stem
@@ -101,14 +104,11 @@ if __name__ == '__main__':
                        path=paths.forward_checkpoints / 'latest_model.pt',
                        device=device)
 
+    print('Averaging speaker embeddings...')
     for speaker_name in tqdm.tqdm(speaker_names, total=len(speaker_names)):
-        print(speaker_name)
-        print(speaker_emb[speaker_name])
-        print(speaker_norm[speaker_name])
         emb = speaker_emb[speaker_name] / speaker_norm[speaker_name]
-        emb = torch.tensor(emb).float().to(device)
-        print(emb)
-
+        emb = emb / np.linalg.norm(emb, 2)
+        semb = torch.from_numpy(emb).float().to(device)
         setattr(model, speaker_name, emb)
 
     if force_gta:
