@@ -75,9 +75,12 @@ class MaskedL1(torch.nn.Module):
         mask = mask.unsqueeze(1).expand_as(x)
         if mask_2 is not None:
             mask = mask * mask_2
+        mask_sum = mask.sum()
+        if mask_sum == 0.:
+            mask_sum = 1.
         loss = F.l1_loss(
             x * mask, target * mask, reduction='sum')
-        return loss / mask.sum()
+        return loss / mask_sum
 
 
 # Adapted from https://gist.github.com/jihunchoi/f1434a77df9db1bb337417854b398df1
