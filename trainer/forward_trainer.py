@@ -208,7 +208,8 @@ class ForwardTrainer:
             tag='Ground_Truth_Aligned/postnet_wav', snd_tensor=m2_hat_wav,
             global_step=model.step, sample_rate=self.dsp.sample_rate)
 
-        speaker_names = list(self.config['speaker_names'])[:10]
+        #speaker_names = list(self.config['speaker_names'])[:10]
+        speaker_names = ['welt', 'bild', 'kammmacher', '4815_komoedie3_28_dante_64kb']
         for speaker_name in speaker_names:
             speaker_emb = getattr(model, speaker_name).unsqueeze(0)
             gen = model.generate(batch['x'][0:1, :batch['x_len'][0]], semb=speaker_emb)
