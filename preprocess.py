@@ -86,7 +86,7 @@ class Preprocessor:
         item_id = path.stem
         text = self.text_dict[item_id]
         text = self.cleaner(text)
-        preprocessed_wav = preprocess_wav(dp.path)
+        preprocessed_wav = preprocess_wav(path)
 
         return DataPoint(item_id=item_id,
                          mel=mel.astype(np.float32),
