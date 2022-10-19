@@ -4,6 +4,7 @@ from multiprocessing import Pool, cpu_count
 from random import Random
 
 import pyworld as pw
+import torch.cuda
 import tqdm
 from resemblyzer import VoiceEncoder, preprocess_wav
 
@@ -29,6 +30,7 @@ class DataPoint:
     text: str = None
     mel: np.array = None
     quant: np.array = None
+    preprocessed_wav: np.array = None
     pitch: np.array = None
     path: Path = None
 
@@ -84,6 +86,7 @@ class Preprocessor:
         item_id = path.stem
         text = self.text_dict[item_id]
         text = self.cleaner(text)
+        preprocessed_wav = preprocess_wav(dp.path)
 
         return DataPoint(item_id=item_id,
                          mel=mel.astype(np.float32),
@@ -91,7 +94,8 @@ class Preprocessor:
                          text=text,
                          quant=quant.astype(np.int64),
                          pitch=pitch.astype(np.float32),
-                         path=path)
+                         path=path,
+                         preprocessed_wav=preprocessed_wav)
 
 
 parser = argparse.ArgumentParser(description='Preprocessing for WaveRNN and Tacotron')
@@ -141,13 +145,14 @@ if __name__ == '__main__':
                                 dsp=dsp,
                                 cleaner=cleaner,
                                 lang=config['preprocessing']['language'])
-    voice_encoder = VoiceEncoder()
+
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    voice_encoder = VoiceEncoder().to(device)
 
     for i, dp in tqdm.tqdm(enumerate(pool.imap_unordered(preprocessor, wav_files), 1), total=len(wav_files)):
         if dp is not None and dp.item_id in text_dict:
             try:
-                wav = preprocess_wav(dp.path)
-                emb = voice_encoder.embed_utterance(wav)
+                emb = voice_encoder.embed_utterance(dp.preprocessed_wav)
                 np.save(paths.speaker_emb / f'{dp.item_id}.npy', emb, allow_pickle=False)
                 dataset += [(dp.item_id, dp.mel_len)]
                 cleaned_texts += [(dp.item_id, dp.text)]
