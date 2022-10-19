@@ -8,7 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from models.fast_pitch import FastPitch
 from models.forward_tacotron import ForwardTacotron
-from trainer.common import Averager, TTSSession, MaskedL1, to_device, np_now
+from trainer.common import Averager, TTSSession, MaskedL1, to_device, np_now, MaskedL2
 from utils.checkpoints import  save_checkpoint
 from utils.dataset import get_tts_datasets
 from utils.decorators import ignore_exception
@@ -31,6 +31,7 @@ class ForwardTrainer:
         self.train_cfg = config[model_type]['training']
         self.writer = SummaryWriter(log_dir=paths.forward_log, comment='v1')
         self.l1_loss = MaskedL1()
+        self.l2_loss = MaskedL2()
 
     def train(self, model: Union[ForwardTacotron, FastPitch], optimizer: Optimizer) -> None:
         forward_schedule = self.train_cfg['schedule']
@@ -99,14 +100,13 @@ class ForwardTrainer:
                     dur_diff_mean += torch.mean(dur_diff)
                     dur_diff_median += torch.median(dur_diff)
 
-                dur_loss = self.l1_loss(dur_hat.transpose(1, 2), batch['dur'].unsqueeze(1), batch['x_len'])
-                dur_loss_2 = self.l1_loss(dur_hat.transpose(1, 2), batch['dur'].unsqueeze(1), batch['x_len'], mask_2=pe_dur)
+                dur_loss = self.l2_loss(dur_hat.transpose(1, 2), batch['dur'].unsqueeze(1), batch['x_len'])
+                #dur_loss_2 = self.l1_loss(dur_hat.transpose(1, 2), batch['dur'].unsqueeze(1), batch['x_len'], mask_2=pe_dur)
 
-                pitch_loss = self.l1_loss(pitch_hat, pitch_target.unsqueeze(1), batch['x_len'])
+                pitch_loss = self.l2_loss(pitch_hat, pitch_target.unsqueeze(1), batch['x_len'])
 
                 loss = self.train_cfg['pitch_loss_factor'] * pitch_loss \
-                       + self.train_cfg['dur_loss_factor'] * dur_loss \
-                       + self.train_cfg['dur_loss_factor'] * dur_loss_2
+                       + self.train_cfg['dur_loss_factor'] * dur_loss
 
                 optimizer.zero_grad()
                 loss.backward()
