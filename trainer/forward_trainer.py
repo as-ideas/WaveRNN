@@ -109,7 +109,7 @@ class ForwardTrainer:
                 #pe = torch.std(pitch_target[pitch_target!=0], dim=1)
                 pitch_loss = self.l1_loss(pitch_hat * pe[:, None, None], pitch_target.unsqueeze(1) * pe[:, None, None], batch['x_len'])
 
-                loss = self.train_cfg['pitch_loss_factor']
+                loss = self.train_cfg['pitch_loss_factor'] * pitch_loss
                        #* pitch_loss \
                        #+ self.train_cfg['dur_loss_factor'] * dur_loss
 
@@ -138,7 +138,7 @@ class ForwardTrainer:
                     self.generate_plots(model, session)
 
                 self.writer.add_scalar('Pitch_Loss/train', pitch_loss, model.get_step())
-                self.writer.add_scalar('Duration_Loss/train', dur_loss, model.get_step())
+                #self.writer.add_scalar('Duration_Loss/train', dur_loss, model.get_step())
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
                 self.writer.add_scalar('Params/learning_rate', session.lr, model.get_step())
                 self.writer.add_scalar('Dur_Diff/mean', dur_diff_mean, model.get_step())
