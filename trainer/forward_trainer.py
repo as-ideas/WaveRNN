@@ -16,6 +16,7 @@ from utils.display import stream, simple_table, plot_mel, plot_pitch
 from utils.dsp import DSP
 from utils.files import parse_schedule
 from utils.paths import Paths
+from utils.text.tokenizer import Tokenizer
 
 
 class ForwardTrainer:
@@ -103,11 +104,19 @@ class ForwardTrainer:
                 #dur_loss = self.l1_loss(dur_hat.transpose(1, 2), batch['dur'].unsqueeze(1), batch['x_len'])
                 #dur_loss_2 = self.l1_loss(dur_hat.transpose(1, 2), batch['dur'].unsqueeze(1), batch['x_len'], mask_2=pe_dur)
                 """
-                pe = torch.zeros(pitch_target.size(0)).to(pitch_target.device)
+
+                tokenizer = Tokenizer()
+                pe = torch.ones(pitch_target.unsqueeze(1).size())
                 for b in range(pitch_target.size(0)):
-                    pe[b] = torch.std(pitch_target[b, :batch['x_len'][b]])
-                #pe = torch.std(pitch_target[pitch_target!=0], dim=1)
-                pitch_loss = self.l1_loss(pitch_hat * pe[:, None, None], pitch_target.unsqueeze(1) * pe[:, None, None], batch['x_len'])
+                    xlen = batch['x_len'][b]
+                    end = batch['x'][b, xlen-1]
+                    print(tokenizer.decode([int(end)]))
+                    if end == 9:
+                        pe[b, :, xlen-10:] = torch.abs(batch['pitch'][b, xlen-10:])
+                        print(pe[b, :, xlen-20:])
+                        print(pitch_target[b, xlen-20:])
+
+                pitch_loss = self.l1_loss(pitch_hat, pitch_target.unsqueeze(1), batch['x_len'])
 
                 loss = self.train_cfg['pitch_loss_factor'] * pitch_loss
                        #* pitch_loss \
