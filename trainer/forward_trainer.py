@@ -107,7 +107,7 @@ class ForwardTrainer:
                 for b in range(pitch_target.size(0)):
                     pe[b] = torch.std(pitch_target[b, :batch['x_len'][b]])
                 #pe = torch.std(pitch_target[pitch_target!=0], dim=1)
-                pitch_loss = self.l1_loss(pitch_hat * pe, pitch_target.unsqueeze(1) * pe, batch['x_len'])
+                pitch_loss = self.l1_loss(pitch_hat * pe[:, None, None], pitch_target.unsqueeze(1) * pe[:, None, None], batch['x_len'])
 
                 loss = self.train_cfg['pitch_loss_factor']
                        #* pitch_loss \
