@@ -154,13 +154,13 @@ def get_tts_datasets(path: Path,
     val_data = filter_max_len(val_data, max_mel_len)
 
     train_len_original = len(train_data)
-    train_data = filter_bad_text_probs(train_data, text_probs, filter_min_text_prob)
-    val_data = filter_bad_text_probs(val_data, text_probs, filter_min_text_prob)
+    #train_data = filter_bad_text_probs(train_data, text_probs, filter_min_text_prob)
+    #val_data = filter_bad_text_probs(val_data, text_probs, filter_min_text_prob)
     print(f'Filtered {train_len_original - len(train_data)} files due to bad text probs!')
 
     train_len_original = len(train_data)
-    train_data = filter_bad_text_probs(train_data, text_sims, filter_min_text_sim)
-    val_data = filter_bad_text_probs(val_data, text_sims, filter_min_text_sim)
+    #train_data = filter_bad_text_probs(train_data, text_sims, filter_min_text_sim)
+    #val_data = filter_bad_text_probs(val_data, text_sims, filter_min_text_sim)
     print(f'Filtered {train_len_original - len(train_data)} files due to bad text sim!')
 
     train_len_original = len(train_data)
