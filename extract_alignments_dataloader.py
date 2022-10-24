@@ -157,7 +157,7 @@ class DurationExtractorPipeline:
             att_score_dict[res.item_id] = (res.align_score, res.att_score)
             sum_att_score += res.att_score
             if res.durs is not None:
-                np.save(paths.data / f'alg_extr/{res.item_id}.npy', res.durs, allow_pickle=False)
+                np.save(paths.alg / f'{res.item_id}.npy', res.durs, allow_pickle=False)
 
 
 if __name__ == '__main__':
