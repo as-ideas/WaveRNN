@@ -25,7 +25,7 @@ class DurationResult:
     item_id: str
     att_score: float
     align_score: float
-    durs: np.array
+    durs: Optional[np.array] = None
 
 
 class DurationCollator:
@@ -53,22 +53,26 @@ class DurationDataset(Dataset):
 
     def __getitem__(self, index: int) -> DurationResult:
         item_id = self.metadata[index]
-        x = self.text_dict[item_id]
-        x = self.tokenizer(x)
-        mel = np.load(self.paths.mel / f'{item_id}.npy')
-        mel = torch.from_numpy(mel)
-        x = torch.tensor(x)
-        att_npy = np.load(str(self.paths.att_pred / f'{item_id}.npy'))
-        att = torch.from_numpy(att_npy)
-        mel_len = mel.shape[-1]
-        mel_len = torch.tensor(mel_len).unsqueeze(0)
-        align_score, _ = attention_score(att.unsqueeze(0), mel_len, r=1)
-        align_score = float(align_score)
-        durs, att_score = self.duration_extractor(x=x, mel=mel, att=att)
-        att_score = float(att_score)
-        durs_npy = durs.cpu().numpy()
-        if np.sum(durs_npy) != mel_len:
-            print(f'WARNINNG: Sum of durations did not match mel length for item {item_id}!')
+        try:
+            x = self.text_dict[item_id]
+            x = self.tokenizer(x)
+            mel = np.load(self.paths.mel / f'{item_id}.npy')
+            mel = torch.from_numpy(mel)
+            x = torch.tensor(x)
+            att_npy = np.load(str(self.paths.att_pred / f'{item_id}.npy'))
+            att = torch.from_numpy(att_npy)
+            mel_len = mel.shape[-1]
+            mel_len = torch.tensor(mel_len).unsqueeze(0)
+            align_score, _ = attention_score(att.unsqueeze(0), mel_len, r=1)
+            align_score = float(align_score)
+            durs, att_score = self.duration_extractor(x=x, mel=mel, att=att)
+            att_score = float(att_score)
+            durs_npy = durs.cpu().numpy()
+            assert np.sum(durs_npy) == mel_len, f'WARNINNG: Sum of durations did not match mel length for item {item_id}!'
+        except Exception as e:
+            print(e)
+            return DurationResult(item_id=item_id, att_score=0.,
+                                  align_score=0., durs=None)
         return DurationResult(item_id=item_id, att_score=att_score,
                               align_score=align_score, durs=durs_npy)
 
@@ -146,13 +150,14 @@ class DurationExtractorPipeline:
                              sampler=BinnedLengthSampler(lengths=mel_lens, batch_size=1, bin_size=num_workers * 8),
                              num_workers=num_workers)
 
-        pbar = tqdm(dataset, total=len(dataset))
+        pbar = tqdm(dataset, total=len(dataset), smoothing=0.01)
 
         for i, res in enumerate(pbar, 1):
             pbar.set_description(f'Avg tuned attention score: {sum_att_score / i}', refresh=True)
             att_score_dict[res.item_id] = (res.align_score, res.att_score)
             sum_att_score += res.att_score
-            np.save(paths.data / f'alg_extr/{res.item_id}.npy', res.durs, allow_pickle=False)
+            if res.durs is not None:
+                np.save(paths.data / f'alg_extr/{res.item_id}.npy', res.durs, allow_pickle=False)
 
 
 if __name__ == '__main__':
