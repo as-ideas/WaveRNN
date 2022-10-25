@@ -13,7 +13,7 @@ class Paths:
         self.mel = self.data/'mel'
         self.gta = self.data/'gta'
         self.alg = self.data/'alg'
-        self.att_pred = self.data/'alg_att_predictions'
+        self.att_pred = self.data/'alg_att_predictions_flex'
         self.speaker_emb = self.data/'speaker_emb'
         self.raw_pitch = self.data/'raw_pitch'
         self.phon_pitch = self.data/'phon_pitch'
