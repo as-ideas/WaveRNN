@@ -1,7 +1,7 @@
 import argparse
 import itertools
 from dataclasses import dataclass
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 
 import numpy as np
 import torch
@@ -14,7 +14,7 @@ from trainer.common import to_device
 from utils.checkpoints import restore_checkpoint
 from utils.dataset import get_tts_datasets, BinnedLengthSampler, get_taco_duration_extraction_generator, filter_max_len
 from utils.duration_extractor import DurationExtractor
-from utils.files import read_config, unpickle_binary
+from utils.files import read_config, unpickle_binary, pickle_binary
 from utils.metrics import attention_score
 from utils.paths import Paths
 from utils.text.tokenizer import Tokenizer
@@ -128,7 +128,7 @@ class DurationExtractorPipeline:
             pbar.set_description(f'Avg attention score: {sum_att_score / sum_count}', refresh=True)
 
     def extract_durations(self,
-                          num_workers: int = 0) -> None:
+                          num_workers: int = 0) -> Dict[str, Tuple[float, float]]:
         train_set = unpickle_binary(paths.data / 'train_dataset.pkl')
         val_set = unpickle_binary(paths.data / 'val_dataset.pkl')
         text_dict = unpickle_binary(paths.data / 'text_dict.pkl')
@@ -163,6 +163,7 @@ class DurationExtractorPipeline:
             if res.durs is not None:
                 np.save(paths.alg / f'{res.item_id}.npy', res.durs, allow_pickle=False)
 
+        return att_score_dict
 
 def batchify(input: List[Any], batch_size: int) -> List[List[Any]]:
     l = len(input)
@@ -203,4 +204,5 @@ if __name__ == '__main__':
     print('Extracting attention from tacotron...')
     dur_pipeline.extract_attentions(max_batch_size=32, model=model)
     print('Extracting durations from attention matrices...')
-    dur_pipeline.extract_durations(num_workers=12)
+    att_score_dict = dur_pipeline.extract_durations(num_workers=12)
+    pickle_binary(att_score_dict, paths.data / 'att_score_dict.pkl')
