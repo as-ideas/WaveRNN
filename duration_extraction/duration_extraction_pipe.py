@@ -108,7 +108,7 @@ class DurationExtractionPipeline:
 
         sum_items = 0
         sum_att_score = 0
-        pbar = tqdm(dataloader, total=len(dataloader))
+        pbar = tqdm(dataloader, total=len(dataloader), smoothing=0.01)
         for i, batch in enumerate(pbar, 1):
             batch = to_device(batch, device=device)
             with torch.no_grad():
@@ -168,7 +168,7 @@ class DurationExtractionPipeline:
                              sampler=BinnedLengthSampler(lengths=mel_lens, batch_size=1, bin_size=sampler_bin_size),
                              num_workers=num_workers)
 
-        pbar = tqdm(dataset, total=len(dataset))
+        pbar = tqdm(dataset, total=len(dataset), smoothing=0.01)
 
         for i, res in enumerate(pbar, 1):
             sum_att_score += res.att_score
