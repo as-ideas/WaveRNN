@@ -92,7 +92,7 @@ class DurationExtractorPipeline:
 
     def extract_attentions(self,
                            model: Tacotron,
-                           batch_size: int = 1) -> None:
+                           max_batch_size: int = 1) -> None:
         assert model.r == 1, f'Model reduction factor is not one! Was: {model.r}'
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         model.eval()
@@ -104,9 +104,10 @@ class DurationExtractorPipeline:
         train_data = unpickle_binary(paths.data/'train_dataset.pkl')
         val_data = unpickle_binary(paths.data/'val_dataset.pkl')
         dataset = train_data + val_data
-        dataset_gen = get_taco_duration_extraction_generator(paths.data, dataset=dataset, max_batch_size=batch_size)
+        dataset_gen = get_taco_duration_extraction_generator(paths.data, dataset=dataset, max_batch_size=max_batch_size)
 
         pbar = tqdm(dataset_gen, total=len(dataset))
+        sum_count = 0
 
         for i, batch in enumerate(pbar, 1):
             batch = to_device(batch, device=device)
@@ -114,13 +115,15 @@ class DurationExtractorPipeline:
                 _, _, att_batch = model(batch['x'], batch['mel'], batch['speaker_emb'])
             _, att_score = attention_score(att_batch, batch['mel_len'], r=1)
             sum_att_score += att_score.sum()
+            B = batch['x_len'].size(0)
+            sum_count += B
             for b in range(batch['x_len'].size(0)):
                 x_len = batch['x_len'][b].cpu()
                 mel_len = batch['mel_len'][b].cpu()
                 item_id = batch['item_id'][b]
                 att = att_batch[b, :mel_len, :x_len].cpu()
                 np.save(paths.att_pred / f'{item_id}.npy', att.numpy(), allow_pickle=False)
-            pbar.set_description(f'Avg attention score: {sum_att_score / (i * batch_size)}', refresh=True)
+            pbar.set_description(f'Avg attention score: {sum_att_score / sum_count}', refresh=True)
 
     def extract_durations(self,
                           num_workers: int = 0) -> None:

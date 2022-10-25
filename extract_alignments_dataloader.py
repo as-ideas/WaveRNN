@@ -107,7 +107,9 @@ class DurationExtractorPipeline:
                                               filter_attention=False)
 
         dataset = itertools.chain(train_set, val_set)
+
         pbar = tqdm(dataset, total=len(val_set) + len(train_set))
+
         sum_count = 0
 
         for i, batch in enumerate(pbar, 1):
