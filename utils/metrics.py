@@ -26,6 +26,6 @@ def attention_score(att, mel_lens, r=1):
 
         # score for attention sharpness
         sharp_score, inds = att.max(dim=2)
-        sharp_score = torch.mean(sharp_score * mask, dim=1)
+        sharp_score = torch.sum(sharp_score * mask, dim=1) / torch.sum(mask, dim=1)
 
         return loc_score, sharp_score
