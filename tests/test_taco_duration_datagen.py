@@ -19,7 +19,7 @@ class TestTacoDurationDatagen(unittest.TestCase):
         self.temp_dir = TemporaryDirectory(prefix='forwardtaco_data_test_temp')
         self.paths = Paths(data_path=self.temp_dir.name + '/data', voc_id='voc_test_id', tts_id='tts_test_id')
         self.dataset = [('id_1', 2), ('id_2', 2), ('id_3', 3), ('id_4', 4), ('id_5', 4), ('id_6', 4)]
-        self.text_dict = {file_id: 'a' * length for file_id, length in self.dataset}
+        self.text_dict = {'id_1': 'aa', 'id_2': 'aa', 'id_3': 'aaa', 'id_4': 'aaaa', 'id_5': 'aaaa', 'id_6': 'aaaa'}
         pickle_binary(self.text_dict, self.paths.data / 'text_dict.pkl')
         for id, mel_len in self.dataset:
             np.save(self.paths.mel / f'{id}.npy', np.ones((5, mel_len)), allow_pickle=False)
