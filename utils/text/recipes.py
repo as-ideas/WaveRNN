@@ -1,3 +1,4 @@
+import math
 from multiprocessing.pool import Pool
 
 from utils.display import progbar, stream
@@ -5,6 +6,12 @@ from utils.files import get_files
 from pathlib import Path
 from typing import Union, Tuple
 import pandas as pd
+
+def get_value(row: pd.Series, key: str, default_value: float = 1) -> float:
+    val = row.get(key, default_value)
+    if math.isnan(val) or math.isinf(val):
+        val = default_value
+    return val
 
 def ljspeech(path: Union[str, Path]):
     csv_files = get_files(path, extension='.csv')
@@ -32,8 +39,8 @@ def multispeaker(path: Union[str, Path]):
     for index, row in df.iterrows():
         id = row['file_id']
         text_dict[id] = row['text_phonemized']
-        text_prob[id] = row.get('transcription_probability', 1)
-        text_sim[id] = row.get('levenshtein_similarity', 1)
+        text_prob[id] = get_value(row, 'transcription_probability', default_value=1)
+        text_sim[id] = get_value(row, 'levenshtein_similarity', default_value=1)
         speaker_dict[id] = row['speaker_id'] + '_' + row['book_id']
 
     return text_dict, speaker_dict, text_prob, text_sim

@@ -93,7 +93,7 @@ class DurationExtractorPipeline:
     def extract_attentions(self,
                            model: Tacotron,
                            batch_size: int = 1) -> None:
-
+        assert model.r == 1, f'Model reduction factor is not one! Was: {model.r}'
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         model.eval()
         model.decoder.prenet.train()

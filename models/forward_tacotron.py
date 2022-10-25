@@ -271,7 +271,6 @@ class ForwardTacotron(nn.Module):
         x = F.pad(x, [0, max_len - x.size(2), 0, 0], 'constant', self.padding_value)
         return x
 
-
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> 'ForwardTacotron':
         speaker_names = config['speaker_names']

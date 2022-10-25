@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Tuple
 
 import torch
+import tqdm
 from torch import optim
 from torch.utils.data.dataloader import DataLoader
 
@@ -45,16 +46,18 @@ def extract_pitch_energy(save_path_pitch: Path,
 
     speaker_names = set([v for v in speaker_dict.values() if len(v) > 1])
     mean, var = 0, 0
-    for speaker_name in speaker_names:
+
+    train_data = unpickle_binary(paths.data / 'train_dataset.pkl')
+    val_data = unpickle_binary(paths.data / 'val_dataset.pkl')
+    all_data = train_data + val_data
+
+    for speaker_name in tqdm.tqdm(speaker_names, total=len(speaker_names), smoothing=0):
             print(f'normalizing for {speaker_name}')
-            train_data = unpickle_binary(paths.data / 'train_dataset.pkl')
-            val_data = unpickle_binary(paths.data / 'val_dataset.pkl')
-            all_data = train_data + val_data
-            all_data = [d for d in all_data if speaker_dict[d[0]] == speaker_name]
-            print(f'normalizing {len(all_data)} files.')
+            all_data_speaker = [d for d in all_data if speaker_dict[d[0]] == speaker_name]
+            print(f'normalizing {len(all_data_speaker)} files.')
             phoneme_pitches = []
             phoneme_energies = []
-            for prog_idx, (item_id, mel_len) in enumerate(all_data, 1):
+            for prog_idx, (item_id, mel_len) in enumerate(all_data_speaker, 1):
                 try:
                     dur = np.load(paths.alg / f'{item_id}.npy')
                     mel = np.load(paths.mel / f'{item_id}.npy')
@@ -73,7 +76,7 @@ def extract_pitch_energy(save_path_pitch: Path,
                     phoneme_pitches.append((item_id, pitch_char))
                     phoneme_energies.append((item_id, energy_char))
                     bar = progbar(prog_idx, len(all_data))
-                    msg = f'{bar} {prog_idx}/{len(all_data)} Files '
+                    msg = f'{bar} {prog_idx}/{len(all_data_speaker  )} Files '
                     stream(msg)
                 except Exception as e:
                     print(e)
