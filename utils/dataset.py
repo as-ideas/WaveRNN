@@ -1,7 +1,9 @@
+from random import Random
+
 import torch
 from torch.utils.data.sampler import Sampler
 from torch.utils.data import Dataset, DataLoader
-from typing import List, Dict, Union, Tuple
+from typing import List, Dict, Union, Tuple, Generator
 
 from utils.dsp import *
 from utils.files import unpickle_binary
@@ -214,6 +216,42 @@ def get_tts_datasets(path: Path,
     return train_set, val_set
 
 
+def get_taco_duration_extraction_generator(path: Path,
+                                           dataset: List[Tuple[str, int]],
+                                           max_batch_size: int) -> Generator:
+    tokenizer = Tokenizer()
+    file_id_text_lens = []
+    text_dict = unpickle_binary(path / 'text_dict.pkl')
+    for item_id, _ in dataset:
+        toks = tokenizer(text_dict[item_id])
+        file_id_text_lens.append((item_id, len(toks)))
+
+    file_id_text_lens.sort(key=lambda x: x[1])
+    dataset_ids = [file_id for file_id, _ in file_id_text_lens]
+    dataset_lens = [text_len for _, text_len in file_id_text_lens]
+
+    taco_dataset = TacoDataset(path=path, dataset_ids=dataset_ids,
+                               text_dict=text_dict, tokenizer=tokenizer)
+
+    dataset_lens = np.array(dataset_lens, dtype=int)
+    consecutive_split_points = np.where(np.diff(dataset_lens, append=0, prepend=0) != 0)[0]
+
+    dataset_indices = list(range(len(dataset)))
+    all_batches = []
+
+    for a, b in zip(consecutive_split_points[:-1], consecutive_split_points[1:]):
+        big_batch = dataset_indices[a:b]
+        batches = list(batchify(big_batch, batch_size=max_batch_size))
+        all_batches.extend(batches)
+
+    Random(42).shuffle(all_batches)
+
+    for batch in all_batches:
+        batch = [taco_dataset[i] for i in batch]
+        batch = collate_tts(batch, r=1)
+        yield(batch)
+
+
 def filter_max_len(dataset: List[tuple], max_mel_len: int) -> List[tuple]:
     if max_mel_len is None:
         return dataset
@@ -371,6 +409,15 @@ def collate_tts(batch: List[Dict[str, Union[str, torch.tensor]]], r: int) -> Dic
     return {'x': text, 'mel': mel, 'item_id': item_id, 'x_len': x_len,
             'mel_len': mel_lens, 'dur': dur, 'pitch': pitch,
             'energy': energy, 'dur_hat': dur_hat, 'pitch_hat': pitch_hat, 'speaker_emb': speaker_emb}
+
+
+def batchify(input: List[Any], batch_size: int) -> List[List[Any]]:
+    l = len(input)
+    output = []
+    for i in range(0, l, batch_size):
+        batch = input[i:min(i + batch_size, l)]
+        output.append(batch)
+    return output
 
 
 class BinnedLengthSampler(Sampler):

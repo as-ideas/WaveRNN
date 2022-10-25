@@ -11,8 +11,7 @@ from tqdm import tqdm
 
 from models.tacotron import Tacotron
 from trainer.common import to_device
-from utils.checkpoints import restore_checkpoint
-from utils.dataset import get_tts_datasets, BinnedLengthSampler
+from utils.dataset import get_tts_datasets, BinnedLengthSampler, get_taco_duration_extraction_generator, filter_max_len
 from utils.duration_extractor import DurationExtractor
 from utils.files import read_config, unpickle_binary
 from utils.metrics import attention_score
@@ -92,7 +91,7 @@ class DurationExtractorPipeline:
 
     def extract_attentions(self,
                            model: Tacotron,
-                           max_batch_size: int = 1) -> None:
+                           batch_size: int = 1) -> None:
         assert model.r == 1, f'Model reduction factor is not one! Was: {model.r}'
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         model.eval()
@@ -100,15 +99,13 @@ class DurationExtractorPipeline:
         model.to(device)
 
         sum_att_score = 0
-        train_set, val_set = get_tts_datasets(path=paths.data,
-                                              batch_size=max_batch_size,
-                                              r=1,
-                                              max_mel_len=None,
-                                              filter_attention=False)
 
-        dataset = itertools.chain(train_set, val_set)
-        pbar = tqdm(dataset, total=len(val_set) + len(train_set))
-        sum_count = 0
+        train_data = unpickle_binary(paths.data/'train_dataset.pkl')
+        val_data = unpickle_binary(paths.data/'val_dataset.pkl')
+        dataset = train_data + val_data
+        dataset_gen = get_taco_duration_extraction_generator(paths.data, dataset=dataset, max_batch_size=batch_size)
+
+        pbar = tqdm(dataset_gen, total=len(dataset))
 
         for i, batch in enumerate(pbar, 1):
             batch = to_device(batch, device=device)
@@ -116,15 +113,13 @@ class DurationExtractorPipeline:
                 _, _, att_batch = model(batch['x'], batch['mel'], batch['speaker_emb'])
             _, att_score = attention_score(att_batch, batch['mel_len'], r=1)
             sum_att_score += att_score.sum()
-            B = batch['x_len'].size(0)
-            sum_count += B
             for b in range(batch['x_len'].size(0)):
                 x_len = batch['x_len'][b].cpu()
                 mel_len = batch['mel_len'][b].cpu()
                 item_id = batch['item_id'][b]
                 att = att_batch[b, :mel_len, :x_len].cpu()
                 np.save(paths.att_pred / f'{item_id}.npy', att.numpy(), allow_pickle=False)
-            pbar.set_description(f'Avg attention score: {sum_att_score / sum_count}', refresh=True)
+            pbar.set_description(f'Avg attention score: {sum_att_score / (i * batch_size)}', refresh=True)
 
     def extract_durations(self,
                           num_workers: int = 0) -> None:
@@ -141,7 +136,7 @@ class DurationExtractorPipeline:
         sum_att_score = 0
 
         dataset = DurationDataset(
-            duration_extractor=duration_extractor,
+            duration_extractor=self.duration_extractor,
             paths=paths, dataset_ids=data_ids,
             text_dict=text_dict, tokenizer=Tokenizer())
 
@@ -163,6 +158,15 @@ class DurationExtractorPipeline:
                 np.save(paths.alg / f'{res.item_id}.npy', res.durs, allow_pickle=False)
 
 
+def batchify(input: List[Any], batch_size: int) -> List[List[Any]]:
+    l = len(input)
+    output = []
+    for i in range(0, l, batch_size):
+        batch = input[i:min(i + batch_size, l)]
+        output.append(batch)
+    return output
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train ForwardTacotron TTS')
     parser.add_argument('--config', metavar='FILE', default='config.yaml', help='The config containing all hyperparams.')
@@ -170,27 +174,5 @@ if __name__ == '__main__':
     config = read_config(args.config)
     paths = Paths(config['data_path'], config['voc_model_id'], config['tts_model_id'])
 
-    print('\nInitialising Tacotron Model...\n')
-    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-    model = Tacotron.from_config(config).to(device)
-
-    optimizer = optim.Adam(model.parameters())
-    restore_checkpoint(model=model, optim=optimizer,
-                       path=paths.taco_checkpoints / 'latest_model.pt',
-                       device=device)
-
-    model.eval()
-    model.decoder.prenet.train()
-
-    duration_extractor = DurationExtractor(
-        silence_threshold=config['preprocessing']['silence_threshold'],
-        silence_prob_shift=config['preprocessing']['silence_prob_shift'])
-
-    dur_pipeline = DurationExtractorPipeline(paths=paths,
-                                             config=config,
-                                             duration_extractor=duration_extractor)
-
-    print('Extracting attention from tacotron...')
-    dur_pipeline.extract_attentions(max_batch_size=32, model=model)
-    print('Extracting durations from attention matrices...')
-    dur_pipeline.extract_durations(num_workers=12)
+    for d in dataset:
+        print(d)
