@@ -104,9 +104,11 @@ class DurationExtractorPipeline:
         train_data = unpickle_binary(paths.data/'train_dataset.pkl')
         val_data = unpickle_binary(paths.data/'val_dataset.pkl')
         dataset = train_data + val_data
-        dataset_gen = get_taco_duration_extraction_generator(paths.data, dataset=dataset, max_batch_size=max_batch_size)
+        dataset_len, dataset_gen = get_taco_duration_extraction_generator(paths.data,
+                                                                          dataset=dataset,
+                                                                          max_batch_size=max_batch_size)
 
-        pbar = tqdm(dataset_gen, total=len(dataset))
+        pbar = tqdm(dataset_gen, total=dataset_len)
         sum_count = 0
 
         for i, batch in enumerate(pbar, 1):

@@ -218,7 +218,7 @@ def get_tts_datasets(path: Path,
 
 def get_taco_duration_extraction_generator(path: Path,
                                            dataset: List[Tuple[str, int]],
-                                           max_batch_size: int) -> Generator:
+                                           max_batch_size: int) -> Tuple[int, Generator]:
     tokenizer = Tokenizer()
     file_id_text_lens = []
     text_dict = unpickle_binary(path / 'text_dict.pkl')
@@ -246,11 +246,13 @@ def get_taco_duration_extraction_generator(path: Path,
 
     Random(42).shuffle(all_batches)
 
-    for batch in all_batches:
-        batch = [taco_dataset[i] for i in batch]
-        batch = collate_tts(batch, r=1)
-        yield(batch)
+    def new_gen():
+        for batch in all_batches:
+            batch = [taco_dataset[i] for i in batch]
+            batch = collate_tts(batch, r=1)
+            yield batch
 
+    return len(all_batches), new_gen()
 
 def filter_max_len(dataset: List[tuple], max_mel_len: int) -> List[tuple]:
     if max_mel_len is None:
