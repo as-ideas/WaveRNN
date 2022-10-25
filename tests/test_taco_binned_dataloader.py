@@ -10,7 +10,7 @@ from utils.files import read_config, pickle_binary
 from utils.paths import Paths
 
 
-class TestTacotronBinnedDataloader(unittest.TestCase):
+class TestTacoBinnedDataloader(unittest.TestCase):
 
     def setUp(self) -> None:
         test_path = os.path.dirname(os.path.abspath(__file__))
