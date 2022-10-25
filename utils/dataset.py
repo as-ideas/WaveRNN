@@ -154,13 +154,13 @@ def get_tts_datasets(path: Path,
     val_data = filter_max_len(val_data, max_mel_len)
 
     train_len_original = len(train_data)
-    #train_data = filter_bad_text_probs(train_data, text_probs, filter_min_text_prob)
-    #val_data = filter_bad_text_probs(val_data, text_probs, filter_min_text_prob)
+    train_data = filter_bad_text_probs(train_data, text_probs, filter_min_text_prob)
+    val_data = filter_bad_text_probs(val_data, text_probs, filter_min_text_prob)
     print(f'Filtered {train_len_original - len(train_data)} files due to bad text probs!')
 
     train_len_original = len(train_data)
-    #train_data = filter_bad_text_probs(train_data, text_sims, filter_min_text_sim)
-    #val_data = filter_bad_text_probs(val_data, text_sims, filter_min_text_sim)
+    train_data = filter_bad_text_probs(train_data, text_sims, filter_min_text_sim)
+    val_data = filter_bad_text_probs(val_data, text_sims, filter_min_text_sim)
     print(f'Filtered {train_len_original - len(train_data)} files due to bad text sim!')
 
     train_len_original = len(train_data)
@@ -226,9 +226,10 @@ def filter_bad_text_probs(dataset: List[tuple],
     dataset_filtered = []
     for item_id, mel_len in dataset:
         text_prob = text_probs[item_id]
-        if text_prob > min_text_prob:
+        if text_prob > min_text_prob or math.isnan(text_prob):
             dataset_filtered.append((item_id, mel_len))
     return dataset_filtered
+
 
 def filter_bad_attentions(dataset: List[tuple],
                           attention_score_dict: Dict[str, tuple],
@@ -402,3 +403,5 @@ class BinnedLengthSampler(Sampler):
 
     def __len__(self):
         return len(self.idx)
+
+
