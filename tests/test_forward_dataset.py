@@ -1,7 +1,6 @@
-import shutil
-import tempfile
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import numpy as np
 
@@ -19,7 +18,7 @@ class TestForwardDataset(unittest.TestCase):
 
     def test_get_items(self) -> None:
         text_dict = {'0': 'a', '1': 'bc'}
-        data_dir = self.temp_dir / 'data'
+        data_dir = Path(self.temp_dir.name + '/data')
         mel_dir = data_dir / 'mel'
         alg_dir = data_dir / 'alg'
         pitch_dir = data_dir / 'phon_pitch'
