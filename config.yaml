@@ -1,7 +1,7 @@
 
 voc_model_id: 'ljspeech_voc'
-tts_model_id: 'ljspeech_tts'
-data_path: 'data/'                                        # output data path
+tts_model_id: 'bild_final_tts'
+data_path: 'data_bild_final'                                        # output data path
 
 tts_model: 'forward_tacotron'                             # choices: [forward_tacotron, fast_pitch]
 
@@ -50,9 +50,9 @@ duration_extraction:
   silence_threshold: -11             # normalized mel value below which the voice is considered silent
                                      # minimum mel value = -11.512925465 for zeros in the wav array (=log(1e-5),
                                      # where 1e-5 is a cutoff value)
-  silence_prob_shift: 0.25           # Increase probability for silent characters in periods of silence
+  silence_prob_shift: 0.25           # increase probability for silent characters in periods of silence
                                      # for better durations during non voiced periods
-  batch_size: 1                      # batch size for tacotron inference to obtain attention matrices
+  max_batch_size: 32                 # max allowed for binned dataloader used for tacotron inference
   num_workers: 12                    # number of processes for costly dijkstra duration extraction
 
 

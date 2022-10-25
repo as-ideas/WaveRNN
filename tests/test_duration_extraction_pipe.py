@@ -37,7 +37,7 @@ class TestDurationExtractionPipe(unittest.TestCase):
         test_path = os.path.dirname(os.path.abspath(__file__))
         self.resource_path = Path(test_path) / 'resources'
         self.config = read_config(self.resource_path / 'test_config.yaml')
-        self.temp_dir = TemporaryDirectory(prefix='forwardtaco_data_test_temp')
+        self.temp_dir = TemporaryDirectory(prefix='TestDurationExtractionPipeTmp')
         self.paths = Paths(data_path=self.temp_dir.name + '/data', voc_id='voc_test_id', tts_id='tts_test_id')
         self.train_dataset = [('id_1', 5), ('id_2', 10), ('id_3', 15)]
         self.val_dataset = [('id_4', 6), ('id_5', 12)]
@@ -60,7 +60,7 @@ class TestDurationExtractionPipe(unittest.TestCase):
         duration_extraction_pipe = DurationExtractionPipeline(paths=self.paths, config=self.config,
                                                               duration_extractor=duration_extractor)
 
-        avg_att_score = duration_extraction_pipe.extract_attentions(model=mock_tacotron, batch_size=1)
+        avg_att_score = duration_extraction_pipe.extract_attentions(model=mock_tacotron, max_batch_size=1)
         self.assertEqual(1., avg_att_score)
         att_files = list(self.paths.att_pred.glob('**/*.npy'))
         self.assertEqual(5, len(att_files))
@@ -71,7 +71,10 @@ class TestDurationExtractionPipe(unittest.TestCase):
             expected_att_size = (mel_len, len(x))
             self.assertEqual(expected_att_size, att.shape)
 
-        duration_extraction_pipe.extract_durations(num_workers=1, sampler_bin_size=1)
+        att_score_dict = duration_extraction_pipe.extract_durations(num_workers=1, sampler_bin_size=1)
+
+        expected_att_score_dict = {f'{file_id}': (1., 1.) for file_id, _ in self.train_dataset + self.val_dataset}
+        self.assertEqual(expected_att_score_dict, att_score_dict)
 
         dur_files = list(self.paths.alg.glob('**/*.npy'))
         self.assertEqual(5, len(dur_files))

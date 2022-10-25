@@ -12,11 +12,10 @@ from utils.text.tokenizer import Tokenizer
 class TestForwardDataset(unittest.TestCase):
 
     def setUp(self) -> None:
-        temp_dir = tempfile.mkdtemp(prefix='TestForwardDatasetTmp')
-        self.temp_dir = Path(temp_dir)
+        self.temp_dir = TemporaryDirectory(prefix='TestForwarDatasetTmp')
 
     def tearDown(self) -> None:
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
+        self.temp_dir.cleanup()
 
     def test_get_items(self) -> None:
         text_dict = {'0': 'a', '1': 'bc'}

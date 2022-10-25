@@ -1,7 +1,9 @@
+from random import Random
+
 import torch
 from torch.utils.data.sampler import Sampler
 from torch.utils.data import Dataset, DataLoader
-from typing import List, Dict, Union, Tuple
+from typing import List, Dict, Union, Tuple, Iterator
 
 from utils.dsp import *
 from utils.files import unpickle_binary
@@ -131,6 +133,147 @@ class VocCollator:
 ###################################################################################
 
 
+
+class BinnedLengthSampler(Sampler):
+    def __init__(self, lengths, batch_size, bin_size):
+        _, self.idx = torch.sort(torch.tensor(lengths).long())
+        self.batch_size = batch_size
+        self.bin_size = bin_size
+        assert self.bin_size % self.batch_size == 0
+
+    def __iter__(self):
+        # Need to change to numpy since there's a bug in random.shuffle(tensor)
+        # TODO: Post an issue on pytorch repo
+        idx = self.idx.numpy()
+        bins = []
+
+        for i in range(len(idx) // self.bin_size):
+            this_bin = idx[i * self.bin_size:(i + 1) * self.bin_size]
+            random.shuffle(this_bin)
+            bins += [this_bin]
+
+        random.shuffle(bins)
+        binned_idx = np.stack(bins).reshape(-1)
+
+        if len(binned_idx) < len(idx):
+            last_bin = idx[len(binned_idx):]
+            random.shuffle(last_bin)
+            binned_idx = np.concatenate([binned_idx, last_bin])
+
+        return iter(torch.tensor(binned_idx).long())
+
+    def __len__(self):
+        return len(self.idx)
+
+
+class TacoDataset(Dataset):
+
+    def __init__(self,
+                 path: Path,
+                 dataset_ids: List[str],
+                 text_dict: Dict[str, str],
+                 tokenizer: Tokenizer) -> None:
+        self.path = path
+        self.metadata = dataset_ids
+        self.text_dict = text_dict
+        self.tokenizer = tokenizer
+
+    def __getitem__(self, index: int) -> Dict[str, torch.tensor]:
+        item_id = self.metadata[index]
+        text = self.text_dict[item_id]
+        x = self.tokenizer(text)
+        mel = np.load(str(self.path/'mel'/f'{item_id}.npy'))
+        mel_len = mel.shape[-1]
+        return {'x': x, 'mel': mel, 'item_id': item_id,
+                'mel_len': mel_len, 'x_len': len(x)}
+
+    def __len__(self):
+        return len(self.metadata)
+
+
+class ForwardDataset(Dataset):
+
+    def __init__(self,
+                 path: Path,
+                 dataset_ids: List[str],
+                 text_dict: Dict[str, str],
+                 tokenizer: Tokenizer):
+        self.path = path
+        self.metadata = dataset_ids
+        self.text_dict = text_dict
+        self.tokenizer = tokenizer
+
+    def __getitem__(self, index: int) -> Dict[str, torch.tensor]:
+        item_id = self.metadata[index]
+        text = self.text_dict[item_id]
+        x = self.tokenizer(text)
+        mel = np.load(str(self.path/'mel'/f'{item_id}.npy'))
+        mel_len = mel.shape[-1]
+        dur = np.load(str(self.path/'alg'/f'{item_id}.npy'))
+        pitch = np.load(str(self.path/'phon_pitch'/f'{item_id}.npy'))
+        energy = np.load(str(self.path/'phon_energy'/f'{item_id}.npy'))
+        return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
+                'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy}
+
+    def __len__(self):
+        return len(self.metadata)
+
+
+class BinnedTacoDataLoader:
+    """
+    Special dataloader to allow tacotron inference on batches with equal input length per batch.
+    This is used to safely generate attention matrices for extracting phoneme durations as there
+    is no input padding needed.
+    """
+
+    def __init__(self,
+                 data_path: Path,
+                 dataset: List[Tuple[str, int]],
+                 max_batch_size: int = 8) -> None:
+        """
+        Initializes the dataloader.
+
+        Args:
+            data_path: Main path to training data (paths.data)
+            dataset: List of Tuples with (file_id, mel_length)
+            max_batch_size: Maximum allowed batch size.
+        """
+
+        tokenizer = Tokenizer()
+        file_id_text_lens = []
+        text_dict = unpickle_binary(data_path / 'text_dict.pkl')
+        for item_id, _ in dataset:
+            toks = tokenizer(text_dict[item_id])
+            file_id_text_lens.append((item_id, len(toks)))
+
+        file_id_text_lens.sort(key=lambda x: x[1])
+        dataset_ids = [file_id for file_id, _ in file_id_text_lens]
+        dataset_lens = [text_len for _, text_len in file_id_text_lens]
+        dataset_lens = np.array(dataset_lens, dtype=int)
+        consecutive_split_points = np.where(np.diff(dataset_lens, append=0, prepend=0) != 0)[0]
+        dataset_indices = list(range(len(dataset)))
+        all_batches = []
+
+        for a, b in zip(consecutive_split_points[:-1], consecutive_split_points[1:]):
+            big_batch = dataset_indices[a:b]
+            batches = list(batchify(big_batch, batch_size=max_batch_size))
+            all_batches.extend(batches)
+
+        Random(42).shuffle(all_batches)
+        self.all_batches = all_batches
+        self.taco_dataset = TacoDataset(path=data_path, dataset_ids=dataset_ids,
+                                        text_dict=text_dict, tokenizer=tokenizer)
+
+    def __iter__(self) -> Iterator:
+        for batch in self.all_batches:
+            batch = [self.taco_dataset[i] for i in batch]
+            batch = collate_tts(batch, r=1)
+            yield batch
+
+    def __len__(self) -> int:
+        return len(self.all_batches)
+
+
 def get_tts_datasets(path: Path,
                      batch_size: int,
                      r: int,
@@ -199,84 +342,11 @@ def get_tts_datasets(path: Path,
     return train_set, val_set
 
 
-def filter_max_len(dataset: List[tuple], max_mel_len: int) -> List[tuple]:
-    if max_mel_len is None:
-        return dataset
-    return [(id, len) for id, len in dataset if len <= max_mel_len]
-
-
-def filter_bad_attentions(dataset: List[tuple],
-                          attention_score_dict: Dict[str, tuple],
-                          min_alignment: float,
-                          min_sharpness: float) -> List[tuple]:
-    dataset_filtered = []
-    for item_id, mel_len in dataset:
-        align_score, sharp_score = attention_score_dict[item_id]
-        if align_score > min_alignment \
-                and sharp_score > min_sharpness:
-            dataset_filtered.append((item_id, mel_len))
-    return dataset_filtered
-
-
-class TacoDataset(Dataset):
-
-    def __init__(self,
-                 path: Path,
-                 dataset_ids: List[str],
-                 text_dict: Dict[str, str],
-                 tokenizer: Tokenizer) -> None:
-        self.path = path
-        self.metadata = dataset_ids
-        self.text_dict = text_dict
-        self.tokenizer = tokenizer
-
-    def __getitem__(self, index: int) -> Dict[str, torch.tensor]:
-        item_id = self.metadata[index]
-        text = self.text_dict[item_id]
-        x = self.tokenizer(text)
-        mel = np.load(str(self.path/'mel'/f'{item_id}.npy'))
-        mel_len = mel.shape[-1]
-        return {'x': x, 'mel': mel, 'item_id': item_id,
-                'mel_len': mel_len, 'x_len': len(x)}
-
-    def __len__(self):
-        return len(self.metadata)
-
-
-class ForwardDataset(Dataset):
-
-    def __init__(self,
-                 path: Path,
-                 dataset_ids: List[str],
-                 text_dict: Dict[str, str],
-                 tokenizer: Tokenizer):
-        self.path = path
-        self.metadata = dataset_ids
-        self.text_dict = text_dict
-        self.tokenizer = tokenizer
-
-    def __getitem__(self, index: int) -> Dict[str, torch.tensor]:
-        item_id = self.metadata[index]
-        text = self.text_dict[item_id]
-        x = self.tokenizer(text)
-        mel = np.load(str(self.path/'mel'/f'{item_id}.npy'))
-        mel_len = mel.shape[-1]
-        dur = np.load(str(self.path/'alg'/f'{item_id}.npy'))
-        pitch = np.load(str(self.path/'phon_pitch'/f'{item_id}.npy'))
-        energy = np.load(str(self.path/'phon_energy'/f'{item_id}.npy'))
-        return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
-                'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy}
-
-    def __len__(self):
-        return len(self.metadata)
-
-
-def pad1d(x, max_len):
-    return np.pad(x, (0, max_len - len(x)), mode='constant')
-
-
-def pad2d(x, max_len):
-    return np.pad(x, ((0, 0), (0, max_len - x.shape[-1])), constant_values=-11.5129, mode='constant')
+def get_binned_taco_dataloader(data_path: Path, max_batch_size: int = 8) -> BinnedTacoDataLoader:
+    train_data = unpickle_binary(data_path / 'train_dataset.pkl')
+    val_data = unpickle_binary(data_path / 'val_dataset.pkl')
+    dataset = train_data + val_data
+    return BinnedTacoDataLoader(data_path=data_path, dataset=dataset, max_batch_size=max_batch_size)
 
 
 def collate_tts(batch: List[Dict[str, Union[str, torch.tensor]]], r: int) -> Dict[str, torch.tensor]:
@@ -315,33 +385,37 @@ def collate_tts(batch: List[Dict[str, Union[str, torch.tensor]]], r: int) -> Dic
             'mel_len': mel_lens, 'dur': dur, 'pitch': pitch, 'energy': energy}
 
 
-class BinnedLengthSampler(Sampler):
-    def __init__(self, lengths, batch_size, bin_size):
-        _, self.idx = torch.sort(torch.tensor(lengths).long())
-        self.batch_size = batch_size
-        self.bin_size = bin_size
-        assert self.bin_size % self.batch_size == 0
+def filter_max_len(dataset: List[tuple], max_mel_len: int) -> List[tuple]:
+    if max_mel_len is None:
+        return dataset
+    return [(id, len) for id, len in dataset if len <= max_mel_len]
 
-    def __iter__(self):
-        # Need to change to numpy since there's a bug in random.shuffle(tensor)
-        # TODO: Post an issue on pytorch repo
-        idx = self.idx.numpy()
-        bins = []
 
-        for i in range(len(idx) // self.bin_size):
-            this_bin = idx[i * self.bin_size:(i + 1) * self.bin_size]
-            random.shuffle(this_bin)
-            bins += [this_bin]
+def filter_bad_attentions(dataset: List[tuple],
+                          attention_score_dict: Dict[str, tuple],
+                          min_alignment: float,
+                          min_sharpness: float) -> List[tuple]:
+    dataset_filtered = []
+    for item_id, mel_len in dataset:
+        align_score, sharp_score = attention_score_dict[item_id]
+        if align_score > min_alignment \
+                and sharp_score > min_sharpness:
+            dataset_filtered.append((item_id, mel_len))
+    return dataset_filtered
 
-        random.shuffle(bins)
-        binned_idx = np.stack(bins).reshape(-1)
 
-        if len(binned_idx) < len(idx):
-            last_bin = idx[len(binned_idx):]
-            random.shuffle(last_bin)
-            binned_idx = np.concatenate([binned_idx, last_bin])
+def pad1d(x, max_len):
+    return np.pad(x, (0, max_len - len(x)), mode='constant')
 
-        return iter(torch.tensor(binned_idx).long())
 
-    def __len__(self):
-        return len(self.idx)
+def pad2d(x, max_len):
+    return np.pad(x, ((0, 0), (0, max_len - x.shape[-1])), constant_values=-11.5129, mode='constant')
+
+
+def batchify(input: List[Any], batch_size: int) -> List[List[Any]]:
+    l = len(input)
+    output = []
+    for i in range(0, l, batch_size):
+        batch = input[i:min(i + batch_size, l)]
+        output.append(batch)
+    return output

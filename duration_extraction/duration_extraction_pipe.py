@@ -12,7 +12,7 @@ from tqdm import tqdm
 from duration_extraction.duration_extractor import DurationExtractor
 from models.tacotron import Tacotron
 from trainer.common import to_device
-from utils.dataset import get_tts_datasets, BinnedLengthSampler
+from utils.dataset import get_tts_datasets, BinnedLengthSampler, BinnedTacoDataLoader, get_binned_taco_dataloader
 from utils.files import unpickle_binary
 from utils.metrics import attention_score
 from utils.paths import Paths
@@ -88,7 +88,7 @@ class DurationExtractionPipeline:
 
     def extract_attentions(self,
                            model: Tacotron,
-                           batch_size: int = 1) -> float:
+                           max_batch_size: int = 1) -> float:
         """
         Performs tacotron inference and stores the attention matrices as npy arrays in paths.data.att_pred.
         Returns average attention score.
@@ -104,32 +104,28 @@ class DurationExtractionPipeline:
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         model.to(device)
 
+        dataloader = get_binned_taco_dataloader(data_path=self.paths.data, max_batch_size=max_batch_size)
+
+        sum_items = 0
         sum_att_score = 0
-        train_set, val_set = get_tts_datasets(path=self.paths.data,
-                                              batch_size=batch_size,
-                                              r=1,
-                                              max_mel_len=None,
-                                              filter_attention=False,
-                                              model_type='tacotron')
-
-        dataset = itertools.chain(train_set, val_set)
-
-        pbar = tqdm(dataset, total=len(val_set) + len(train_set))
+        pbar = tqdm(dataloader, total=len(dataloader))
         for i, batch in enumerate(pbar, 1):
             batch = to_device(batch, device=device)
             with torch.no_grad():
                 _, _, att_batch = model(batch['x'], batch['mel'])
             _, att_score = attention_score(att_batch, batch['mel_len'], r=1)
             sum_att_score += att_score.sum()
-            for b in range(batch['x_len'].size(0)):
+            B = batch['x_len'].size(0)
+            sum_items += B
+            for b in range(B):
                 x_len = batch['x_len'][b].cpu()
                 mel_len = batch['mel_len'][b].cpu()
                 item_id = batch['item_id'][b]
                 att = att_batch[b, :mel_len, :x_len].cpu()
                 np.save(self.paths.att_pred / f'{item_id}.npy', att.numpy(), allow_pickle=False)
-            pbar.set_description(f'Avg attention score: {sum_att_score / (i * batch_size)}', refresh=True)
+            pbar.set_description(f'Avg attention score: {sum_att_score / sum_items}', refresh=True)
 
-        return sum_att_score / (len(train_set) + len(val_set))
+        return sum_att_score / len(dataloader)
 
     def extract_durations(self,
                           num_workers: int = 0,
@@ -175,9 +171,9 @@ class DurationExtractionPipeline:
         pbar = tqdm(dataset, total=len(dataset))
 
         for i, res in enumerate(pbar, 1):
-            pbar.set_description(f'Avg attention score: {sum_att_score / i}', refresh=True)
-            att_score_dict[res.item_id] = (res.align_score, res.att_score)
             sum_att_score += res.att_score
+            pbar.set_description(f'Avg duration attention score: {sum_att_score / i}', refresh=True)
+            att_score_dict[res.item_id] = (res.align_score, res.att_score)
             np.save(self.paths.alg / f'{res.item_id}.npy', res.durs.astype(int), allow_pickle=False)
 
         return att_score_dict

@@ -118,7 +118,7 @@ def create_align_features(model: Tacotron,
                                                           duration_extractor=duration_extractor)
 
     print('Extracting attention matrices from tacotron...')
-    duration_extraction_pipe.extract_attentions(model, batch_size=durex_conf['batch_size'])
+    duration_extraction_pipe.extract_attentions(model, max_batch_size=durex_conf['max_batch_size'])
 
     num_workers = durex_conf['num_workers']
     print(f'Extracting durations from attention matrices (num workers={num_workers})...')
