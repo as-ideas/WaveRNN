@@ -11,6 +11,7 @@ from tqdm import tqdm
 
 from models.tacotron import Tacotron
 from trainer.common import to_device
+from utils.checkpoints import restore_checkpoint
 from utils.dataset import get_tts_datasets, BinnedLengthSampler, get_taco_duration_extraction_generator, filter_max_len
 from utils.duration_extractor import DurationExtractor
 from utils.files import read_config, unpickle_binary
@@ -174,5 +175,27 @@ if __name__ == '__main__':
     config = read_config(args.config)
     paths = Paths(config['data_path'], config['voc_model_id'], config['tts_model_id'])
 
-    for d in dataset:
-        print(d)
+    print('\nInitialising Tacotron Model...\n')
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    model = Tacotron.from_config(config).to(device)
+
+    optimizer = optim.Adam(model.parameters())
+    restore_checkpoint(model=model, optim=optimizer,
+                       path=paths.taco_checkpoints / 'latest_model.pt',
+                       device=device)
+
+    model.eval()
+    model.decoder.prenet.train()
+
+    duration_extractor = DurationExtractor(
+        silence_threshold=config['preprocessing']['silence_threshold'],
+        silence_prob_shift=config['preprocessing']['silence_prob_shift'])
+
+    dur_pipeline = DurationExtractorPipeline(paths=paths,
+                                             config=config,
+                                             duration_extractor=duration_extractor)
+
+    print('Extracting attention from tacotron...')
+    dur_pipeline.extract_attentions(max_batch_size=32, model=model)
+    print('Extracting durations from attention matrices...')
+    dur_pipeline.extract_durations(num_workers=12)
