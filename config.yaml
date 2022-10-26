@@ -125,6 +125,10 @@ forward_tacotron:
     clip_grad_norm: 1.0           # clips the gradient norm to prevent explosion - set to None if not needed
     checkpoint_every: 50_000      # checkpoints the model every x steps
     plot_every: 5000              # generates samples and plots every x steps
+    speakers_to_generate:
+      - 'bild_bild'
+      - 'welt_welt'
+      - 'karlsson_kleinzaches'
 
     min_trans_prob: 0.7
     min_trans_sim: 0.9
