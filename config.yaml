@@ -53,7 +53,8 @@ preprocessing:
 tacotron:
 
   model:
-    embed_dims: 256
+    embed_dims: 32
+    encoder_embed_dims: 256
     encoder_dims: 128
     decoder_dims: 256
     postnet_dims: 128

@@ -177,6 +177,7 @@ class Decoder(nn.Module):
 class Tacotron(nn.Module):
 
     def __init__(self,
+                 encoder_embed_dims: int,
                  embed_dims: int,
                  num_chars: int,
                  encoder_dims: int,
@@ -191,13 +192,14 @@ class Tacotron(nn.Module):
                  stop_threshold: float,
                  semb_dim=256) -> None:
         super().__init__()
+        self.embedding = nn.Embedding(num_chars, embed_dims)
         self.n_mels = n_mels
         self.lstm_dims = lstm_dims
         self.decoder_dims = decoder_dims
-        self.encoder = Encoder(embed_dims, num_chars, encoder_dims,
+        self.encoder = Encoder(encoder_embed_dims, num_chars, encoder_dims,
                                encoder_k, num_highways, dropout)
-        self.encoder_proj_query = nn.Linear(decoder_dims + semb_dim, decoder_dims, bias=False)
-        self.encoder_proj = nn.Linear(decoder_dims + semb_dim, decoder_dims, bias=False)
+        self.encoder_proj_query = nn.Linear(decoder_dims + semb_dim + embed_dims, decoder_dims, bias=False)
+        self.encoder_proj = nn.Linear(decoder_dims + semb_dim + embed_dims, decoder_dims, bias=False)
         self.decoder = Decoder(n_mels, decoder_dims, lstm_dims)
         self.postnet = CBHG(postnet_k, n_mels, postnet_dims, [256, 80], num_highways)
         self.post_proj = nn.Linear(postnet_dims * 2, n_mels, bias=False)
@@ -243,10 +245,11 @@ class Tacotron(nn.Module):
 
         # Project the encoder outputs to avoid
         # unnecessary matmuls in the decoder loop
+        x_emb = self.embedding(x)
         encoder_seq = self.encoder(x)
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, encoder_seq.shape[1], 1)
-        encoder_seq = torch.cat([encoder_seq, speaker_emb], dim=2)
+        encoder_seq = torch.cat([encoder_seq, speaker_emb, x_emb], dim=2)
         encoder_seq_proj_query = self.encoder_proj_query(encoder_seq)
         encoder_seq_proj = self.encoder_proj(encoder_seq)
 
@@ -305,9 +308,10 @@ class Tacotron(nn.Module):
         # Project the encoder outputs to avoid
         # unnecessary matmuls in the decoder loop
         encoder_seq = self.encoder(x)
+        x_emb = self.embedding(x)
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, encoder_seq.shape[1], 1)
-        encoder_seq = torch.cat([encoder_seq, speaker_emb], dim=2)
+        encoder_seq = torch.cat([encoder_seq, speaker_emb, x_emb], dim=2)
         encoder_seq_proj = self.encoder_proj(encoder_seq)
         encoder_seq_proj_query = self.encoder_proj_query(encoder_seq)
 
