@@ -2,10 +2,10 @@ import re
 from typing import Dict, Any
 
 from phonemizer.backend import EspeakBackend
-from phonemizer.phonemize import phonemize
+from unidecode import unidecode
+
 from utils.text.numbers import normalize_numbers
 from utils.text.symbols import phonemes_set
-from unidecode import unidecode
 
 # Regular expression matching whitespace:
 _whitespace_re = re.compile(r'\s+')
