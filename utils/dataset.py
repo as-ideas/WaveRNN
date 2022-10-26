@@ -1,20 +1,19 @@
+import random
 from random import Random
+from typing import List, Tuple, Iterator
 
 import torch
-from torch.utils.data.sampler import Sampler
 from torch.utils.data import Dataset, DataLoader
-from typing import List, Dict, Union, Tuple, Iterator
+from torch.utils.data.sampler import Sampler
 
 from utils.dsp import *
 from utils.files import unpickle_binary
-from pathlib import Path
-import random
+from utils.text.tokenizer import Tokenizer
 
 
 ###################################################################################
 # WaveRNN/Vocoder Dataset #########################################################
 ###################################################################################
-from utils.text.tokenizer import Tokenizer
 
 
 class VocoderDataset(Dataset):
@@ -26,8 +25,8 @@ class VocoderDataset(Dataset):
 
     def __getitem__(self, index: int) -> Dict[str, np.array]:
         item_id = self.metadata[index]
-        mel = np.load(self.mel_path/f'{item_id}.npy')
-        x = np.load(self.quant_path/f'{item_id}.npy')
+        mel = np.load(str(self.mel_path/f'{item_id}.npy'))
+        x = np.load(str(self.quant_path/f'{item_id}.npy'))
         return {'mel': mel, 'x': x}
 
     def __len__(self):
@@ -404,11 +403,11 @@ def filter_bad_attentions(dataset: List[tuple],
     return dataset_filtered
 
 
-def pad1d(x, max_len):
+def pad1d(x, max_len) -> np.array:
     return np.pad(x, (0, max_len - len(x)), mode='constant')
 
 
-def pad2d(x, max_len):
+def pad2d(x, max_len) -> np.array:
     return np.pad(x, ((0, 0), (0, max_len - x.shape[-1])), constant_values=-11.5129, mode='constant')
 
 

@@ -47,7 +47,7 @@ def extract_pitch_energy(save_path_pitch: Path,
     phoneme_pitches = []
     phoneme_energies = []
     for prog_idx, (item_id, mel_len) in enumerate(all_data, 1):
-        dur = np.load(paths.alg / f'{item_id}.npy').astype(int)
+        dur = np.load(paths.alg / f'{item_id}.npy')
         mel = np.load(paths.mel / f'{item_id}.npy')
         energy = np.linalg.norm(np.exp(mel), axis=0, ord=2)
         assert np.sum(dur) == mel_len
