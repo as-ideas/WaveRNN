@@ -1,6 +1,7 @@
 import re
 from typing import Dict, Any
 
+from phonemizer.backend import EspeakBackend
 from phonemizer.phonemize import phonemize
 from utils.text.numbers import normalize_numbers
 from utils.text.symbols import phonemes_set
@@ -53,20 +54,6 @@ def english_cleaners(text):
     return text
 
 
-def to_phonemes(text: str, lang: str) -> str:
-    phonemes = phonemize(text,
-                         language=lang,
-                         backend='espeak',
-                         strip=True,
-                         preserve_punctuation=True,
-                         with_stress=False,
-                         njobs=1,
-                         punctuation_marks=';:,.!?¡¿—…"«»“”()',
-                         language_switch='remove-flags')
-    phonemes = ''.join([p for p in phonemes if p in phonemes_set])
-    return phonemes
-
-
 class Cleaner:
 
     def __init__(self,
@@ -82,11 +69,18 @@ class Cleaner:
                              f'Currently supported: [\'english_cleaners\', \'no_cleaners\']')
         self.use_phonemes = use_phonemes
         self.lang = lang
+        if use_phonemes:
+            self.backend = EspeakBackend(language=lang,
+                                         preserve_punctuation=True,
+                                         with_stress=False,
+                                         punctuation_marks=';:,.!?¡¿—…"«»“”()',
+                                         language_switch='remove-flags')
 
     def __call__(self, text: str) -> str:
         text = self.clean_func(text)
         if self.use_phonemes:
-            text = to_phonemes(text, self.lang)
+            text = self.backend.phonemize(text, strip=True)
+            text = ''.join([p for p in text if p in phonemes_set])
         text = collapse_whitespace(text)
         text = text.strip()
         return text
