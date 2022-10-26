@@ -47,7 +47,7 @@ def extract_pitch_energy(save_path_pitch: Path,
     phoneme_pitches = []
     phoneme_energies = []
     for prog_idx, (item_id, mel_len) in enumerate(all_data, 1):
-        dur = np.load(paths.alg / f'{item_id}.npy')
+        dur = np.load(paths.alg / f'{item_id}.npy').astype(int)
         mel = np.load(paths.mel / f'{item_id}.npy')
         energy = np.linalg.norm(np.exp(mel), axis=0, ord=2)
         assert np.sum(dur) == mel_len
@@ -118,7 +118,7 @@ def create_align_features(model: Tacotron,
                                                           duration_extractor=duration_extractor)
 
     print('Extracting attention matrices from tacotron...')
-    duration_extraction_pipe.extract_attentions(model, max_batch_size=durex_conf['max_batch_size'])
+    #duration_extraction_pipe.extract_attentions(model, max_batch_size=durex_conf['max_batch_size'])
 
     num_workers = durex_conf['num_workers']
     print(f'Extracting durations from attention matrices (num workers={num_workers})...')
