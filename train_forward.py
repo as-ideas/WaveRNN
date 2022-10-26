@@ -108,7 +108,7 @@ if __name__ == '__main__':
     for speaker_name in tqdm.tqdm(speaker_names, total=len(speaker_names)):
         emb = speaker_emb[speaker_name] / speaker_norm[speaker_name]
         emb = emb / np.linalg.norm(emb, 2)
-        semb = torch.from_numpy(emb).float().to(device)
+        emb = torch.from_numpy(emb).float().to(device)
         setattr(model, speaker_name, emb)
 
     if force_gta:
