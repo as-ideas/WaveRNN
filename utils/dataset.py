@@ -228,7 +228,9 @@ def filter_bad_text_probs(dataset: List[tuple],
     dataset_filtered = []
     for item_id, mel_len in dataset:
         text_prob = text_probs[item_id]
-        if text_prob > min_text_prob:
+        if text_prob < min_text_prob:
+            continue
+        else:
             dataset_filtered.append((item_id, mel_len))
     return dataset_filtered
 
