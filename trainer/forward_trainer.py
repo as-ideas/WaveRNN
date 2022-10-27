@@ -92,6 +92,16 @@ class ForwardTrainer:
 
                 pitch_p_loss = self.ce_loss(pred['pitch_p'].transpose(1, 2), pitch_p_target)
 
+                pitch_p_acc, pitch_p_acc_norm = 0, 0
+                for b in range(pitch_p_target.size(0)):
+                    x_len = batch['x_len'][b]
+                    pitch_p_hat = torch.argmax(pred['pitch_p'][b, :x_len, :].detach().squeeze(), dim=1).long()
+                    pitch_p_t = pitch_p_target[b, :x_len]
+                    pitch_p_acc += (pitch_p_hat == pitch_p_t).float().sum()
+                    pitch_p_acc_norm += len(pitch_p_t)
+
+                pitch_p_acc = pitch_p_acc / pitch_p_acc_norm
+
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur_hat'].unsqueeze(1), batch['x_len'])
                 pitch_loss = self.l1_loss(pred['pitch'], pitch_target.unsqueeze(1), batch['x_len'])
                 energy_loss = self.l1_loss(pred['energy'], energy_target.unsqueeze(1), batch['x_len'])
@@ -131,6 +141,7 @@ class ForwardTrainer:
                 self.writer.add_scalar('Mel_Loss/train', m1_loss + m2_loss, model.get_step())
                 self.writer.add_scalar('Pitch_Loss/train', pitch_loss, model.get_step())
                 self.writer.add_scalar('Pitch_P_Loss/train', pitch_p_loss, model.get_step())
+                self.writer.add_scalar('Pitch_P_Acc/train', pitch_p_acc, model.get_step())
                 self.writer.add_scalar('Energy_Loss/train', energy_loss, model.get_step())
                 self.writer.add_scalar('Duration_Loss/train', dur_loss, model.get_step())
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
@@ -143,6 +154,7 @@ class ForwardTrainer:
             self.writer.add_scalar('Duration_Loss/val', val_out['dur_loss'], model.get_step())
             self.writer.add_scalar('Pitch_Loss/val', val_out['pitch_loss'], model.get_step())
             self.writer.add_scalar('Pitch_P_Loss/val', val_out['pitch_p_loss'], model.get_step())
+            self.writer.add_scalar('Pitch_P_Acc/val', val_out['pitch_p_acc'], model.get_step())
             self.writer.add_scalar('Energy_Loss/val', val_out['energy_loss'], model.get_step())
             save_checkpoint(model=model, optim=optimizer, config=self.config,
                             path=self.paths.forward_checkpoints / 'latest_model.pt')
@@ -158,6 +170,7 @@ class ForwardTrainer:
         dur_val_loss = 0
         pitch_val_loss = 0
         pitch_p_val_loss = 0
+        pitch_p_val_acc = 0
         energy_val_loss = 0
         device = next(model.parameters()).device
         for i, batch in enumerate(val_set, 1):
@@ -169,6 +182,17 @@ class ForwardTrainer:
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur_hat'].unsqueeze(1), batch['x_len'])
                 pitch_loss = self.l1_loss(pred['pitch'], batch['pitch_hat'].unsqueeze(1), batch['x_len'])
                 pitch_p_loss = self.ce_loss(pred['pitch_p'].transpose(1, 2), batch['pitch_p'])
+                pitch_p_target = batch['pitch_p']
+                pitch_p_acc, pitch_p_acc_norm = 0, 0
+                for b in range(pitch_p_target.size(0)):
+                    x_len = batch['x_len'][b]
+                    pitch_p_hat = torch.argmax(pred['pitch_p'][b, :x_len, :].detach().squeeze(), dim=1).long()
+                    pitch_p_t = pitch_p_target[b, :x_len]
+                    pitch_p_acc += (pitch_p_hat == pitch_p_t).float().sum()
+                    pitch_p_acc_norm += len(pitch_p_t)
+
+                pitch_p_acc = pitch_p_acc / pitch_p_acc_norm
+                pitch_p_val_acc += pitch_p_acc
 
                 energy_loss = self.l1_loss(pred['energy'], batch['energy'].unsqueeze(1), batch['x_len'])
                 pitch_val_loss += pitch_loss
@@ -181,6 +205,7 @@ class ForwardTrainer:
             'dur_loss': dur_val_loss / len(val_set),
             'pitch_loss': pitch_val_loss / len(val_set),
             'pitch_p_loss': pitch_p_val_loss / len(val_set),
+            'pitch_p_acc': pitch_p_val_acc / len(val_set),
             'energy_loss': energy_val_loss / len(val_set)
         }
 

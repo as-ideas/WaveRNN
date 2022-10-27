@@ -296,28 +296,13 @@ class ForwardDataset(Dataset):
         speaker_emb = np.load(str(self.path/'speaker_emb'/f'{item_id}.npy'))
         pitch_soft_hat = pitch.copy()
 
-        pitch_diff = np.diff(pitch, prepend=0)
-        pitch_soft_hat[pitch_diff < 0] = 1
-        pitch_soft_hat[pitch_diff > 0] = 3
-        pitch_soft_hat[pitch == 0] = 2
+        pitch_soft_hat[pitch < 0] = 2
+        pitch_soft_hat[pitch > 0] = 2
+        pitch_soft_hat[pitch == 0] = 1
         pitch_p = pitch_soft_hat
 
         dur_hat = dur.copy()
         pitch_hat = pitch.copy()
-        text = self.tokenizer.decode([int(t) for t in x])
-        for i, (t, d) in enumerate(zip(text, dur_hat[:])):
-            if t == ',' and i < len(dur_hat) - 1:
-                dur_hat[i+1] = max(dur_hat[i+1], 15)
-
-
-
-        #if text.endswith('?'):
-        #    if pitch_hat[-3] - pitch_hat[-4] < 0.5:
-        #        pitch_hat[-3] = pitch_hat[-4] + 0.5
-        #    if pitch_hat[-2] - pitch_hat[-3] < 0.5:
-        #        pitch_hat[-2] = pitch_hat[-3] + 0.5
-        #    if pitch_hat[-1] - pitch_hat[-2] < 1:
-        #        pitch_hat[-1] = pitch_hat[-2] + 1
 
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
                 'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy,
