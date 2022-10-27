@@ -34,7 +34,7 @@ class VocoderDataset(Dataset):
 
 
 def get_vocoder_datasets(path: Path,
-                         batch_size:int,
+                         batch_size: int,
                          train_gta: bool,
                          max_mel_len: int,
                          hop_length: int,
@@ -100,7 +100,7 @@ class VocCollator:
 
     def __call__(self, batch: List[Dict[str, torch.tensor]]) -> Dict[str, torch.tensor]:
         mel_win = self.voc_seq_len // self.hop_length + 2 * self.voc_pad
-        max_offsets = [b['mel'].shape[-1] -2 - (mel_win + 2 * self.voc_pad) for b in batch]
+        max_offsets = [b['mel'].shape[-1] - 2 - (mel_win + 2 * self.voc_pad) for b in batch]
         mel_offsets = [np.random.randint(0, offset) for offset in max_offsets]
         sig_offsets = [(offset + self.voc_pad) * self.hop_length for offset in mel_offsets]
 
@@ -130,7 +130,6 @@ class VocCollator:
 ###################################################################################
 # Tacotron/TTS Dataset ############################################################
 ###################################################################################
-
 
 
 class BinnedLengthSampler(Sampler):
@@ -412,9 +411,9 @@ def pad2d(x, max_len) -> np.array:
 
 
 def batchify(input: List[Any], batch_size: int) -> List[List[Any]]:
-    l = len(input)
+    input_len = len(input)
     output = []
-    for i in range(0, l, batch_size):
-        batch = input[i:min(i + batch_size, l)]
+    for i in range(0, input_len, batch_size):
+        batch = input[i:min(i + batch_size, input_len)]
         output.append(batch)
     return output
