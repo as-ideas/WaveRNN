@@ -194,7 +194,7 @@ def get_tts_datasets(path: Path,
         speaker_counts[speaker] = speaker_counts[speaker] + 1
 
     print('Speaker counts (orig, filtered):')
-    for s in sorted(list(speakers), key=lambda s: -speaker_counts[s]):
+    for s in sorted(list(speakers), key=lambda s: speaker_counts[s]):
         print(f'{s} {speaker_counts_orig[s]} {speaker_counts[s]}')
 
     train_ids, train_lens = zip(*train_data)
