@@ -151,6 +151,7 @@ def get_tts_datasets(path: Path,
     text_dict = unpickle_binary(path/'text_dict.pkl')
     text_probs = unpickle_binary(path/'text_prob.pkl')
     text_sims = unpickle_binary(path/'text_sim.pkl')
+    speaker_dict = unpickle_binary(path/'speaker_dict.pkl')
 
     train_data = filter_max_len(train_data, max_mel_len)
     val_data = filter_max_len(val_data, max_mel_len)
@@ -166,6 +167,7 @@ def get_tts_datasets(path: Path,
     print(f'Filtered {train_len_original - len(train_data)} files due to bad text sim!')
 
     train_len_original = len(train_data)
+    train_data_orig = train_data[:]
 
     if model_type == 'forward' and filter_attention:
         attention_score_dict = unpickle_binary(path/'att_score_dict.pkl')
@@ -179,6 +181,21 @@ def get_tts_datasets(path: Path,
                                          min_sharpness=filter_min_sharpness)
         print(f'Using {len(train_data)} train files. '
               f'Filtered {train_len_original - len(train_data)} files due to bad attention!')
+
+    print('Calc speaker stats...')
+    speakers = set(speaker_dict.values())
+    speaker_counts_orig = {s: 0 for s in speakers}
+    speaker_counts = {s: 0 for s in speakers}
+    for t in train_data_orig:
+        speaker = speaker_dict[t[0]]
+        speaker_counts_orig[speaker] = speaker_counts_orig[speaker] + 1
+    for t in train_data:
+        speaker = speaker_dict[t[0]]
+        speaker_counts[speaker] = speaker_counts[speaker] + 1
+
+    print('Speaker counts (orig, filtered):')
+    for s in sorted(list(speakers), key=lambda s: -speaker_counts[s]):
+        print(f'{s} {speaker_counts_orig[s]} {speaker_counts[s]}')
 
     train_ids, train_lens = zip(*train_data)
     val_ids, val_lens = zip(*val_data)
