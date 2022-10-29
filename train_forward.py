@@ -111,13 +111,15 @@ if __name__ == '__main__':
 
     print('Save mean embs')
     for f in tqdm.tqdm(sembs, total=len(sembs)):
+        item_id = f.stem
         try:
-            item_id = f.stem
             speaker_name = speaker_dict[item_id]
             emb = getattr(model, speaker_name)
             emb = emb.cpu().numpy()
             np.save(paths.speaker_emb_mean / f'{item_id}.npy', emb)
         except Exception as e:
+            emb = np.load(paths.speaker_emb / f'{item_id}.npy')
+            np.save(paths.speaker_emb_mean / f'{item_id}.npy', emb)
             print(e)
 
     if force_gta:
