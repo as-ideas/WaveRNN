@@ -113,7 +113,7 @@ if __name__ == '__main__':
     for f in tqdm.tqdm(sembs, total=len(sembs)):
         item_id = f.stem
         try:
-            speaker_name = speaker_dict[item_id]
+            speaker_name = speaker_dict[item_id].replace('.', '')
             emb = getattr(model, speaker_name)
             emb = emb.cpu().numpy()
             np.save(paths.speaker_emb_mean / f'{item_id}.npy', emb)
