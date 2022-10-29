@@ -75,7 +75,7 @@ if __name__ == '__main__':
 
     # Instantiate Forward TTS Model
     speaker_dict = unpickle_binary(paths.data / 'speaker_dict.pkl')
-    speaker_names = {s.replace('.', '') for s in speaker_dict.values() if len(s) > 1}
+    speaker_names = {s for s in speaker_dict.values() if len(s) > 1}
     config['speaker_names'] = speaker_names
     model = init_tts_model(config).to(device)
     print(f'\nInitialized tts model: {model}\n')
@@ -107,7 +107,7 @@ if __name__ == '__main__':
         emb = speaker_emb[speaker_name] / speaker_norm[speaker_name]
         emb = emb / np.linalg.norm(emb, 2)
         emb = torch.from_numpy(emb).float().to(device)
-        setattr(model, speaker_name, emb)
+        setattr(model, speaker_name.replace('.', ''), emb)
 
     print('Save mean embs')
     for f in tqdm.tqdm(sembs, total=len(sembs)):
