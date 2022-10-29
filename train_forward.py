@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 from typing import Union
 
+import numpy as np
 import torch
 import tqdm
 from torch import optim
@@ -103,14 +104,21 @@ if __name__ == '__main__':
                        device=device)
 
     for speaker_name in tqdm.tqdm(speaker_names, total=len(speaker_names)):
-        print(speaker_name)
-        print(speaker_emb[speaker_name])
-        print(speaker_norm[speaker_name])
         emb = speaker_emb[speaker_name] / speaker_norm[speaker_name]
-        emb = torch.tensor(emb).float().to(device)
-        print(emb)
-
+        emb = emb / np.linalg.norm(emb, 2)
+        emb = torch.from_numpy(emb).float().to(device)
         setattr(model, speaker_name, emb)
+
+    print('Save mean embs')
+    for f in tqdm.tqdm(sembs, total=len(sembs)):
+        try:
+            item_id = f.stem
+            speaker_name = speaker_dict[item_id]
+            emb = getattr(model, speaker_name)
+            emb = emb.numpy()
+            np.save(paths.speaker_emb_mean / f'{item_id}.npy', emb)
+        except Exception as e:
+            print(e)
 
     if force_gta:
         print('Creating Ground Truth Aligned Dataset...\n')

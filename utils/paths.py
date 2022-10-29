@@ -15,6 +15,7 @@ class Paths:
         self.alg = self.data/'alg'
         self.att_pred = self.data/'alg_att_predictions'
         self.speaker_emb = self.data/'speaker_emb'
+        self.speaker_emb_mean = self.data/'speaker_emb_mean'
         self.raw_pitch = self.data/'raw_pitch'
         self.phon_pitch = self.data/'phon_pitch'
         self.phon_energy = self.data/'phon_energy'

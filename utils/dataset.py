@@ -312,7 +312,7 @@ class ForwardDataset(Dataset):
         dur = np.load(str(self.path/'alg'/f'{item_id}.npy'))
         pitch = np.load(str(self.path/'phon_pitch'/f'{item_id}.npy'))
         energy = np.load(str(self.path/'phon_energy'/f'{item_id}.npy'))
-        speaker_emb = np.load(str(self.path/'speaker_emb'/f'{item_id}.npy'))
+        speaker_emb = np.load(str(self.path/'speaker_emb_mean'/f'{item_id}.npy'))
         pitch_soft_hat = pitch.copy()
 
         pitch_soft_hat[pitch < 0] = 2
