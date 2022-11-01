@@ -11,6 +11,8 @@ from utils.files import unpickle_binary
 from utils.text.tokenizer import Tokenizer
 
 
+SHUFFLE_SEED = 42
+
 ###################################################################################
 # WaveRNN/Vocoder Dataset #########################################################
 ###################################################################################
@@ -68,7 +70,7 @@ def get_vocoder_datasets(path: Path,
                          shuffle=False,
                          pin_memory=True)
 
-    np.random.seed(42)  # fix numpy seed to obtain the same val set every time, I know its hacky
+    np.random.seed(SHUFFLE_SEED)  # fix numpy seed to obtain the same val set every time, I know its hacky
     val_set = [b for b in val_set]
     np.random.seed()
 
@@ -257,7 +259,7 @@ class BinnedTacoDataLoader:
             batches = list(batchify(big_batch, batch_size=max_batch_size))
             all_batches.extend(batches)
 
-        Random(42).shuffle(all_batches)
+        Random(SHUFFLE_SEED).shuffle(all_batches)
         self.all_batches = all_batches
         self.taco_dataset = TacoDataset(path=data_path, dataset_ids=dataset_ids,
                                         text_dict=text_dict, tokenizer=tokenizer)

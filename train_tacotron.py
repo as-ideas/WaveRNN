@@ -109,18 +109,18 @@ def create_align_features(model: Tacotron,
     model.eval()
     model.decoder.prenet.train()
 
-    durex_conf = config['duration_extraction']
+    dur_extr_conf = config['duration_extraction']
 
-    duration_extractor = DurationExtractor(silence_threshold=durex_conf['silence_threshold'],
-                                           silence_prob_shift=durex_conf['silence_prob_shift'])
+    duration_extractor = DurationExtractor(silence_threshold=dur_extr_conf['silence_threshold'],
+                                           silence_prob_shift=dur_extr_conf['silence_prob_shift'])
 
     duration_extraction_pipe = DurationExtractionPipeline(paths=paths, config=config,
                                                           duration_extractor=duration_extractor)
 
     print('Extracting attention matrices from tacotron...')
-    #duration_extraction_pipe.extract_attentions(model, max_batch_size=durex_conf['max_batch_size'])
+    duration_extraction_pipe.extract_attentions(model, max_batch_size=dur_extr_conf['max_batch_size'])
 
-    num_workers = durex_conf['num_workers']
+    num_workers = dur_extr_conf['num_workers']
     print(f'Extracting durations from attention matrices (num workers={num_workers})...')
     att_score_dict = duration_extraction_pipe.extract_durations(num_workers=num_workers,
                                                                 sampler_bin_size=num_workers*4)
