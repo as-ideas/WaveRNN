@@ -79,7 +79,7 @@ class Cleaner:
     def __call__(self, text: str) -> str:
         text = self.clean_func(text)
         if self.use_phonemes:
-            text = self.backend.phonemize(text, strip=True)
+            text = self.backend.phonemize([text], strip=True)[0]
             text = ''.join([p for p in text if p in phonemes_set])
         text = collapse_whitespace(text)
         text = text.strip()
