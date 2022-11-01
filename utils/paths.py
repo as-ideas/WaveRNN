@@ -38,6 +38,7 @@ class Paths:
         os.makedirs(self.data, exist_ok=True)
         os.makedirs(self.quant, exist_ok=True)
         os.makedirs(self.speaker_emb, exist_ok=True)
+        os.makedirs(self.speaker_emb_mean, exist_ok=True)
         os.makedirs(self.mel, exist_ok=True)
         os.makedirs(self.gta, exist_ok=True)
         os.makedirs(self.alg, exist_ok=True)

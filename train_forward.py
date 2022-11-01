@@ -81,7 +81,7 @@ if __name__ == '__main__':
     print(f'\nInitialized tts model: {model}\n')
 
     print('Loading semb')
-    sembs = list(paths.speaker_emb.glob('*.npy'))
+    sembs = list(paths.speaker_emb.glob('*.npy'))[:10]
 
     print(f'Speaker names: {speaker_names}')
     speaker_emb = {name: np.zeros(256) for name in speaker_names}
