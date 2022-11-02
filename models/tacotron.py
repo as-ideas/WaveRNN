@@ -177,7 +177,6 @@ class Decoder(nn.Module):
 class Tacotron(nn.Module):
 
     def __init__(self,
-                 encoder_embed_dims: int,
                  embed_dims: int,
                  num_chars: int,
                  encoder_dims: int,
@@ -189,7 +188,9 @@ class Tacotron(nn.Module):
                  postnet_k: int,
                  num_highways: int,
                  dropout: float,
-                 stop_threshold: float) -> None:
+                 stop_threshold: float,
+                 encoder_embed_dims: int = 32,
+                 ) -> None:
         super().__init__()
         self.n_mels = n_mels
         self.lstm_dims = lstm_dims
