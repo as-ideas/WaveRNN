@@ -177,6 +177,7 @@ class Decoder(nn.Module):
 class Tacotron(nn.Module):
 
     def __init__(self,
+                 encoder_embed_dims: int,
                  embed_dims: int,
                  num_chars: int,
                  encoder_dims: int,
@@ -193,9 +194,10 @@ class Tacotron(nn.Module):
         self.n_mels = n_mels
         self.lstm_dims = lstm_dims
         self.decoder_dims = decoder_dims
-        self.encoder = Encoder(embed_dims, num_chars, encoder_dims,
+        self.encoder = Encoder(encoder_embed_dims, num_chars, encoder_dims,
                                encoder_k, num_highways, dropout)
-        self.encoder_proj = nn.Linear(decoder_dims, decoder_dims, bias=False)
+        self.encoder_proj_query = nn.Linear(decoder_dims + embed_dims, decoder_dims, bias=False)
+        self.encoder_proj = nn.Linear(decoder_dims + embed_dims, decoder_dims, bias=False)
         self.decoder = Decoder(n_mels, decoder_dims, lstm_dims)
         self.postnet = CBHG(postnet_k, n_mels, postnet_dims, [256, 80], num_highways)
         self.post_proj = nn.Linear(postnet_dims * 2, n_mels, bias=False)
@@ -240,7 +242,10 @@ class Tacotron(nn.Module):
 
         # Project the encoder outputs to avoid
         # unnecessary matmuls in the decoder loop
+        x_emb = self.embedding(x)
         encoder_seq = self.encoder(x)
+        encoder_seq = torch.cat([encoder_seq, x_emb], dim=2)
+        encoder_seq_proj_query = self.encoder_proj_query(encoder_seq)
         encoder_seq_proj = self.encoder_proj(encoder_seq)
 
         # Need a couple of lists for outputs
@@ -250,7 +255,7 @@ class Tacotron(nn.Module):
         for t in range(0, steps, self.r):
             prenet_in = m[:, :, t - 1] if t > 0 else go_frame
             mel_frames, scores, hidden_states, cell_states, context_vec = \
-                self.decoder(encoder_seq, encoder_seq_proj, prenet_in,
+                self.decoder(encoder_seq_proj_query, encoder_seq_proj, prenet_in,
                              hidden_states, cell_states, context_vec, t)
             mel_outputs.append(mel_frames)
             attn_scores.append(scores)
@@ -295,7 +300,10 @@ class Tacotron(nn.Module):
         # Project the encoder outputs to avoid
         # unnecessary matmuls in the decoder loop
         encoder_seq = self.encoder(x)
+        x_emb = self.embedding(x)
+        encoder_seq = torch.cat([encoder_seq, x_emb], dim=2)
         encoder_seq_proj = self.encoder_proj(encoder_seq)
+        encoder_seq_proj_query = self.encoder_proj_query(encoder_seq)
 
         # Need a couple of lists for outputs
         mel_outputs, attn_scores = [], []
@@ -304,7 +312,7 @@ class Tacotron(nn.Module):
         for t in range(0, steps, self.r):
             prenet_in = mel_outputs[-1][:, :, -1] if t > 0 else go_frame
             mel_frames, scores, hidden_states, cell_states, context_vec = \
-            self.decoder(encoder_seq, encoder_seq_proj, prenet_in,
+            self.decoder(encoder_seq_proj_query, encoder_seq_proj, prenet_in,
                          hidden_states, cell_states, context_vec, t)
             mel_outputs.append(mel_frames)
             attn_scores.append(scores)
@@ -317,7 +325,6 @@ class Tacotron(nn.Module):
         # Post-Process for Linear Spectrograms
         postnet_out = self.postnet(mel_outputs)
         linear = self.post_proj(postnet_out)
-
 
         linear = linear.transpose(1, 2)[0].cpu().data.numpy()
         mel_outputs = mel_outputs[0].cpu().data.numpy()
