@@ -193,6 +193,7 @@ class Tacotron(nn.Module):
                  ) -> None:
         super().__init__()
         self.n_mels = n_mels
+        self.embedding = nn.Embedding(num_chars, encoder_embed_dims)
         self.lstm_dims = lstm_dims
         self.decoder_dims = decoder_dims
         self.encoder = Encoder(encoder_embed_dims, num_chars, encoder_dims,
