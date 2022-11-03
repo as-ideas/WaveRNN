@@ -87,6 +87,7 @@ class ForwardTacotron(nn.Module):
         self.rnn_dims = rnn_dims
         self.padding_value = padding_value
         self.embedding = nn.Embedding(num_chars, embed_dims)
+        self.prob_embedding = nn.Embedding(num_chars, embed_dims)
         self.lr = LengthRegulator()
         self.dur_pred = SeriesPredictor(num_chars=num_chars,
                                         emb_dim=series_embed_dims,
@@ -138,6 +139,7 @@ class ForwardTacotron(nn.Module):
         mel_lens = batch['mel_len']
         pitch = batch['pitch'].unsqueeze(1)
         energy = batch['energy'].unsqueeze(1)
+        dur_probs = batch['dur_probs']
 
         if self.training:
             self.step += 1
@@ -146,7 +148,12 @@ class ForwardTacotron(nn.Module):
         pitch_hat = self.pitch_pred(x).transpose(1, 2)
         energy_hat = self.energy_pred(x).transpose(1, 2)
 
-        x = self.embedding(x)
+        x_in = x
+        x = self.embedding(x_in)
+        x_prob = self.prob_embedding(x_in)
+        dp = (dur_probs < 0.1).float()[:, :, None]
+        x = x + x_prob * dp
+
         x = x.transpose(1, 2)
         x = self.prenet(x)
 

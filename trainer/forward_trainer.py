@@ -86,16 +86,16 @@ class ForwardTrainer:
                 batch['pitch'] = batch['pitch'] * pitch_zoneout_mask.to(device).float()
                 batch['energy'] = batch['energy'] * energy_zoneout_mask.to(device).float()
 
-                mp = lr(batch['dur_probs'], batch['dur']).unsqueeze(1)
-                mp = F.pad(mp, [0, batch['mel'].size(2) - mp.size(2), 0, 0], 'constant', 0)
-                dp = batch['dur_probs'].unsqueeze(1)
+                #mp = lr(batch['dur_probs'], batch['dur']).unsqueeze(1)
+                #mp = F.pad(mp, [0, batch['mel'].size(2) - mp.size(2), 0, 0], 'constant', 0)
+                #dp = batch['dur_probs'].unsqueeze(1)
 
                 pred = model(batch)
 
-                m1_loss = self.l1_loss(pred['mel'] * mp, batch['mel'] * mp, batch['mel_len'])
-                m2_loss = self.l1_loss(pred['mel_post'] * mp, batch['mel'] * mp, batch['mel_len'])
+                m1_loss = self.l1_loss(pred['mel'] , batch['mel'], batch['mel_len'])
+                m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
-                dur_loss = self.l1_loss(pred['dur'].unsqueeze(1) * dp, batch['dur'].unsqueeze(1) * dp, batch['x_len'])
+                dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
                 pitch_loss = self.l1_loss(pred['pitch'], pitch_target.unsqueeze(1), batch['x_len'])
                 energy_loss = self.l1_loss(pred['energy'], energy_target.unsqueeze(1), batch['x_len'])
 
