@@ -67,7 +67,7 @@ class DurationDataset(Dataset):
             align_score = float(align_score)
             durs, att_score = self.duration_extractor(x=x, mel=mel, att=att)
             att_score = float(att_score)
-            durs_npy = durs.cpu().numpy()
+            durs_npy = durs.cpu().numpy().astype(int)
             assert np.sum(durs_npy) == mel_len, f'WARNINNG: Sum of durations did not match mel length for item {item_id}!'
         except Exception as e:
             print(e)
