@@ -107,7 +107,8 @@ if __name__ == '__main__':
         print(speaker_emb[speaker_name])
         print(speaker_norm[speaker_name])
         emb = speaker_emb[speaker_name] / speaker_norm[speaker_name]
-        emb = torch.tensor(emb).float().to(device)
+        emb = emb / np.linalg.norm(emb, 2)
+        emb = torch.from_numpy(emb).float().to(device)
         print(emb)
 
         setattr(model, speaker_name, emb)
