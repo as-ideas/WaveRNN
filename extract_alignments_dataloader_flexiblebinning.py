@@ -192,6 +192,7 @@ if __name__ == '__main__':
 
     model.eval()
     model.decoder.prenet.train()
+    assert model.r == 1, f'Reduction factor is not 1!, Was {model.r}'
 
     duration_extractor = DurationExtractor(
         silence_threshold=config['preprocessing']['silence_threshold'],
