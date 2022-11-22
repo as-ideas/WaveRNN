@@ -23,17 +23,17 @@ class DurationExtractor:
     def __call__(self,
                  x: torch.Tensor,
                  mel: torch.Tensor,
-                 att: torch.Tensor) -> Tuple[torch.tensor, float]:
+                 attention: torch.Tensor) -> Tuple[torch.tensor, float]:
         """
         Extracts durations from the attention matrix by finding the shortest monotonic path from
         top left to bottom right.
 
         :param x: Tokenized sequence.
         :param mel: Mel spec.
-        :param att: Attention matrix with shape (mel_len, x_len).
+        :param attention: Attention matrix with shape (mel_len, x_len).
         :return: Tuple, where the first entry is the durations and the second entry is the average attention probability.
         """
-        att = att[...]
+        attention = attention[...]
         mel_len = mel.shape[-1]
 
         # We add a little probability to silent phonemes within unvoiced parts of the spec where the tacotron attention
@@ -47,10 +47,10 @@ class DurationExtractor:
         for i in sil_mel_inds:
             sil_tok_inds = torch.isin(x, sil_phon_inds)
             att_shift = sil_tok_inds.float() * self.silence_prob_shift * 2 - self.silence_prob_shift
-            att[i, :] = att[i, :] + att_shift
+            attention[i, :] = attention[i, :] + att_shift
 
-        att = torch.clamp(att, min=0., max=1.)
-        path_probs = 1.-att[:mel_len, :]
+        attention = torch.clamp(attention, min=0., max=1.)
+        path_probs = 1. - attention[:mel_len, :]
         adj_matrix = self._to_adj_matrix(path_probs)
         dist_matrix, predecessors = dijkstra(csgraph=adj_matrix, directed=True,
                                              indices=0, return_predecessors=True)
@@ -74,7 +74,7 @@ class DurationExtractor:
             i, j = self._from_node_index(node_index, cols)
             mel_text[i] = j
             if not sil_mask[i]:
-                att_scores.append(float(att[i, j]))
+                att_scores.append(float(attention[i, j]))
 
         for j in mel_text.values():
             durations[j] += 1

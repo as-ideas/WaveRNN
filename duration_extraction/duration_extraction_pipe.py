@@ -1,4 +1,3 @@
-import itertools
 import logging
 from dataclasses import dataclass
 from logging import INFO
@@ -12,7 +11,7 @@ from tqdm import tqdm
 from duration_extraction.duration_extractor import DurationExtractor
 from models.tacotron import Tacotron
 from trainer.common import to_device
-from utils.dataset import get_tts_datasets, BinnedLengthSampler, BinnedTacoDataLoader, get_binned_taco_dataloader
+from utils.dataset import BinnedLengthSampler, get_binned_taco_dataloader
 from utils.files import unpickle_binary
 from utils.metrics import attention_score
 from utils.paths import Paths
@@ -24,7 +23,7 @@ class DurationResult:
     item_id: str
     att_score: float
     align_score: float
-    durs: np.array
+    durations: np.array
 
 
 class DurationCollator:
@@ -57,19 +56,19 @@ class DurationExtractionDataset(Dataset):
         mel = np.load(self.paths.mel / f'{item_id}.npy')
         mel = torch.from_numpy(mel)
         x = torch.tensor(x)
-        att_npy = np.load(str(self.paths.att_pred / f'{item_id}.npy'))
-        att = torch.from_numpy(att_npy)
+        attention_npy = np.load(str(self.paths.att_pred / f'{item_id}.npy'))
+        attention = torch.from_numpy(attention_npy)
         mel_len = mel.shape[-1]
         mel_len = torch.tensor(mel_len).unsqueeze(0)
-        align_score, _ = attention_score(att.unsqueeze(0), mel_len, r=1)
+        align_score, _ = attention_score(attention.unsqueeze(0), mel_len, r=1)
         align_score = float(align_score)
-        durs, att_score = self.duration_extractor(x=x, mel=mel, att=att)
+        durations, att_score = self.duration_extractor(x=x, mel=mel, attention=attention)
         att_score = float(att_score)
-        durs_npy = durs.cpu().numpy()
-        if np.sum(durs_npy) != mel_len:
+        durations_npy = durations.cpu().numpy()
+        if np.sum(durations_npy) != mel_len:
             print(f'WARNINNG: Sum of durations did not match mel length for item {item_id}!')
         return DurationResult(item_id=item_id, att_score=att_score,
-                              align_score=align_score, durs=durs_npy)
+                              align_score=align_score, durations=durations_npy)
 
     def __len__(self):
         return len(self.metadata)
@@ -112,8 +111,8 @@ class DurationExtractionPipeline:
         for i, batch in enumerate(pbar, 1):
             batch = to_device(batch, device=device)
             with torch.no_grad():
-                _, _, att_batch = model(batch['x'], batch['mel'])
-            _, att_score = attention_score(att_batch, batch['mel_len'], r=1)
+                _, _, attention_batch = model(batch['x'], batch['mel'])
+            _, att_score = attention_score(attention_batch, batch['mel_len'], r=1)
             sum_att_score += att_score.sum()
             B = batch['x_len'].size(0)
             sum_items += B
@@ -121,8 +120,8 @@ class DurationExtractionPipeline:
                 x_len = batch['x_len'][b].cpu()
                 mel_len = batch['mel_len'][b].cpu()
                 item_id = batch['item_id'][b]
-                att = att_batch[b, :mel_len, :x_len].cpu()
-                np.save(self.paths.att_pred / f'{item_id}.npy', att.numpy(), allow_pickle=False)
+                attention = attention_batch[b, :mel_len, :x_len].cpu()
+                np.save(self.paths.att_pred / f'{item_id}.npy', attention.numpy(), allow_pickle=False)
             pbar.set_description(f'Avg attention score: {sum_att_score / sum_items}', refresh=True)
 
         return sum_att_score / len(dataloader)
@@ -174,6 +173,6 @@ class DurationExtractionPipeline:
             sum_att_score += res.att_score
             pbar.set_description(f'Avg duration attention score: {sum_att_score / i}', refresh=True)
             att_score_dict[res.item_id] = (res.align_score, res.att_score)
-            np.save(self.paths.alg / f'{res.item_id}.npy', res.durs.astype(int), allow_pickle=False)
+            np.save(self.paths.alg / f'{res.item_id}.npy', res.durations.astype(int), allow_pickle=False)
 
         return att_score_dict

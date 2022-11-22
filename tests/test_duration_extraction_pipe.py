@@ -15,7 +15,7 @@ from utils.files import read_config, pickle_binary
 from utils.paths import Paths
 
 
-def new_diagonal_att(dims: Tuple[int, int, int]) -> torch.Tensor:
+def new_diagonal_attention(dims: Tuple[int, int, int]) -> torch.Tensor:
     """ Returns perfect diagonal attention matrix, assuming that the dimensions are almost square (1, M, M) """
     att = torch.zeros(dims).float()
     for i in range(dims[1]):
@@ -28,7 +28,7 @@ class MockTacotron(torch.nn.Module):
 
     def __call__(self, x: torch.Tensor, mel: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """ We just use the mock model to get the returned diagonal attention matrix. """
-        return x, x, new_diagonal_att((1, mel.size(-1), x.size(-1)))
+        return x, x, new_diagonal_attention((1, mel.size(-1), x.size(-1)))
 
 
 class TestDurationExtractionPipe(unittest.TestCase):
