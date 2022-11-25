@@ -68,14 +68,17 @@ class Averager:
 
 class MaskedL1(torch.nn.Module):
 
-    def forward(self, x, target, lens):
+    def forward(self, x, target, lens, normalize=False):
         target.requires_grad = False
         max_len = target.size(2)
         mask = pad_mask(lens, max_len)
         mask = mask.unsqueeze(1).expand_as(x)
         loss = F.l1_loss(
-            x * mask, target * mask, reduction='sum')
-        return loss / mask.sum()
+            x * mask, target * mask, reduction='none')
+        if normalize:
+            loss_norm = loss.mean(dim=1) + 0.1
+            loss = loss / loss_norm[:, None, :]
+        return loss.sum() / mask.sum()
 
 
 # Adapted from https://gist.github.com/jihunchoi/f1434a77df9db1bb337417854b398df1
