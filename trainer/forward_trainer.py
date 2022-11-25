@@ -83,8 +83,8 @@ class ForwardTrainer:
 
                 pred = model(batch)
 
-                m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'], rescale=True)
-                m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'], rescale=True)
+                m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'], normalize=True)
+                m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'], normalize=True)
 
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
                 pitch_loss = self.l1_loss(pred['pitch'], pitch_target.unsqueeze(1), batch['x_len'])
