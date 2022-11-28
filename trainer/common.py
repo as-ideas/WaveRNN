@@ -77,7 +77,7 @@ class MaskedL1(torch.nn.Module):
             x * mask, target * mask, reduction='none')
 
         if normalize:
-            loss[loss > 1] *= 0.1
+            loss = torch.sqrt(loss)
             #loss_norm = loss.mean(dim=1) + 0.1
             #loss_norm[loss_norm < 1.] = 1.
             #loss = loss / loss_norm[:, None, :]
