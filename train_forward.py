@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Union
 
 import torch
+import tqdm
 from torch import optim
 from torch.nn import init
 from torch.utils.data.dataloader import DataLoader
@@ -38,17 +39,27 @@ def create_gta_features(model: Tacotron,
     device = next(model.parameters()).device  # use same device as model parameters
     iters = len(train_set) + len(val_set)
     dataset = itertools.chain(train_set, val_set)
-    for i, batch in enumerate(dataset, 1):
+
+
+    for i, batch in tqdm.tqdm(enumerate(dataset, 1), total=len(train_set) + len(val_set)):
+        item_id = batch['item_id'][0]
+        if item_id != 'bild_r_0344_026':
+            continue
         batch = to_device(batch, device=device)
 
         with torch.no_grad():
             pred = model(batch)
-        gta = pred['mel_post'].cpu().numpy()
-        for j, item_id in enumerate(batch['item_id']):
-            mel = gta[j][:, :batch['mel_len'][j]]
-            np.save(str(save_path/f'{item_id}.npy'), mel, allow_pickle=False)
+        gta = pred['mel_post']
+        loss = torch.abs(gta - batch['mel']).squeeze().mean(dim=0)
+        fig = plot_pitch(loss)
+        plt.savefig(f'/tmp/gta/{item_id}.png')
+        print(batch['item_id'], loss)
         bar = progbar(i, iters)
         msg = f'{bar} {i}/{iters} Batches '
+        for j, item_id in enumerate(batch['item_id']):
+            mel = gta[j][:, :batch['mel_len'][j]]
+            torch.save(torch.from_numpy(mel), str(save_path/f'{item_id}.mel'))
+
         stream(msg)
 
 
@@ -82,7 +93,7 @@ if __name__ == '__main__':
     if force_gta:
         print('Creating Ground Truth Aligned Dataset...\n')
         train_set, val_set = get_tts_datasets(
-            paths.data, 8, r=1, model_type='forward',
+            paths.data, 1, r=1, model_type='forward',
             filter_attention=False, max_mel_len=None)
         create_gta_features(model, train_set, val_set, paths.gta)
         print('\n\nYou can now train WaveRNN on GTA features - use python train_wavernn.py --gta\n')
