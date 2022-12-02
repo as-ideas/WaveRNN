@@ -1,3 +1,4 @@
+import random
 import time
 from typing import Tuple, Dict, Any, Union
 
@@ -8,6 +9,8 @@ from torch.utils.tensorboard import SummaryWriter
 
 from models.fast_pitch import FastPitch
 from models.forward_tacotron import ForwardTacotron
+from models.generator import Generator
+from models.multiscale import MultiScaleDiscriminator
 from trainer.common import Averager, TTSSession, MaskedL1, to_device, np_now
 from utils.checkpoints import  save_checkpoint
 from utils.dataset import get_tts_datasets
@@ -33,6 +36,8 @@ class ForwardTrainer:
         self.l1_loss = MaskedL1()
 
     def train(self, model: Union[ForwardTacotron, FastPitch], optimizer: Optimizer) -> None:
+
+
         forward_schedule = self.train_cfg['schedule']
         forward_schedule = parse_schedule(forward_schedule)
         for i, session_params in enumerate(forward_schedule, 1):
@@ -62,6 +67,21 @@ class ForwardTrainer:
         for g in optimizer.param_groups:
             g['lr'] = session.lr
 
+        model_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/bild_voice/voc_model/model.pt'
+        model_g = Generator(80)
+        model_d = MultiScaleDiscriminator()
+
+        optim_g = torch.optim.Adam(model_g.parameters(),
+                                   lr=0.0001, betas=(0.5, 0.9))
+        optim_d = torch.optim.Adam(model_d.parameters(),
+                                   lr=0.0001, betas=(0.5, 0.9))
+
+        checkpoint = torch.load(model_path, map_location=torch.device('cpu'))
+        model_g.load_state_dict(checkpoint['model_g'], strict=False)
+        model_d.load_state_dict(checkpoint['model_d'])
+        optim_g.load_state_dict(checkpoint['optim_g'])
+        optim_d.load_state_dict(checkpoint['optim_d'])
+
         m_loss_avg = Averager()
         dur_loss_avg = Averager()
         duration_avg = Averager()
@@ -83,6 +103,21 @@ class ForwardTrainer:
 
                 pred = model(batch)
 
+                melG = pred['mel_post']
+
+                max_len = melG.size(-1)
+
+                left = random.randint(0, max(max_len-128, 0))
+                right = left + 128
+                melG_in = melG[:, :, left:right]
+                fake_audio = model_g(melG_in)[:, :, :]
+                disc_fake = model_d(fake_audio)
+                loss_g = 0.0
+                for (feats_fake, score_fake) in disc_fake:
+                    loss_g += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
+
+                print(loss_g)
+
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
@@ -93,7 +128,8 @@ class ForwardTrainer:
                 loss = m1_loss + m2_loss \
                        + self.train_cfg['dur_loss_factor'] * dur_loss \
                        + self.train_cfg['pitch_loss_factor'] * pitch_loss \
-                       + self.train_cfg['energy_loss_factor'] * energy_loss
+                       + self.train_cfg['energy_loss_factor'] * energy_loss \
+                       + 0.1 * loss_g
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -119,12 +155,13 @@ class ForwardTrainer:
                                     path=self.paths.forward_checkpoints / f'forward_step{k}k.pt')
 
                 if step % self.train_cfg['plot_every'] == 0:
-                    self.generate_plots(model, session)
+                    self.generate_plots(model, session, model_g)
 
                 self.writer.add_scalar('Mel_Loss/train', m1_loss + m2_loss, model.get_step())
                 self.writer.add_scalar('Pitch_Loss/train', pitch_loss, model.get_step())
                 self.writer.add_scalar('Energy_Loss/train', energy_loss, model.get_step())
                 self.writer.add_scalar('Duration_Loss/train', dur_loss, model.get_step())
+                self.writer.add_scalar('Melgan_Loss/train', loss_g, model.get_step())
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
                 self.writer.add_scalar('Params/learning_rate', session.lr, model.get_step())
 
@@ -171,7 +208,7 @@ class ForwardTrainer:
         }
 
     @ignore_exception
-    def generate_plots(self, model: Union[ForwardTacotron, FastPitch], session: TTSSession) -> None:
+    def generate_plots(self, model: Union[ForwardTacotron, FastPitch], session: TTSSession, model_g) -> None:
         model.eval()
         device = next(model.parameters()).device
         batch = session.val_sample
@@ -198,14 +235,16 @@ class ForwardTrainer:
         self.writer.add_figure('Ground_Truth_Aligned/linear', m1_hat_fig, model.step)
         self.writer.add_figure('Ground_Truth_Aligned/postnet', m2_hat_fig, model.step)
 
-        m2_hat_wav = self.dsp.griffinlim(m2_hat)
         target_wav = self.dsp.griffinlim(m_target)
+        m2_hat_voc = pred['mel_post']
+        m2_hat_wav_voc = model_g(m2_hat_voc)
+        m2_hat_wav_voc = m2_hat_wav_voc[0, :, :]
 
         self.writer.add_audio(
             tag='Ground_Truth_Aligned/target_wav', snd_tensor=target_wav,
             global_step=model.step, sample_rate=self.dsp.sample_rate)
         self.writer.add_audio(
-            tag='Ground_Truth_Aligned/postnet_wav', snd_tensor=m2_hat_wav,
+            tag='Ground_Truth_Aligned/melgan_wav', snd_tensor=m2_hat_wav_voc,
             global_step=model.step, sample_rate=self.dsp.sample_rate)
 
         gen = model.generate(batch['x'][0:1, :batch['x_len'][0]])
@@ -214,7 +253,9 @@ class ForwardTrainer:
 
         m1_hat_fig = plot_mel(m1_hat)
         m2_hat_fig = plot_mel(m2_hat)
-
+        m2_hat_voc = gen['mel_post']
+        m2_hat_wav_voc = model_g(m2_hat_voc)
+        m2_hat_wav_voc = m2_hat_wav_voc[0, :, :]
         pitch_gen_fig = plot_pitch(np_now(gen['pitch'].squeeze()))
         energy_gen_fig = plot_pitch(np_now(gen['energy'].squeeze()))
 
@@ -224,11 +265,10 @@ class ForwardTrainer:
         self.writer.add_figure('Generated/linear', m1_hat_fig, model.step)
         self.writer.add_figure('Generated/postnet', m2_hat_fig, model.step)
 
-        m2_hat_wav = self.dsp.griffinlim(m2_hat)
-
         self.writer.add_audio(
             tag='Generated/target_wav', snd_tensor=target_wav,
             global_step=model.step, sample_rate=self.dsp.sample_rate)
         self.writer.add_audio(
-            tag='Generated/postnet_wav', snd_tensor=m2_hat_wav,
+            tag='Generated/melgan_voc', snd_tensor=m2_hat_wav_voc,
             global_step=model.step, sample_rate=self.dsp.sample_rate)
+
