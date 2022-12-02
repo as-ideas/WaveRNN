@@ -258,6 +258,7 @@ class ForwardTrainer:
         m2_hat_voc = gen['mel_post']
         m2_hat_wav_voc = model_g(m2_hat_voc)
         m2_hat_wav_voc = m2_hat_wav_voc[0, :, :]
+
         pitch_gen_fig = plot_pitch(np_now(gen['pitch'].squeeze()))
         energy_gen_fig = plot_pitch(np_now(gen['energy'].squeeze()))
 
