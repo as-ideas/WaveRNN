@@ -106,12 +106,13 @@ class ForwardTrainer:
                 pred = model(batch)
 
                 melG = pred['mel_post']
-
+                print(melG.size())
                 max_len = melG.size(-1)
 
-                left = random.randint(0, max(max_len-128, 0))
-                right = left + 128
+                left = random.randint(0, max(max_len-64, 0))
+                right = left + 64
                 melG_in = melG[:, :, left:right]
+                print('melg_in', melG_in.size())
                 fake_audio = model_g(melG_in)[:, :, :]
                 disc_fake = model_d(fake_audio)
                 loss_g = 0.0
@@ -238,8 +239,9 @@ class ForwardTrainer:
         self.writer.add_figure('Ground_Truth_Aligned/postnet', m2_hat_fig, model.step)
 
         target_wav = self.dsp.griffinlim(m_target)
-        m2_hat_voc = pred['mel_post']
-        m2_hat_wav_voc = model_g(m2_hat_voc)
+        m2_hat_voc = pred['mel_post'][0:1, :, :]
+        with torch.no_grad():
+            m2_hat_wav_voc = model_g(m2_hat_voc)
         m2_hat_wav_voc = m2_hat_wav_voc[0, :, :]
 
         self.writer.add_audio(
@@ -255,9 +257,11 @@ class ForwardTrainer:
 
         m1_hat_fig = plot_mel(m1_hat)
         m2_hat_fig = plot_mel(m2_hat)
-        m2_hat_voc = gen['mel_post']
-        m2_hat_wav_voc = model_g(m2_hat_voc)
-        m2_hat_wav_voc = m2_hat_wav_voc[0, :, :]
+
+        m2_hat_voc = pred['mel_post'][0:1, :, :]
+        with torch.no_grad():
+            m2_hat_wav_voc = model_g(m2_hat_voc)
+            m2_hat_wav_voc = m2_hat_wav_voc[0, :, :]
 
         pitch_gen_fig = plot_pitch(np_now(gen['pitch'].squeeze()))
         energy_gen_fig = plot_pitch(np_now(gen['energy'].squeeze()))
