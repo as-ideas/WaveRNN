@@ -28,7 +28,10 @@ class SeriesPredictor(nn.Module):
     def forward(self,
                 x: torch.Tensor,
                 alpha: float = 1.0) -> torch.Tensor:
-        x = self.embedding(x)
+        x_in = x
+        x = self.embedding(x_in[:, 0, :])
+        for i in range(5):
+            x += self.embedding(x_in[:, i, :])
         x = x.transpose(1, 2)
         for conv in self.convs:
             x = conv(x)
@@ -146,7 +149,10 @@ class ForwardTacotron(nn.Module):
         pitch_hat = self.pitch_pred(x).transpose(1, 2)
         energy_hat = self.energy_pred(x).transpose(1, 2)
 
-        x = self.embedding(x)
+        x_in = x
+        x = self.embedding(x_in[:, 0, :])
+        for i in range(5):
+            x += self.embedding(x_in[:, i, :])
         x = x.transpose(1, 2)
         x = self.prenet(x)
 

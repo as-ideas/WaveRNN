@@ -19,12 +19,10 @@ class Encoder(nn.Module):
                          num_highways=num_highways)
 
     def forward(self, x):
-        print()
         x_in = x
         x = self.embedding(x_in[:, 0, :])
         for i in range(5):
             x += self.embedding(x_in[:, i, :])
-
 
         x = self.pre_net(x)
         x.transpose_(1, 2)
