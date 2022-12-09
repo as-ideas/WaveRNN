@@ -237,7 +237,7 @@ class TacoDataset(Dataset):
         mel = np.load(str(self.path/'mel'/f'{item_id}.npy'))
         mel_len = mel.shape[-1]
         return {'x': x, 'mel': mel, 'item_id': item_id,
-                'mel_len': mel_len, 'x_len': len(x)}
+                'mel_len': mel_len, 'x_len': x.shape[-1]}
 
     def __len__(self):
         return len(self.metadata)
@@ -275,15 +275,15 @@ def pad1d(x, max_len):
     return np.pad(x, (0, max_len - len(x)), mode='constant')
 
 
-def pad2d(x, max_len):
-    return np.pad(x, ((0, 0), (0, max_len - x.shape[-1])), constant_values=-11.5129, mode='constant')
+def pad2d(x, max_len, pad_value=-11.5129):
+    return np.pad(x, ((0, 0), (0, max_len - x.shape[-1])), constant_values=pad_value, mode='constant')
 
 
 def collate_tts(batch: List[Dict[str, Union[str, torch.tensor]]], r: int) -> Dict[str, torch.tensor]:
     x_len = [b['x_len'] for b in batch]
     x_len = torch.tensor(x_len)
     max_x_len = max(x_len)
-    text = [pad1d(b['x'], max_x_len) for b in batch]
+    text = [pad2d(b['x'], max_x_len, pad_value=0) for b in batch]
     text = np.stack(text)
     text = torch.tensor(text).long()
     spec_lens = [b['mel_len'] for b in batch]

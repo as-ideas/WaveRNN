@@ -125,7 +125,7 @@ def create_align_features(model: Tacotron,
         with torch.no_grad():
             _, _, att_batch = model(x, mel)
 
-        x = batch['x'][0].cpu()
+        x = batch['x'][0, 0, :].cpu()
         mel_len = batch['mel_len'][0].cpu()
         item_id = batch['item_id'][0]
         mel = batch['mel'][0, :, :mel_len].cpu()
