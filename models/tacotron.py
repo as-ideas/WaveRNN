@@ -12,7 +12,7 @@ from utils.text.symbols import phonemes
 class Encoder(nn.Module):
     def __init__(self, embed_dims, num_chars, cbhg_channels, K, num_highways, dropout):
         super().__init__()
-        self.embedding = nn.Embedding(num_chars, embed_dims//2)
+        self.embedding = nn.Embedding(num_chars, embed_dims)
         self.pre_net = PreNet(embed_dims)
         self.cbhg = CBHG(K=K, in_channels=cbhg_channels, channels=cbhg_channels,
                          proj_channels=[cbhg_channels, cbhg_channels],
