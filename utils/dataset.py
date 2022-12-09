@@ -264,7 +264,7 @@ class ForwardDataset(Dataset):
         dur = np.load(str(self.path/'alg'/f'{item_id}.npy'))
         pitch = np.load(str(self.path/'phon_pitch'/f'{item_id}.npy'))
         energy = np.load(str(self.path/'phon_energy'/f'{item_id}.npy'))
-        return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
+        return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': x.shape[-1],
                 'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy}
 
     def __len__(self):
