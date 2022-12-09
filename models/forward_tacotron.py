@@ -151,8 +151,8 @@ class ForwardTacotron(nn.Module):
 
         x_in = x
         x = self.embedding(x_in[:, 0, :])
-        for i in range(5):
-            x += self.embedding(x_in[:, i, :])
+        for i in range(1, 5):
+            x += self.embedding(x_in[:, i, :]) * (x_in[:, i, :] != 0).float()
         x = x.transpose(1, 2)
         x = self.prenet(x)
 
