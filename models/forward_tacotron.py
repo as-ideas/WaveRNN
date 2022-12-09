@@ -30,10 +30,8 @@ class SeriesPredictor(nn.Module):
                 alpha: float = 1.0) -> torch.Tensor:
         x_in = x
         x = self.embedding(x_in[:, 0, :])
-        x_sil = self.embedding(x_in[:, 1, :])
-        for i in range(2, 5):
-            x_sil += self.embedding(x_in[:, i, :]) * (x_in[:, i, :] != 0).float()[:, :, None]
-        x = torch.cat([x, x_sil], dim=-1)
+        for i in range(1, 5):
+            x += self.embedding(x_in[:, i, :]) * (x_in[:, i, :] != 0).float()[:, :, None]
         x = x.transpose(1, 2)
         for conv in self.convs:
             x = conv(x)
@@ -153,10 +151,8 @@ class ForwardTacotron(nn.Module):
 
         x_in = x
         x = self.embedding(x_in[:, 0, :])
-        x_sil = self.embedding(x_in[:, 1, :])
-        for i in range(2, 5):
-            x_sil += self.embedding(x_in[:, i, :]) * (x_in[:, i, :] != 0).float()[:, :, None]
-        x = torch.cat([x, x_sil], dim=-1)
+        for i in range(1, 5):
+            x += self.embedding(x_in[:, i, :]) * (x_in[:, i, :] != 0).float()[:, :, None]
 
         x = x.transpose(1, 2)
         x = self.prenet(x)
