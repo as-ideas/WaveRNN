@@ -12,7 +12,7 @@ from utils.text.symbols import phonemes
 class Encoder(nn.Module):
     def __init__(self, embed_dims, num_chars, cbhg_channels, K, num_highways, dropout):
         super().__init__()
-        self.embedding = nn.Embedding(num_chars, embed_dims)
+        self.embedding = nn.Embedding(num_chars, embed_dims//2)
         self.pre_net = PreNet(embed_dims)
         self.cbhg = CBHG(K=K, in_channels=cbhg_channels, channels=cbhg_channels,
                          proj_channels=[cbhg_channels, cbhg_channels],
@@ -21,9 +21,10 @@ class Encoder(nn.Module):
     def forward(self, x):
         x_in = x
         x = self.embedding(x_in[:, 0, :])
-        for i in range(1, 5):
-            x += self.embedding(x_in[:, i, :]) * (x_in[:, i, :] != 0).float()[:, :, None]
-
+        x_sil = self.embedding(x_in[:, 1, :])
+        for i in range(2, 5):
+            x_sil += self.embedding(x_in[:, i, :]) * (x_in[:, i, :] != 0).float()[:, :, None]
+        x = torch.cat([x, x_sil], dim=-1)
         x = self.pre_net(x)
         x.transpose_(1, 2)
         x = self.cbhg(x)
