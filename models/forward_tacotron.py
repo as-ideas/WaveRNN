@@ -15,7 +15,8 @@ class SeriesPredictor(nn.Module):
 
     def __init__(self, num_chars, emb_dim=64, conv_dims=256, rnn_dims=64, dropout=0.5):
         super().__init__()
-        self.embedding = Embedding(num_chars, emb_dim)
+        self.embedding = Embedding(num_chars, emb_dim-16)
+        self.sil_embedding = Embedding(num_chars, 16)
         self.convs = torch.nn.ModuleList([
             BatchNormConv(emb_dim, conv_dims, 5, relu=True),
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
@@ -30,8 +31,10 @@ class SeriesPredictor(nn.Module):
                 alpha: float = 1.0) -> torch.Tensor:
         x_in = x
         x = self.embedding(x_in[:, 0, :])
-        for i in range(1, 5):
-            x += self.embedding(x_in[:, i, :]) * (x_in[:, i, :] != 0).float()[:, :, None]
+        x_sil = self.sil_embedding(x_in[:, 1, :])
+        for i in range(2, 5):
+            x_sil += self.sil_embedding(x_in[:, i, :]) * (x_in[:, i, :] != 0).float()[:, :, None]
+        x = torch.cat([x, x_sil], dim=-1)
         x = x.transpose(1, 2)
         for conv in self.convs:
             x = conv(x)
@@ -89,7 +92,8 @@ class ForwardTacotron(nn.Module):
         super().__init__()
         self.rnn_dims = rnn_dims
         self.padding_value = padding_value
-        self.embedding = nn.Embedding(num_chars, embed_dims)
+        self.embedding = nn.Embedding(num_chars, embed_dims-16)
+        self.sil_embedding = nn.Embedding(num_chars, 16)
         self.lr = LengthRegulator()
         self.dur_pred = SeriesPredictor(num_chars=num_chars,
                                         emb_dim=series_embed_dims,
@@ -151,8 +155,10 @@ class ForwardTacotron(nn.Module):
 
         x_in = x
         x = self.embedding(x_in[:, 0, :])
-        for i in range(1, 5):
-            x += self.embedding(x_in[:, i, :]) * (x_in[:, i, :] != 0).float()[:, :, None]
+        x_sil = self.sil_embedding(x_in[:, 1, :])
+        for i in range(2, 5):
+            x_sil += self.sil_embedding(x_in[:, i, :]) * (x_in[:, i, :] != 0).float()[:, :, None]
+        x = torch.cat([x, x_sil], dim=-1)
 
         x = x.transpose(1, 2)
         x = self.prenet(x)
@@ -232,8 +238,10 @@ class ForwardTacotron(nn.Module):
                       energy_hat: torch.Tensor) -> Dict[str, torch.Tensor]:
         x_in = x
         x = self.embedding(x_in[:, 0, :])
-        for i in range(1, 5):
-            x += self.embedding(x_in[:, i, :]) * (x_in[:, i, :] != 0).float()[:, :, None]
+        x_sil = self.sil_embedding(x_in[:, 1, :])
+        for i in range(2, 5):
+            x_sil += self.sil_embedding(x_in[:, i, :]) * (x_in[:, i, :] != 0).float()[:, :, None]
+        x = torch.cat([x, x_sil], dim=-1)
         x = x.transpose(1, 2)
         x = self.prenet(x)
 
