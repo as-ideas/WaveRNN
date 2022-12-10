@@ -230,7 +230,10 @@ class ForwardTacotron(nn.Module):
                       dur_hat: torch.Tensor,
                       pitch_hat: torch.Tensor,
                       energy_hat: torch.Tensor) -> Dict[str, torch.Tensor]:
-        x = self.embedding(x)
+        x_in = x
+        x = self.embedding(x_in[:, 0, :])
+        for i in range(1, 5):
+            x += self.embedding(x_in[:, i, :]) * (x_in[:, i, :] != 0).float()[:, :, None]
         x = x.transpose(1, 2)
         x = self.prenet(x)
 
