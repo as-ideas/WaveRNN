@@ -73,13 +73,13 @@ class ForwardTrainer:
                 start = time.time()
                 model.train()
 
-                pitch_zoneout_mask = torch.rand(batch['x'].size()) > self.train_cfg['pitch_zoneout']
-                energy_zoneout_mask = torch.rand(batch['x'].size()) > self.train_cfg['energy_zoneout']
+                #pitch_zoneout_mask = torch.rand(batch['x'].size()) > self.train_cfg['pitch_zoneout']
+                #energy_zoneout_mask = torch.rand(batch['x'].size()) > self.train_cfg['energy_zoneout']
 
                 pitch_target = batch['pitch'].detach().clone()
                 energy_target = batch['energy'].detach().clone()
-                batch['pitch'] = batch['pitch'] * pitch_zoneout_mask.to(device).float()
-                batch['energy'] = batch['energy'] * energy_zoneout_mask.to(device).float()
+                #batch['pitch'] = batch['pitch'] * pitch_zoneout_mask.to(device).float()
+                #batch['energy'] = batch['energy'] * energy_zoneout_mask.to(device).float()
 
                 pred = model(batch)
 
