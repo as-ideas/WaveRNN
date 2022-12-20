@@ -1,4 +1,3 @@
-import math
 import struct
 from pathlib import Path
 from typing import Dict, Any, Union
@@ -28,9 +27,6 @@ class DSP:
                  vad_window_length: float,
                  vad_moving_average_width: float,
                  vad_max_silence_length: int,
-                 bits: int,
-                 mu_law: bool,
-                 voc_mode: str,
                  ) -> None:
 
         self.n_mels = num_mels
@@ -51,10 +47,6 @@ class DSP:
         self.vad_window_length = vad_window_length
         self.vad_moving_average_width = vad_moving_average_width
         self.vad_max_silence_length = vad_max_silence_length
-
-        self.bits = bits
-        self.mu_law = mu_law
-        self.voc_mode = voc_mode
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> 'DSP':
@@ -135,28 +127,3 @@ class DSP:
         audio_mask[:] = binary_dilation(audio_mask[:], np.ones(self.vad_max_silence_length + 1))
         audio_mask = np.repeat(audio_mask, samples_per_window)
         return wav[audio_mask]
-
-    @staticmethod
-    def label_2_float(x: np.array, bits: float) -> np.array:
-        return 2 * x / (2**bits - 1.) - 1.
-
-    @staticmethod
-    def float_2_label(x: np.array, bits: float) -> np.array:
-        assert abs(x).max() <= 1.0
-        x = (x + 1.) * (2**bits - 1) / 2
-        return x.clip(0, 2**bits - 1)
-
-    @staticmethod
-    def encode_mu_law(x: np.array, mu: float) -> np.array:
-        mu = mu - 1
-        fx = np.sign(x) * np.log(1 + mu * np.abs(x)) / np.log(1 + mu)
-        return np.floor((fx + 1) / 2 * mu + 0.5)
-
-    @staticmethod
-    def decode_mu_law(y: np.array, mu: float, from_labels=True) -> np.array:
-        if from_labels:
-            y = DSP.label_2_float(y, math.log2(mu))
-        mu = mu - 1
-        x = np.sign(y) / mu * ((1 + mu) ** np.abs(y) - 1)
-        return x
-

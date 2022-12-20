@@ -67,14 +67,6 @@ class Preprocessor:
         mel = self.dsp.wav_to_mel(y)
         pitch, _ = pw.dio(y.astype(np.float64), self.dsp.sample_rate,
                           frame_period=self.dsp.hop_length / self.dsp.sample_rate * 1000)
-        if self.dsp.voc_mode == 'RAW':
-            quant = self.dsp.encode_mu_law(y, mu=2**self.dsp.bits) \
-                if self.dsp.mu_law else self.dsp.float_2_label(y, bits=self.dsp.bits)
-        elif self.dsp.voc_mode == 'MOL':
-            quant = self.dsp.float_2_label(y, bits=16)
-        else:
-            raise ValueError(f'Unexpected voc mode {self.dsp.voc_mode}, should be either RAW or MOL.')
-
         item_id = path.stem
         text = self.text_dict[item_id]
         text = self.cleaner(text)

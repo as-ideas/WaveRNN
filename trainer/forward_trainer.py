@@ -1,5 +1,5 @@
 import time
-from typing import Tuple, Dict, Any, Union
+from typing import Dict, Any, Union
 
 import torch
 from torch.optim.optimizer import Optimizer

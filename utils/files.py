@@ -46,5 +46,5 @@ def parse_schedule(schedule: List[str]) -> List[Tuple]:
 
 
 if __name__ == '__main__':
-    config = read_config('../config.yaml')
+    config = read_config('../configs/config.yaml')
     print(config)

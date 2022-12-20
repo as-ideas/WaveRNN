@@ -54,7 +54,6 @@ if __name__ == '__main__':
     wr_parser = subparsers.add_parser('wavernn')
     wr_parser.add_argument('--overlap', '-o', default=550,  type=int, help='[int] number of crossover samples')
     wr_parser.add_argument('--target', '-t', default=11_000, type=int, help='[int] number of samples in each batch index')
-    wr_parser.add_argument('--voc_checkpoint', type=str, help='[string/path] Load in different WaveRNN weights')
 
     gl_parser = subparsers.add_parser('griffinlim')
     mg_parser = subparsers.add_parser('melgan')
@@ -62,7 +61,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    assert args.vocoder in {'griffinlim', 'wavernn', 'melgan', 'hifigan'}, \
+    assert args.vocoder in {'griffinlim', 'melgan', 'hifigan'}, \
         'Please provide a valid vocoder! Choices: [\'griffinlim\', \'wavernn\', \'melgan\', \'hifigan\']'
 
     checkpoint_path = args.checkpoint
@@ -75,10 +74,6 @@ if __name__ == '__main__':
     dsp = DSP.from_config(config)
 
     voc_model, voc_dsp = None, None
-    if args.vocoder == 'wavernn':
-        voc_model, voc_config = load_wavernn(args.voc_checkpoint)
-        voc_dsp = DSP.from_config(voc_config)
-
     out_path = Path('model_outputs')
     out_path.mkdir(parents=True, exist_ok=True)
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -121,14 +116,7 @@ if __name__ == '__main__':
         if args.vocoder == 'melgan':
             torch.save(m, out_path / f'{wav_name}.mel')
         if args.vocoder == 'hifigan':
-            np.save(out_path / f'{wav_name}.npy', m.numpy(), allow_pickle=False)
-        if args.vocoder == 'wavernn':
-            wav = voc_model.generate(mels=m,
-                                     batched=True,
-                                     target=args.target,
-                                     overlap=args.overlap,
-                                     mu_law=voc_dsp.mu_law)
-            dsp.save_wav(wav, out_path / f'{wav_name}.wav')
+            np.save(str(out_path / f'{wav_name}.npy'), m.numpy(), allow_pickle=False)
         elif args.vocoder == 'griffinlim':
             wav = dsp.griffinlim(m.squeeze().numpy())
             dsp.save_wav(wav, out_path / f'{wav_name}.wav')

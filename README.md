@@ -145,7 +145,6 @@ python gen_forward.py --input_text 'Hi there!' --checkpoint forward_step90k.pt w
 
 ```
 
-
 ## Export Model with TorchScript
 
 Here is a dummy example of exporting the model in TorchScript:
@@ -163,24 +162,6 @@ For the necessary preprocessing steps (text to tokens) please refer to:
 ```
 gen_forward.py
 ```
-
-## Tips for training a WaveRNN model
-
-- From experience I recommend starting with the standard params (RAW mode with 9 bit), which
-should start to sound good after about 300k steps.
-- Sound quality of the models varies quite a bit, so it is important to cherry-pick the best one.
-- For cherry-picking it is useful to listen to the validation sound samples in tensorboard. 
-The sound quality of the samples is measured by an additional metric (L1 distance of mel specs).
-- The top k models according to the above metric are constantly monitored and checkpointed under path/to/checkpoint/top_k_models.
-
-Here is what the WaveRNN tensorboard looks like:
-<p align="center">
-  <img src="assets/tensorboard_wavernn.png" width="700" />
-</p>
-<p align="center">
-  <b>Figure 3:</b> Tensorboard example for training a WaveRNN model.
-</p>
-
 
 ## References
 
