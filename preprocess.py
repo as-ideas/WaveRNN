@@ -74,7 +74,6 @@ class Preprocessor:
             y /= peak
         mel = self.dsp.wav_to_mel(y)
         pitch = self.pitch_extractor(y)
-        print(pitch)
         item_id = path.stem
         text = self.text_dict[item_id]
         text = self.cleaner(text)
