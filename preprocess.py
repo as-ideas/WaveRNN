@@ -1,16 +1,24 @@
 import argparse
+import traceback
 from dataclasses import dataclass
+from enum import Enum
 from multiprocessing import Pool, cpu_count
 from random import Random
 
-import pyworld as pw
+import tqdm
 
+from pitch_extraction.pitch_extractor import PitchExtractor, LibrosaPitchExtractor, PyworldPitchExtractor
 from utils.display import *
 from utils.dsp import *
 from utils.files import get_files, pickle_binary, read_config
 from utils.paths import Paths
 from utils.text.cleaners import Cleaner
 from utils.text.recipes import ljspeech
+
+
+class PitchExtractionMethod(Enum):
+    LIBROSA = 'librosa'
+    PYWORLD = 'pyworld'
 
 
 def valid_n_workers(num):
@@ -26,7 +34,6 @@ class DataPoint:
     mel_len: int = None
     text: str = None
     mel: np.array = None
-    quant: np.array = None
     pitch: np.array = None
 
 
@@ -36,23 +43,24 @@ class Preprocessor:
                  paths: Paths,
                  text_dict: Dict[str, str],
                  cleaner: Cleaner,
-                 lang: str,
-                 dsp: DSP) -> None:
+                 dsp: DSP,
+                 pitch_extractor: PitchExtractor,
+                 lang: str) -> None:
         self.paths = paths
         self.text_dict = text_dict
         self.cleaner = cleaner
         self.lang = lang
         self.dsp = dsp
+        self.pitch_extractor = pitch_extractor
 
     def __call__(self, path: Path) -> Union[DataPoint, None]:
         try:
             dp = self._convert_file(path)
             np.save(self.paths.mel/f'{dp.item_id}.npy', dp.mel, allow_pickle=False)
-            np.save(self.paths.quant/f'{dp.item_id}.npy', dp.quant, allow_pickle=False)
             np.save(self.paths.raw_pitch/f'{dp.item_id}.npy', dp.pitch, allow_pickle=False)
             return dp
         except Exception as e:
-            print(e)
+            print(traceback.format_exc())
             return None
 
     def _convert_file(self, path: Path) -> DataPoint:
@@ -65,8 +73,8 @@ class Preprocessor:
         if self.dsp.should_peak_norm or peak > 1.0:
             y /= peak
         mel = self.dsp.wav_to_mel(y)
-        pitch, _ = pw.dio(y.astype(np.float64), self.dsp.sample_rate,
-                          frame_period=self.dsp.hop_length / self.dsp.sample_rate * 1000)
+        pitch = self.pitch_extractor(y)
+        print(pitch)
         item_id = path.stem
         text = self.text_dict[item_id]
         text = self.cleaner(text)
@@ -75,14 +83,13 @@ class Preprocessor:
                          mel=mel.astype(np.float32),
                          mel_len=mel.shape[-1],
                          text=text,
-                         quant=quant.astype(np.int64),
                          pitch=pitch.astype(np.float32))
 
 
 parser = argparse.ArgumentParser(description='Preprocessing for WaveRNN and Tacotron')
 parser.add_argument('--path', '-p', help='directly point to dataset path')
 parser.add_argument('--num_workers', '-w', metavar='N', type=valid_n_workers, default=cpu_count()-1, help='The number of worker threads to use for preprocessing')
-parser.add_argument('--config', metavar='FILE', default='config.yaml', help='The config containing all hyperparams.')
+parser.add_argument('--config', metavar='FILE', default='default.yaml', help='The config containing all hyperparams.')
 args = parser.parse_args()
 
 
@@ -107,8 +114,6 @@ if __name__ == '__main__':
 
     simple_table([
         ('Sample Rate', dsp.sample_rate),
-        ('Bit Depth', dsp.bits),
-        ('Mu Law', dsp.mu_law),
         ('Hop Length', dsp.hop_length),
         ('CPU Usage', f'{n_workers}/{cpu_count()}'),
         ('Num Validation', config['preprocessing']['n_val'])
@@ -118,19 +123,30 @@ if __name__ == '__main__':
     dataset = []
     cleaned_texts = []
     cleaner = Cleaner.from_config(config)
+    preproc_config = config['preprocessing']
+    pitch_extractor_type = preproc_config['pitch_extractor']
+    if pitch_extractor_type == 'librosa':
+        pitch_extractor = LibrosaPitchExtractor(fmin=preproc_config['pitch_min_freq'],
+                                                fmax=preproc_config['pitch_max_freq'],
+                                                frame_length=preproc_config['pitch_frame_length'],
+                                                sample_rate=dsp.sample_rate,
+                                                hop_length=dsp.hop_length)
+    elif pitch_extractor_type == 'pyworld':
+        pitch_extractor = PyworldPitchExtractor(hop_length=dsp.hop_length, sample_rate=dsp.sample_rate)
+    else:
+        raise ValueError(f'Invalid pitch extractor type: {pitch_extractor_type}, choices: [librosa, pyworld].')
+
     preprocessor = Preprocessor(paths=paths,
                                 text_dict=text_dict,
                                 dsp=dsp,
+                                pitch_extractor=pitch_extractor,
                                 cleaner=cleaner,
-                                lang=config['preprocessing']['language'])
+                                lang=preproc_config['language'])
 
-    for i, dp in enumerate(pool.imap_unordered(preprocessor, wav_files), 1):
+    for i, dp in tqdm.tqdm(enumerate(pool.imap_unordered(preprocessor, wav_files), 1), total=len(wav_files)):
         if dp is not None and dp.item_id in text_dict:
             dataset += [(dp.item_id, dp.mel_len)]
             cleaned_texts += [(dp.item_id, dp.text)]
-        bar = progbar(i, len(wav_files))
-        message = f'{bar} {i}/{len(wav_files)} '
-        stream(message)
 
     dataset.sort()
     random = Random(42)

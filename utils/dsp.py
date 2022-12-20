@@ -21,7 +21,6 @@ class DSP:
                  peak_norm: bool,
                  trim_start_end_silence: bool,
                  trim_silence_top_db:  int,
-                 pitch_max_freq: int,
                  trim_long_silences: bool,
                  vad_sample_rate: int,
                  vad_window_length: float,
@@ -41,7 +40,6 @@ class DSP:
         self.should_trim_start_end_silence = trim_start_end_silence
         self.should_trim_long_silences = trim_long_silences
         self.trim_silence_top_db = trim_silence_top_db
-        self.pitch_max_freq = pitch_max_freq
 
         self.vad_sample_rate = vad_sample_rate
         self.vad_window_length = vad_window_length

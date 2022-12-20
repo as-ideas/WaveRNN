@@ -129,7 +129,7 @@ def create_align_features(model: Tacotron,
     print('Extracting Pitch Values...')
     extract_pitch_energy(save_path_pitch=paths.phon_pitch,
                          save_path_energy=paths.phon_energy,
-                         pitch_max_freq=config['dsp']['pitch_max_freq'])
+                         pitch_max_freq=config['preprocessing']['pitch_max_freq'])
 
 
 if __name__ == '__main__':
@@ -137,7 +137,7 @@ if __name__ == '__main__':
     parser.add_argument('--force_gta', '-g', action='store_true', help='Force the model to create GTA features')
     parser.add_argument('--force_align', '-a', action='store_true', help='Force the model to create attention alignment features')
     parser.add_argument('--extract_pitch', '-p', action='store_true', help='Extracts phoneme-pitch values only')
-    parser.add_argument('--config', metavar='FILE', default='config.yaml', help='The config containing all hyperparams.')
+    parser.add_argument('--config', metavar='FILE', default='default.yaml', help='The config containing all hyperparams.')
 
     args = parser.parse_args()
     config = read_config(args.config)
@@ -148,7 +148,7 @@ if __name__ == '__main__':
         print('Extracting Pitch and Energy Values...')
         mean, var = extract_pitch_energy(save_path_pitch=paths.phon_pitch,
                                          save_path_energy=paths.phon_energy,
-                                         pitch_max_freq=dsp.pitch_max_freq)
+                                         pitch_max_freq=config['preprocessing']['pitch_max_freq'])
         print('\n\nYou can now train ForwardTacotron - use python train_forward.py\n')
         exit()
 

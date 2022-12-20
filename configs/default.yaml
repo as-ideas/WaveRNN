@@ -15,23 +15,16 @@ dsp:
   win_length: 1024
   fmin: 0
   fmax: 8000
-
   peak_norm: False                      # Normalise to the peak of each wav file
   trim_start_end_silence: True          # Whether to trim leading and trailing silence
   trim_silence_top_db: 60               # Threshold in decibels below reference to consider silence for for trimming
                                         # start and end silences with librosa (no trimming if really high)
-  pitch_max_freq: 600                   # Maximum value for pitch frequency to remove outliers (Common pitch range is
-                                        # about 60-300)
+
   trim_long_silences: False             # Whether to reduce long silence using WebRTC Voice Activity Detector
   vad_window_length: 30                 # In milliseconds
   vad_moving_average_width: 8
   vad_max_silence_length: 12
   vad_sample_rate: 16000
-
-  # vocoder
-  voc_mode: 'RAW'                    # choices: [RAW, MOL] - MOL needs longer training and yields better quality
-  bits: 9                            # bit depth of signal
-  mu_law: True                       # Recommended to suppress noise if using raw bits in hp.voc_mode below
 
 
 preprocessing:
@@ -39,10 +32,16 @@ preprocessing:
   seed: 42
   n_val: 200
   language: 'en-us'
-  cleaner_name: 'english_cleaners'   # choices: ['english_cleaners', 'no_cleaners'], expands numbers and abbreviations.
-  use_phonemes: True                 # whether to phonemize the text
-                                     # if set to False, you have to provide the phonemized text yourself
+  cleaner_name: 'english_cleaners'      # choices: ['english_cleaners', 'no_cleaners'], expands numbers and abbreviations.
+  use_phonemes: True                    # whether to phonemize the text
+                                        # if set to False, you have to provide the phonemized text yourself
   min_text_len: 2
+  pitch_min_freq: 30                    # Minimum value for pitch frequency to remove outliers (Common pitch range is
+                                        # about 60-300)
+  pitch_max_freq: 600                   # Maximum value for pitch frequency to remove outliers (Common pitch range is
+                                        # about 60-300)
+  pitch_extractor: librosa              # choice of pitch extraction library, choices: [librosa, pyworld]
+  pitch_frame_length: 2048              # Frame length for extracting pittch with librosa.pyin
 
 
 duration_extraction:
