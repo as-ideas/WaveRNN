@@ -1,24 +1,18 @@
 import argparse
 import traceback
 from dataclasses import dataclass
-from enum import Enum
 from multiprocessing import Pool, cpu_count
 from random import Random
 
 import tqdm
 
-from pitch_extraction.pitch_extractor import PitchExtractor, LibrosaPitchExtractor, PyworldPitchExtractor
+from pitch_extraction.pitch_extractor import PitchExtractor, new_pitch_extractor_from_config
 from utils.display import *
 from utils.dsp import *
 from utils.files import get_files, pickle_binary, read_config
 from utils.paths import Paths
 from utils.text.cleaners import Cleaner
 from utils.text.recipes import ljspeech
-
-
-class PitchExtractionMethod(Enum):
-    LIBROSA = 'librosa'
-    PYWORLD = 'pyworld'
 
 
 def valid_n_workers(num):
@@ -111,36 +105,29 @@ if __name__ == '__main__':
 
     dsp = DSP.from_config(config)
 
+    if config['preprocessing']['n_val'] > len(wav_files):
+        nval = len(wav_files) // 5
+        print(f'WARJNING: Using nval={nval} since the preset nval exceeds number of training files.')
+
     simple_table([
         ('Sample Rate', dsp.sample_rate),
         ('Hop Length', dsp.hop_length),
         ('CPU Usage', f'{n_workers}/{cpu_count()}'),
-        ('Num Validation', config['preprocessing']['n_val'])
+        ('Num Validation', nval)
     ])
 
     pool = Pool(processes=n_workers)
     dataset = []
     cleaned_texts = []
     cleaner = Cleaner.from_config(config)
-    preproc_config = config['preprocessing']
-    pitch_extractor_type = preproc_config['pitch_extractor']
-    if pitch_extractor_type == 'librosa':
-        pitch_extractor = LibrosaPitchExtractor(fmin=preproc_config['pitch_min_freq'],
-                                                fmax=preproc_config['pitch_max_freq'],
-                                                frame_length=preproc_config['pitch_frame_length'],
-                                                sample_rate=dsp.sample_rate,
-                                                hop_length=dsp.hop_length)
-    elif pitch_extractor_type == 'pyworld':
-        pitch_extractor = PyworldPitchExtractor(hop_length=dsp.hop_length, sample_rate=dsp.sample_rate)
-    else:
-        raise ValueError(f'Invalid pitch extractor type: {pitch_extractor_type}, choices: [librosa, pyworld].')
+    pitch_extractor = new_pitch_extractor_from_config(config)
 
     preprocessor = Preprocessor(paths=paths,
                                 text_dict=text_dict,
                                 dsp=dsp,
                                 pitch_extractor=pitch_extractor,
                                 cleaner=cleaner,
-                                lang=preproc_config['language'])
+                                lang=config['preprocessing']['language'])
 
     for i, dp in tqdm.tqdm(enumerate(pool.imap_unordered(preprocessor, wav_files), 1), total=len(wav_files)):
         if dp is not None and dp.item_id in text_dict:
@@ -150,8 +137,9 @@ if __name__ == '__main__':
     dataset.sort()
     random = Random(42)
     random.shuffle(dataset)
-    train_dataset = dataset[config['preprocessing']['n_val']:]
-    val_dataset = dataset[:config['preprocessing']['n_val']]
+    train_dataset = dataset[nval:]
+    val_dataset = dataset[:nval]
+
     # sort val dataset longest to shortest
     val_dataset.sort(key=lambda d: -d[1])
     print(f'First val sample: {val_dataset[0][0]}')
@@ -162,4 +150,4 @@ if __name__ == '__main__':
     pickle_binary(train_dataset, paths.data/'train_dataset.pkl')
     pickle_binary(val_dataset, paths.data/'val_dataset.pkl')
 
-    print('\n\nCompleted. Ready to run "python train_tacotron.py" or "python train_wavernn.py". \n')
+    print('\n\nCompleted. Ready to run "python train_tacotron.py". \n')

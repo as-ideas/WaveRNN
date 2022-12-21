@@ -13,3 +13,4 @@ tensorboard
 matplotlib
 unidecode
 inflect
+pandas

@@ -1,10 +1,18 @@
 from abc import ABC
+from enum import Enum
+from typing import Dict, Any
+
 import librosa
 import numpy as np
 try:
     import pyworld as pw
 except ImportError as e:
     print('WARNING: Could not import pyworld! Please use pitch_extraction_method: librosa.')
+
+
+class PitchExtractionMethod(Enum):
+    LIBROSA = 'librosa'
+    PYWORLD = 'pyworld'
 
 
 class PitchExtractor(ABC):
@@ -51,3 +59,20 @@ class PyworldPitchExtractor(PitchExtractor):
     def __call__(self, wav: np.array) -> np.array:
         return pw.dio(wav.astype(np.float64), self.sample_rate,
                       frame_period=self.hop_length / self.sample_rate * 1000)
+
+
+def new_pitch_extractor_from_config(config: Dict[str, Any]) -> PitchExtractor:
+    preproc_config = config['preprocessing']
+    pitch_extractor_type = preproc_config['pitch_extractor']
+    if pitch_extractor_type == 'librosa':
+        pitch_extractor = LibrosaPitchExtractor(fmin=preproc_config['pitch_min_freq'],
+                                                fmax=preproc_config['pitch_max_freq'],
+                                                frame_length=preproc_config['pitch_frame_length'],
+                                                sample_rate=config['dsp']['sample_rate'],
+                                                hop_length=config['dsp']['hop_length'])
+    elif pitch_extractor_type == 'pyworld':
+        pitch_extractor = PyworldPitchExtractor(hop_length=config['dsp']['hop_length'],
+                                                sample_rate=config['dsp']['sample_rate'])
+    else:
+        raise ValueError(f'Invalid pitch extractor type: {pitch_extractor_type}, choices: [librosa, pyworld].')
+    return pitch_extractor

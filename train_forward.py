@@ -10,6 +10,7 @@ from torch import optim
 from torch.nn import init
 from torch.utils.data.dataloader import DataLoader
 
+from models.fast_pitch import FastPitch
 from models.forward_tacotron import ForwardTacotron
 from models.tacotron import Tacotron
 from trainer.common import to_device
@@ -30,7 +31,7 @@ def try_get_git_hash() -> Union[str, None]:
         return None
 
 
-def create_gta_features(model: Tacotron,
+def create_gta_features(model: Union[ForwardTacotron, FastPitch],
                         train_set: DataLoader,
                         val_set: DataLoader,
                         save_path: Path) -> None:
@@ -40,7 +41,6 @@ def create_gta_features(model: Tacotron,
     dataset = itertools.chain(train_set, val_set)
     for i, batch in enumerate(dataset, 1):
         batch = to_device(batch, device=device)
-
         with torch.no_grad():
             pred = model(batch)
         gta = pred['mel_post'].cpu().numpy()

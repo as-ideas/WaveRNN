@@ -10,7 +10,7 @@ from models.fast_pitch import FastPitch
 from models.forward_tacotron import ForwardTacotron
 from trainer.common import Averager, TTSSession, MaskedL1, to_device, np_now
 from utils.checkpoints import  save_checkpoint
-from utils.dataset import get_tts_datasets
+from utils.dataset import get_forward_datasets
 from utils.decorators import ignore_exception
 from utils.display import stream, simple_table, plot_mel, plot_pitch
 from utils.dsp import DSP
@@ -38,8 +38,8 @@ class ForwardTrainer:
         for i, session_params in enumerate(forward_schedule, 1):
             lr, max_step, bs = session_params
             if model.get_step() < max_step:
-                train_set, val_set = get_tts_datasets(
-                    path=self.paths.data, batch_size=bs, r=1, model_type='forward',
+                train_set, val_set = get_forward_datasets(
+                    path=self.paths.data, batch_size=bs,
                     max_mel_len=self.train_cfg['max_mel_len'],
                     filter_attention=self.train_cfg['filter_attention'],
                     filter_min_alignment=self.train_cfg['min_attention_alignment'],
