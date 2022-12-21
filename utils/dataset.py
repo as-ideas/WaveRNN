@@ -65,8 +65,9 @@ class TacoDataset(Dataset):
         x = self.tokenizer(text)
         mel = np.load(str(self.paths.mel/f'{item_id}.npy'))
         mel_len = mel.shape[-1]
+        speaker_emb = np.load(str(self.paths.mel/f'{item_id}.npy'))
         return {'x': x, 'mel': mel, 'item_id': item_id,
-                'mel_len': mel_len, 'x_len': len(x)}
+                'mel_len': mel_len, 'x_len': len(x), 'speaker_emb': speaker_emb}
 
     def __len__(self):
         return len(self.metadata)
@@ -93,8 +94,10 @@ class ForwardDataset(Dataset):
         dur = np.load(str(self.paths.alg/f'{item_id}.npy'))
         pitch = np.load(str(self.paths.phon_pitch/f'{item_id}.npy'))
         energy = np.load(str(self.paths.phon_energy/f'{item_id}.npy'))
+        speaker_emb = np.load(str(self.paths.mel/f'{item_id}.npy'))
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
-                'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy}
+                'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy,
+                'speaker_emb': speaker_emb}
 
     def __len__(self):
         return len(self.metadata)
@@ -281,8 +284,11 @@ class TacoCollator:
         item_id = [b['item_id'] for b in batch]
         mel_lens = [b['mel_len'] for b in batch]
         mel_lens = torch.tensor(mel_lens)
+        speaker_emb = [b['speaker_emb'] for b in batch]
+        speaker_emb = stack_to_tensor(speaker_emb)
+
         return {'x': text, 'mel': mel, 'item_id': item_id,
-                'x_len': x_len, 'mel_len': mel_lens}
+                'x_len': x_len, 'mel_len': mel_lens, 'speaker_emb': speaker_emb}
 
 
 class ForwardCollator:

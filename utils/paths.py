@@ -12,6 +12,7 @@ class Paths:
         self.gta = self.data/'gta'
         self.att_pred = self.data/'att_pred'
         self.alg = self.data/'alg'
+        self.speaker_emb = self.data/'speaker_emb'
         self.raw_pitch = self.data/'raw_pitch'
         self.phon_pitch = self.data/'phon_pitch'
         self.phon_energy = self.data/'phon_energy'
@@ -32,6 +33,7 @@ class Paths:
         os.makedirs(self.mel, exist_ok=True)
         os.makedirs(self.gta, exist_ok=True)
         os.makedirs(self.alg, exist_ok=True)
+        os.makedirs(self.speaker_emb, exist_ok=True)
         os.makedirs(self.att_pred, exist_ok=True)
         os.makedirs(self.raw_pitch, exist_ok=True)
         os.makedirs(self.phon_pitch, exist_ok=True)

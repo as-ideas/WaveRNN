@@ -29,6 +29,7 @@ class DataPoint:
     text: str = None
     mel: np.array = None
     pitch: np.array = None
+    speaker_emb: np.array = None
 
 
 class Preprocessor:
@@ -52,6 +53,7 @@ class Preprocessor:
             dp = self._convert_file(path)
             np.save(self.paths.mel/f'{dp.item_id}.npy', dp.mel, allow_pickle=False)
             np.save(self.paths.raw_pitch/f'{dp.item_id}.npy', dp.pitch, allow_pickle=False)
+            np.save(self.paths.speaker_emb/f'{dp.item_id}', dp.speaker_emb, allow_pickle=False)
             return dp
         except Exception as e:
             print(traceback.format_exc())
@@ -71,12 +73,14 @@ class Preprocessor:
         item_id = path.stem
         text = self.text_dict[item_id]
         text = self.cleaner(text)
+        speaker_emb = np.zeros(1)
 
         return DataPoint(item_id=item_id,
                          mel=mel.astype(np.float32),
                          mel_len=mel.shape[-1],
                          text=text,
-                         pitch=pitch.astype(np.float32))
+                         pitch=pitch.astype(np.float32),
+                         speaker_emb=speaker_emb.astype(np.float32))
 
 
 parser = argparse.ArgumentParser(description='Preprocessing for WaveRNN and Tacotron')
@@ -91,7 +95,7 @@ if __name__ == '__main__':
     config = read_config(args.config)
     wav_files = get_files(args.path, '.wav')
     wav_ids = {w.stem for w in wav_files}
-    paths = Paths(config['data_path'], config['voc_model_id'], config['tts_model_id'])
+    paths = Paths(config['data_path'], config['tts_model_id'])
     print(f'\n{len(wav_files)} .wav files found in "{args.path}"')
     assert len(wav_files) > 0, f'Found no wav files in {args.path}, exiting.'
 
@@ -105,7 +109,9 @@ if __name__ == '__main__':
 
     dsp = DSP.from_config(config)
 
-    if config['preprocessing']['n_val'] > len(wav_files):
+    nval = config['preprocessing']['n_val']
+
+    if nval > len(wav_files):
         nval = len(wav_files) // 5
         print(f'WARJNING: Using nval={nval} since the preset nval exceeds number of training files.')
 

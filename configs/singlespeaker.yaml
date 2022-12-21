@@ -71,7 +71,7 @@ tacotron:
 
   training:
     schedule:
-      - 5,  1e-3,  10_000,  32      # progressive training schedule
+      - 5,  1e-3,  10_000,  2      # progressive training schedule
       - 3,   1e-4,  20_000,  16     # (r, lr, step, batch_size)
       - 2,   1e-4,  30_000,  8
       - 1,   1e-4,  40_000,  8
