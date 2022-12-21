@@ -108,21 +108,21 @@ class BinnedTacoDataLoader:
     """
 
     def __init__(self,
-                 data_path: Path,
+                 paths: Paths,
                  dataset: List[Tuple[str, int]],
                  max_batch_size: int = 8) -> None:
         """
         Initializes the dataloader.
 
         Args:
-            data_path: Main path to training data (paths.data)
-            dataset: List of Tuples with (file_id, mel_length)
+            pahts: Paths object containing data pahts.
+            dataset: List of Tuples with (file_id, mel_length),
             max_batch_size: Maximum allowed batch size.
         """
 
         tokenizer = Tokenizer()
         file_id_text_lens = []
-        text_dict = unpickle_binary(data_path / 'text_dict.pkl')
+        text_dict = unpickle_binary(paths.data / 'text_dict.pkl')
         for item_id, _ in dataset:
             toks = tokenizer(text_dict[item_id])
             file_id_text_lens.append((item_id, len(toks)))
@@ -142,7 +142,7 @@ class BinnedTacoDataLoader:
 
         Random(SHUFFLE_SEED).shuffle(all_batches)
         self.all_batches = all_batches
-        self.taco_dataset = TacoDataset(path=data_path, dataset_ids=dataset_ids,
+        self.taco_dataset = TacoDataset(paths=paths, dataset_ids=dataset_ids,
                                         text_dict=text_dict, tokenizer=tokenizer)
         self.collator = TacoCollator(r=1)
 
@@ -172,9 +172,9 @@ def get_taco_datasets(paths: Paths,
     train_ids, train_lens = zip(*train_data)
     val_ids, val_lens = zip(*val_data)
 
-    train_dataset = TacoDataset(path=paths, dataset_ids=train_ids,
+    train_dataset = TacoDataset(paths=paths, dataset_ids=train_ids,
                                 text_dict=text_dict, tokenizer=tokenizer)
-    val_dataset = TacoDataset(path=path, dataset_ids=val_ids,
+    val_dataset = TacoDataset(paths=paths, dataset_ids=val_ids,
                               text_dict=text_dict, tokenizer=tokenizer)
     train_sampler = BinnedLengthSampler(train_lens, batch_size, batch_size * 3)
     collator = TacoCollator(r=r)
