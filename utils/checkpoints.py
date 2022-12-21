@@ -3,7 +3,6 @@ from typing import Tuple, Dict, Any, Union
 
 import torch
 import torch.optim.optimizer
-from models.deepmind_version import WaveRNN
 from models.fast_pitch import FastPitch
 from models.forward_tacotron import ForwardTacotron
 from models.tacotron import Tacotron
@@ -18,7 +17,7 @@ def save_checkpoint(model: torch.nn.Module,
                 'config': config}, str(path))
 
 
-def restore_checkpoint(model: Union[FastPitch, ForwardTacotron, Tacotron, WaveRNN],
+def restore_checkpoint(model: Union[FastPitch, ForwardTacotron, Tacotron],
                        optim: torch.optim.Optimizer,
                        path: Path,
                        device: torch.device) -> None:

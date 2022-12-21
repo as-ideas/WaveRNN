@@ -13,7 +13,7 @@ from models.tacotron import Tacotron
 from trainer.common import to_device
 from trainer.taco_trainer import TacoTrainer
 from utils.checkpoints import restore_checkpoint
-from utils.dataset import get_tts_datasets
+from utils.dataset import get_taco_datasets
 from utils.display import *
 from utils.dsp import DSP
 from utils.files import pickle_binary, unpickle_binary, read_config
@@ -137,7 +137,7 @@ if __name__ == '__main__':
     parser.add_argument('--force_gta', '-g', action='store_true', help='Force the model to create GTA features')
     parser.add_argument('--force_align', '-a', action='store_true', help='Force the model to create attention alignment features')
     parser.add_argument('--extract_pitch', '-p', action='store_true', help='Extracts phoneme-pitch values only')
-    parser.add_argument('--config', metavar='FILE', default='default.yaml', help='The config containing all hyperparams.')
+    parser.add_argument('--config', metavar='FILE', default='configs/singlespeaker.yaml', help='The config containing all hyperparams.')
 
     args = parser.parse_args()
     config = read_config(args.config)
@@ -167,25 +167,19 @@ if __name__ == '__main__':
     train_cfg = config['tacotron']['training']
     if args.force_gta:
         print('Creating Ground Truth Aligned Dataset...\n')
-        train_set, val_set = get_tts_datasets(paths.data, 1, model.r,
-                                              max_mel_len=train_cfg['max_mel_len'],
-                                              filter_attention=False)
+        train_set, val_set = get_taco_datasets(paths.data, 1, model.r, max_mel_len=None)
         create_gta_features(model, train_set, val_set, paths.gta)
         print('\n\nYou can now train WaveRNN on GTA features - use python train_wavernn.py --gta\n')
     elif args.force_align:
         print('Creating Attention Alignments and Pitch Values...')
-        train_set, val_set = get_tts_datasets(paths.data, 1, model.r,
-                                              max_mel_len=None,
-                                              filter_attention=False)
+        train_set, val_set = get_taco_datasets(paths.data, 1, model.r, max_mel_len=None)
         create_align_features(model=model, config=config,  paths=paths)
         print('\n\nYou can now train ForwardTacotron - use python train_forward.py\n')
     else:
         trainer = TacoTrainer(paths, config=config, dsp=dsp)
         trainer.train(model, optimizer)
         print('Training finished, now creating Attention Alignments and Pitch Values...')
-        train_set, val_set = get_tts_datasets(paths.data, 1, model.r,
-                                              max_mel_len=None,
-                                              filter_attention=False)
+        train_set, val_set = get_taco_datasets(paths.data, 1, model.r, max_mel_len=None)
         create_align_features(model=model,  config=config, paths=paths)
         print('\n\nYou can now train ForwardTacotron - use python train_forward.py\n')
 

@@ -8,6 +8,7 @@ from torch.utils.data.sampler import Sampler
 
 from utils.dsp import *
 from utils.files import unpickle_binary
+from utils.paths import Paths
 from utils.text.tokenizer import Tokenizer
 
 
@@ -49,11 +50,11 @@ class BinnedLengthSampler(Sampler):
 class TacoDataset(Dataset):
 
     def __init__(self,
-                 path: Path,
+                 paths: Paths,
                  dataset_ids: List[str],
                  text_dict: Dict[str, str],
                  tokenizer: Tokenizer) -> None:
-        self.path = path
+        self.paths = paths
         self.metadata = dataset_ids
         self.text_dict = text_dict
         self.tokenizer = tokenizer
@@ -62,7 +63,7 @@ class TacoDataset(Dataset):
         item_id = self.metadata[index]
         text = self.text_dict[item_id]
         x = self.tokenizer(text)
-        mel = np.load(str(self.path/'mel'/f'{item_id}.npy'))
+        mel = np.load(str(self.paths.mel/f'{item_id}.npy'))
         mel_len = mel.shape[-1]
         return {'x': x, 'mel': mel, 'item_id': item_id,
                 'mel_len': mel_len, 'x_len': len(x)}
@@ -74,11 +75,11 @@ class TacoDataset(Dataset):
 class ForwardDataset(Dataset):
 
     def __init__(self,
-                 path: Path,
+                 paths: Paths,
                  dataset_ids: List[str],
                  text_dict: Dict[str, str],
                  tokenizer: Tokenizer):
-        self.path = path
+        self.paths = paths
         self.metadata = dataset_ids
         self.text_dict = text_dict
         self.tokenizer = tokenizer
@@ -87,11 +88,11 @@ class ForwardDataset(Dataset):
         item_id = self.metadata[index]
         text = self.text_dict[item_id]
         x = self.tokenizer(text)
-        mel = np.load(str(self.path/'mel'/f'{item_id}.npy'))
+        mel = np.load(str(self.paths.mel/f'{item_id}.npy'))
         mel_len = mel.shape[-1]
-        dur = np.load(str(self.path/'alg'/f'{item_id}.npy'))
-        pitch = np.load(str(self.path/'phon_pitch'/f'{item_id}.npy'))
-        energy = np.load(str(self.path/'phon_energy'/f'{item_id}.npy'))
+        dur = np.load(str(self.paths.alg/f'{item_id}.npy'))
+        pitch = np.load(str(self.paths.phon_pitch/f'{item_id}.npy'))
+        energy = np.load(str(self.paths.phon_energy/f'{item_id}.npy'))
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
                 'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy}
 
@@ -155,23 +156,23 @@ class BinnedTacoDataLoader:
         return len(self.all_batches)
 
 
-def get_taco_datasets(path: Path,
+def get_taco_datasets(paths: Paths,
                       batch_size: int,
                       r: int,
                       max_mel_len,
                       num_workers=0) -> Tuple[DataLoader, DataLoader]:
 
     tokenizer = Tokenizer()
-    train_data = unpickle_binary(path/'train_dataset.pkl')
-    val_data = unpickle_binary(path/'val_dataset.pkl')
-    text_dict = unpickle_binary(path/'text_dict.pkl')
+    train_data = unpickle_binary(paths.data/'train_dataset.pkl')
+    val_data = unpickle_binary(paths.data/'val_dataset.pkl')
+    text_dict = unpickle_binary(paths.data/'text_dict.pkl')
     train_data = filter_max_len(train_data, max_mel_len)
     val_data = filter_max_len(val_data, max_mel_len)
 
     train_ids, train_lens = zip(*train_data)
     val_ids, val_lens = zip(*val_data)
 
-    train_dataset = TacoDataset(path=path, dataset_ids=train_ids,
+    train_dataset = TacoDataset(path=paths, dataset_ids=train_ids,
                                 text_dict=text_dict, tokenizer=tokenizer)
     val_dataset = TacoDataset(path=path, dataset_ids=val_ids,
                               text_dict=text_dict, tokenizer=tokenizer)
@@ -196,7 +197,7 @@ def get_taco_datasets(path: Path,
     return train_set, val_set
 
 
-def get_forward_datasets(path: Path,
+def get_forward_datasets(paths: Paths,
                          batch_size: int,
                          max_mel_len,
                          filter_attention=True,
@@ -205,15 +206,15 @@ def get_forward_datasets(path: Path,
                          num_workers=0) -> Tuple[DataLoader, DataLoader]:
 
     tokenizer = Tokenizer()
-    train_data = unpickle_binary(path/'train_dataset.pkl')
-    val_data = unpickle_binary(path/'val_dataset.pkl')
-    text_dict = unpickle_binary(path/'text_dict.pkl')
+    train_data = unpickle_binary(paths.data/'train_dataset.pkl')
+    val_data = unpickle_binary(paths.data/'val_dataset.pkl')
+    text_dict = unpickle_binary(paths.data/'text_dict.pkl')
     train_data = filter_max_len(train_data, max_mel_len)
     val_data = filter_max_len(val_data, max_mel_len)
     train_len_original = len(train_data)
 
     if filter_attention:
-        attention_score_dict = unpickle_binary(path/'att_score_dict.pkl')
+        attention_score_dict = unpickle_binary(paths.data/'att_score_dict.pkl')
         train_data = filter_bad_attentions(dataset=train_data,
                                            attention_score_dict=attention_score_dict,
                                            min_alignment=filter_min_alignment,
@@ -228,9 +229,9 @@ def get_forward_datasets(path: Path,
     train_ids, train_lens = zip(*train_data)
     val_ids, val_lens = zip(*val_data)
 
-    train_dataset = ForwardDataset(path=path, dataset_ids=train_ids,
+    train_dataset = ForwardDataset(paths=paths, dataset_ids=train_ids,
                                    text_dict=text_dict, tokenizer=tokenizer)
-    val_dataset = ForwardDataset(path=path, dataset_ids=val_ids,
+    val_dataset = ForwardDataset(paths=paths, dataset_ids=val_ids,
                                  text_dict=text_dict, tokenizer=tokenizer)
     train_sampler = BinnedLengthSampler(train_lens, batch_size, batch_size * 3)
     collator = ForwardCollator(taco_collator=TacoCollator(r=1))

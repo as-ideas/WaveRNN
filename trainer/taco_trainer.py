@@ -40,7 +40,7 @@ class TacoTrainer:
             r, lr, max_step, bs = session_params
             if model.get_step() < max_step:
                 train_set, val_set = get_taco_datasets(
-                    path=self.paths.data, batch_size=bs, r=r,
+                    paths=self.paths, batch_size=bs, r=r,
                     max_mel_len=self.train_cfg['max_mel_len']
                 )
                 session = TTSSession(

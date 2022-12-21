@@ -39,7 +39,7 @@ class ForwardTrainer:
             lr, max_step, bs = session_params
             if model.get_step() < max_step:
                 train_set, val_set = get_forward_datasets(
-                    path=self.paths.data, batch_size=bs,
+                    paths=self.paths, batch_size=bs,
                     max_mel_len=self.train_cfg['max_mel_len'],
                     filter_attention=self.train_cfg['filter_attention'],
                     filter_min_alignment=self.train_cfg['min_attention_alignment'],
