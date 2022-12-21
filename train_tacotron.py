@@ -142,7 +142,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     config = read_config(args.config)
     dsp = DSP.from_config(config)
-    paths = Paths(config['data_path'], config['voc_model_id'], config['tts_model_id'])
+    paths = Paths(config['data_path'], config['tts_model_id'])
 
     if args.extract_pitch:
         print('Extracting Pitch and Energy Values...')

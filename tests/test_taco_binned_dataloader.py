@@ -17,7 +17,7 @@ class TestTacoBinnedDataloader(unittest.TestCase):
         self.resource_path = Path(test_path) / 'resources'
         self.config = read_config(self.resource_path / 'test_config.yaml')
         self.temp_dir = TemporaryDirectory(prefix='forwardtaco_data_test_temp')
-        self.paths = Paths(data_path=self.temp_dir.name + '/data', voc_id='voc_test_id', tts_id='tts_test_id')
+        self.paths = Paths(data_path=self.temp_dir.name + '/data', tts_id='tts_test_id')
         self.dataset = [('id_1', 2), ('id_2', 2), ('id_3', 3), ('id_4', 4), ('id_5', 4), ('id_6', 4)]
         self.text_dict = {'id_1': 'aa', 'id_2': 'aa', 'id_3': 'aaa', 'id_4': 'aaaa', 'id_5': 'aaaa', 'id_6': 'aaaa'}
         pickle_binary(self.text_dict, self.paths.data / 'text_dict.pkl')
@@ -28,7 +28,7 @@ class TestTacoBinnedDataloader(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def test_get_items(self) -> None:
-        dataloader = BinnedTacoDataLoader(data_path=self.paths.data,
+        dataloader = BinnedTacoDataLoader(paths=self.paths,
                                           dataset=self.dataset,
                                           max_batch_size=2)
 

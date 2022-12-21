@@ -38,7 +38,7 @@ class TestDurationExtractionPipe(unittest.TestCase):
         self.resource_path = Path(test_path) / 'resources'
         self.config = read_config(self.resource_path / 'test_config.yaml')
         self.temp_dir = TemporaryDirectory(prefix='TestDurationExtractionPipeTmp')
-        self.paths = Paths(data_path=self.temp_dir.name + '/data', voc_id='voc_test_id', tts_id='tts_test_id')
+        self.paths = Paths(data_path=self.temp_dir.name + '/data', tts_id='tts_test_id')
         self.train_dataset = [('id_1', 5), ('id_2', 10), ('id_3', 15)]
         self.val_dataset = [('id_4', 6), ('id_5', 12)]
         pickle_binary(self.train_dataset, self.paths.data / 'train_dataset.pkl')

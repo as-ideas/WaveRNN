@@ -103,7 +103,7 @@ class DurationExtractionPipeline:
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         model.to(device)
 
-        dataloader = get_binned_taco_dataloader(data_path=self.paths.data, max_batch_size=max_batch_size)
+        dataloader = get_binned_taco_dataloader(paths=self.paths, max_batch_size=max_batch_size)
 
         sum_items = 0
         sum_att_score = 0

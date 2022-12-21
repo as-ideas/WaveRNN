@@ -4,10 +4,8 @@ from pathlib import Path
 
 class Paths:
     """Manages and configures the paths used by WaveRNN, Tacotron, and the data."""
-    def __init__(self, data_path, voc_id, tts_id):
+    def __init__(self, data_path, tts_id):
         self.base = Path(__file__).parent.parent.expanduser().resolve()
-
-        # Data Paths
         self.data = Path(data_path).expanduser().resolve()
         self.quant = self.data/'quant'
         self.mel = self.data/'mel'
@@ -19,10 +17,6 @@ class Paths:
         self.phon_energy = self.data/'phon_energy'
 
         self.model_output = self.base / 'model_output'
-
-        self.voc_checkpoints = self.base/'checkpoints'/f'{voc_id}.wavernn'
-        self.voc_top_k = self.voc_checkpoints/'top_k_models'
-        self.voc_log = self.voc_checkpoints/'logs'
 
         self.taco_checkpoints = self.base / 'checkpoints' / f'{tts_id}.tacotron'
         self.taco_log = self.taco_checkpoints / 'logs'
@@ -42,8 +36,6 @@ class Paths:
         os.makedirs(self.raw_pitch, exist_ok=True)
         os.makedirs(self.phon_pitch, exist_ok=True)
         os.makedirs(self.phon_energy, exist_ok=True)
-        os.makedirs(self.voc_checkpoints, exist_ok=True)
-        os.makedirs(self.voc_top_k, exist_ok=True)
         os.makedirs(self.taco_checkpoints, exist_ok=True)
         os.makedirs(self.forward_checkpoints, exist_ok=True)
 
