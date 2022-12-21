@@ -143,37 +143,76 @@ class BinnedTacoDataLoader:
         self.all_batches = all_batches
         self.taco_dataset = TacoDataset(path=data_path, dataset_ids=dataset_ids,
                                         text_dict=text_dict, tokenizer=tokenizer)
+        self.collator = TacoCollator(r=1)
 
     def __iter__(self) -> Iterator:
         for batch in self.all_batches:
             batch = [self.taco_dataset[i] for i in batch]
-            batch = collate_tts(batch, r=1)
+            batch = self.collator(batch)
             yield batch
 
     def __len__(self) -> int:
         return len(self.all_batches)
 
 
-def get_tts_datasets(path: Path,
-                     batch_size: int,
-                     r: int,
-                     max_mel_len,
-                     filter_attention=True,
-                     filter_min_alignment=0.5,
-                     filter_min_sharpness=0.9,
-                     model_type='tacotron') -> Tuple[DataLoader, DataLoader]:
+def get_taco_datasets(path: Path,
+                      batch_size: int,
+                      r: int,
+                      max_mel_len,
+                      num_workers=0) -> Tuple[DataLoader, DataLoader]:
 
     tokenizer = Tokenizer()
-
     train_data = unpickle_binary(path/'train_dataset.pkl')
     val_data = unpickle_binary(path/'val_dataset.pkl')
     text_dict = unpickle_binary(path/'text_dict.pkl')
+    train_data = filter_max_len(train_data, max_mel_len)
+    val_data = filter_max_len(val_data, max_mel_len)
 
+    train_ids, train_lens = zip(*train_data)
+    val_ids, val_lens = zip(*val_data)
+
+    train_dataset = TacoDataset(path=path, dataset_ids=train_ids,
+                                text_dict=text_dict, tokenizer=tokenizer)
+    val_dataset = TacoDataset(path=path, dataset_ids=val_ids,
+                              text_dict=text_dict, tokenizer=tokenizer)
+    train_sampler = BinnedLengthSampler(train_lens, batch_size, batch_size * 3)
+    collator = TacoCollator(r=r)
+
+    train_set = DataLoader(train_dataset,
+                           collate_fn=collator,
+                           batch_size=batch_size,
+                           sampler=train_sampler,
+                           num_workers=num_workers,
+                           pin_memory=True)
+
+    val_set = DataLoader(val_dataset,
+                         collate_fn=collator,
+                         batch_size=batch_size,
+                         sampler=None,
+                         num_workers=0,
+                         shuffle=False,
+                         pin_memory=True)
+
+    return train_set, val_set
+
+
+def get_forward_datasets(path: Path,
+                         batch_size: int,
+                         max_mel_len,
+                         filter_attention=True,
+                         filter_min_alignment=0.5,
+                         filter_min_sharpness=0.9,
+                         num_workers=0) -> Tuple[DataLoader, DataLoader]:
+
+    tokenizer = Tokenizer()
+    train_data = unpickle_binary(path/'train_dataset.pkl')
+    val_data = unpickle_binary(path/'val_dataset.pkl')
+    text_dict = unpickle_binary(path/'text_dict.pkl')
     train_data = filter_max_len(train_data, max_mel_len)
     val_data = filter_max_len(val_data, max_mel_len)
     train_len_original = len(train_data)
 
-    if model_type == 'forward' and filter_attention:
+    if filter_attention:
         attention_score_dict = unpickle_binary(path/'att_score_dict.pkl')
         train_data = filter_bad_attentions(dataset=train_data,
                                            attention_score_dict=attention_score_dict,
@@ -189,30 +228,22 @@ def get_tts_datasets(path: Path,
     train_ids, train_lens = zip(*train_data)
     val_ids, val_lens = zip(*val_data)
 
-    if model_type == 'tacotron':
-        train_dataset = TacoDataset(path=path, dataset_ids=train_ids,
-                                    text_dict=text_dict, tokenizer=tokenizer)
-        val_dataset = TacoDataset(path=path, dataset_ids=val_ids,
-                                  text_dict=text_dict, tokenizer=tokenizer)
-    elif model_type == 'forward':
-        train_dataset = ForwardDataset(path=path, dataset_ids=train_ids,
-                                       text_dict=text_dict, tokenizer=tokenizer)
-        val_dataset = ForwardDataset(path=path, dataset_ids=val_ids,
-                                     text_dict=text_dict, tokenizer=tokenizer)
-    else:
-        raise ValueError(f'Unknown model: {model_type}, must be either [tacotron, forward]!')
-
+    train_dataset = ForwardDataset(path=path, dataset_ids=train_ids,
+                                   text_dict=text_dict, tokenizer=tokenizer)
+    val_dataset = ForwardDataset(path=path, dataset_ids=val_ids,
+                                 text_dict=text_dict, tokenizer=tokenizer)
     train_sampler = BinnedLengthSampler(train_lens, batch_size, batch_size * 3)
+    collator = ForwardCollator(taco_collator=TacoCollator(r=1))
 
     train_set = DataLoader(train_dataset,
-                           collate_fn=lambda batch: collate_tts(batch, r),
+                           collate_fn=collator,
                            batch_size=batch_size,
                            sampler=train_sampler,
-                           num_workers=0,
+                           num_workers=num_workers,
                            pin_memory=True)
 
     val_set = DataLoader(val_dataset,
-                         collate_fn=lambda batch: collate_tts(batch, r),
+                         collate_fn=collator,
                          batch_size=batch_size,
                          sampler=None,
                          num_workers=0,
@@ -229,40 +260,52 @@ def get_binned_taco_dataloader(data_path: Path, max_batch_size: int = 8) -> Binn
     return BinnedTacoDataLoader(data_path=data_path, dataset=dataset, max_batch_size=max_batch_size)
 
 
-def collate_tts(batch: List[Dict[str, Union[str, torch.tensor]]], r: int) -> Dict[str, torch.tensor]:
-    x_len = [b['x_len'] for b in batch]
-    x_len = torch.tensor(x_len)
-    max_x_len = max(x_len)
-    text = [pad1d(b['x'], max_x_len) for b in batch]
-    text = np.stack(text)
-    text = torch.tensor(text).long()
-    spec_lens = [b['mel_len'] for b in batch]
-    max_spec_len = max(spec_lens) + 1
-    if max_spec_len % r != 0:
-        max_spec_len += r - max_spec_len % r
-    mel = [pad2d(b['mel'], max_spec_len) for b in batch]
-    mel = np.stack(mel)
-    mel = torch.tensor(mel)
-    item_id = [b['item_id'] for b in batch]
-    mel_lens = [b['mel_len'] for b in batch]
-    mel_lens = torch.tensor(mel_lens)
+class TacoCollator:
 
-    dur, pitch, energy = None, None, None
-    if 'dur' in batch[0]:
+    def __init__(self, r: int) -> None:
+        self.r = r
+
+    def __call__(self, batch: List[Dict[str, Union[str, torch.tensor]]]) -> Dict[str, torch.tensor]:
+        x_len = [b['x_len'] for b in batch]
+        x_len = torch.tensor(x_len)
+        max_x_len = max(x_len)
+        text = [pad1d(b['x'], max_x_len) for b in batch]
+        text = stack_to_tensor(text).long()
+        spec_lens = [b['mel_len'] for b in batch]
+        max_spec_len = max(spec_lens) + 1
+        if max_spec_len % self.r != 0:
+            max_spec_len += self.r - max_spec_len % self.r
+        mel = [pad2d(b['mel'], max_spec_len) for b in batch]
+        mel = stack_to_tensor(mel)
+        item_id = [b['item_id'] for b in batch]
+        mel_lens = [b['mel_len'] for b in batch]
+        mel_lens = torch.tensor(mel_lens)
+        return {'x': text, 'mel': mel, 'item_id': item_id,
+                'x_len': x_len, 'mel_len': mel_lens}
+
+
+class ForwardCollator:
+
+    def __init__(self, taco_collator: TacoCollator) -> None:
+        self.taco_collator = taco_collator
+
+    def __call__(self, batch: List[Dict[str, Union[str, torch.tensor]]]) -> Dict[str, torch.tensor]:
+        output = self.taco_collator(batch)
+        x_len = [b['x_len'] for b in batch]
+        x_len = torch.tensor(x_len)
+        max_x_len = max(x_len)
         dur = [pad1d(b['dur'][:max_x_len], max_x_len) for b in batch]
-        dur = np.stack(dur)
-        dur = torch.tensor(dur).float()
-    if 'pitch' in batch[0]:
+        dur = stack_to_tensor(dur).float()
         pitch = [pad1d(b['pitch'][:max_x_len], max_x_len) for b in batch]
-        pitch = np.stack(pitch)
-        pitch = torch.tensor(pitch).float()
-    if 'energy' in batch[0]:
+        pitch = stack_to_tensor(pitch).float()
         energy = [pad1d(b['energy'][:max_x_len], max_x_len) for b in batch]
-        energy = np.stack(energy)
-        energy = torch.tensor(energy).float()
-
-    return {'x': text, 'mel': mel, 'item_id': item_id, 'x_len': x_len,
-            'mel_len': mel_lens, 'dur': dur, 'pitch': pitch, 'energy': energy}
+        energy = stack_to_tensor(energy).float()
+        output.update({
+            'pitch': pitch,
+            'energy': energy,
+            'dur': dur,
+        })
+        return output
 
 
 def filter_max_len(dataset: List[tuple], max_mel_len: int) -> List[tuple]:
@@ -282,6 +325,12 @@ def filter_bad_attentions(dataset: List[tuple],
                 and sharp_score > min_sharpness:
             dataset_filtered.append((item_id, mel_len))
     return dataset_filtered
+
+
+def stack_to_tensor(x: List[np.array]) -> torch.Tensor:
+    x = np.stack(x)
+    x = torch.tensor(x)
+    return x
 
 
 def pad1d(x, max_len) -> np.array:

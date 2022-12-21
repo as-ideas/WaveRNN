@@ -11,7 +11,7 @@ from utils.text.tokenizer import Tokenizer
 class TestForwardDataset(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.temp_dir = TemporaryDirectory(prefix='TestForwarDatasetTmp')
+        self.temp_dir = TemporaryDirectory(prefix='TestForwardDatasetTmp')
 
     def tearDown(self) -> None:
         self.temp_dir.cleanup()

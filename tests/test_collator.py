@@ -2,12 +2,12 @@ import unittest
 import numpy as np
 import torch
 
-from utils.dataset import collate_tts
+from utils.dataset import TacoCollator, ForwardCollator
 
 
 class TestDataset(unittest.TestCase):
 
-    def test_collate_tts(self) -> None:
+    def test_collate_forward(self) -> None:
         items = [
             {
                 'item_id': 0,
@@ -31,7 +31,8 @@ class TestDataset(unittest.TestCase):
             }
         ]
 
-        batch = collate_tts(items, r=1)
+        collator = ForwardCollator(taco_collator=TacoCollator(r=1))
+        batch = collator(items)
         self.assertEqual(0, batch['item_id'][0])
         self.assertEqual(1, batch['item_id'][1])
         self.assertEqual((2, 7), batch['mel'][0].size())
