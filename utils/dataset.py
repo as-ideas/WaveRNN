@@ -65,7 +65,7 @@ class TacoDataset(Dataset):
         x = self.tokenizer(text)
         mel = np.load(str(self.paths.mel/f'{item_id}.npy'))
         mel_len = mel.shape[-1]
-        speaker_emb = np.load(str(self.paths.mel/f'{item_id}.npy'))
+        speaker_emb = np.load(str(self.paths.speaker_emb/f'{item_id}.npy'))
         return {'x': x, 'mel': mel, 'item_id': item_id,
                 'mel_len': mel_len, 'x_len': len(x), 'speaker_emb': speaker_emb}
 
@@ -94,7 +94,7 @@ class ForwardDataset(Dataset):
         dur = np.load(str(self.paths.alg/f'{item_id}.npy'))
         pitch = np.load(str(self.paths.phon_pitch/f'{item_id}.npy'))
         energy = np.load(str(self.paths.phon_energy/f'{item_id}.npy'))
-        speaker_emb = np.load(str(self.paths.mel/f'{item_id}.npy'))
+        speaker_emb = np.load(str(self.paths.speaker_emb/f'{item_id}.npy'))
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
                 'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy,
                 'speaker_emb': speaker_emb}
