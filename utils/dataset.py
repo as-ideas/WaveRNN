@@ -254,11 +254,11 @@ def get_forward_datasets(paths: Paths,
     return train_set, val_set
 
 
-def get_binned_taco_dataloader(data_path: Path, max_batch_size: int = 8) -> BinnedTacoDataLoader:
-    train_data = unpickle_binary(data_path / 'train_dataset.pkl')
-    val_data = unpickle_binary(data_path / 'val_dataset.pkl')
+def get_binned_taco_dataloader(paths: Paths, max_batch_size: int = 8) -> BinnedTacoDataLoader:
+    train_data = unpickle_binary(paths.data / 'train_dataset.pkl')
+    val_data = unpickle_binary(paths.data / 'val_dataset.pkl')
     dataset = train_data + val_data
-    return BinnedTacoDataLoader(data_path=data_path, dataset=dataset, max_batch_size=max_batch_size)
+    return BinnedTacoDataLoader(paths=paths, dataset=dataset, max_batch_size=max_batch_size)
 
 
 class TacoCollator:
