@@ -1,3 +1,7 @@
+import warnings
+# Ignore future warnings by librosa in resemblyzer
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
 import argparse
 import traceback
 from dataclasses import dataclass
@@ -5,6 +9,9 @@ from multiprocessing import Pool, cpu_count
 from random import Random
 
 import tqdm
+import torch
+from resemblyzer import VoiceEncoder
+from resemblyzer import preprocess_wav as preprocess_resemblyzer
 
 from pitch_extraction.pitch_extractor import PitchExtractor, new_pitch_extractor_from_config
 from utils.display import *
@@ -12,7 +19,7 @@ from utils.dsp import *
 from utils.files import get_files, pickle_binary, read_config
 from utils.paths import Paths
 from utils.text.cleaners import Cleaner
-from utils.text.recipes import ljspeech
+from utils.text.recipes import read_ljspeech, read_metadata
 
 
 def valid_n_workers(num):
@@ -24,12 +31,12 @@ def valid_n_workers(num):
 
 @dataclass
 class DataPoint:
-    item_id: str = None
-    mel_len: int = None
-    text: str = None
-    mel: np.array = None
-    pitch: np.array = None
-    speaker_emb: np.array = None
+    item_id: str
+    mel_len: int
+    text: str
+    mel: np.array
+    pitch: np.array
+    reference_wav: np.array
 
 
 class Preprocessor:
@@ -53,7 +60,6 @@ class Preprocessor:
             dp = self._convert_file(path)
             np.save(self.paths.mel/f'{dp.item_id}.npy', dp.mel, allow_pickle=False)
             np.save(self.paths.raw_pitch/f'{dp.item_id}.npy', dp.pitch, allow_pickle=False)
-            np.save(self.paths.speaker_emb/f'{dp.item_id}', dp.speaker_emb, allow_pickle=False)
             return dp
         except Exception as e:
             print(traceback.format_exc())
@@ -61,6 +67,7 @@ class Preprocessor:
 
     def _convert_file(self, path: Path) -> DataPoint:
         y = self.dsp.load_wav(path)
+        reference_wav = preprocess_resemblyzer(y, source_sr=self.dsp.sample_rate)
         if self.dsp.should_trim_long_silences:
            y = self.dsp.trim_long_silences(y)
         if self.dsp.should_trim_start_end_silence:
@@ -73,24 +80,28 @@ class Preprocessor:
         item_id = path.stem
         text = self.text_dict[item_id]
         text = self.cleaner(text)
-        speaker_emb = np.zeros(1)
-
         return DataPoint(item_id=item_id,
                          mel=mel.astype(np.float32),
                          mel_len=mel.shape[-1],
                          text=text,
                          pitch=pitch.astype(np.float32),
-                         speaker_emb=speaker_emb.astype(np.float32))
+                         reference_wav=reference_wav)
 
 
 parser = argparse.ArgumentParser(description='Preprocessing for WaveRNN and Tacotron')
-parser.add_argument('--path', '-p', help='directly point to dataset path')
+parser.add_argument('--path', '-p', help='directly point to dataset')
+parser.add_argument('--metafile', '-m', default='metadata.csv', help='name of the metafile in the dataset dir')
 parser.add_argument('--num_workers', '-w', metavar='N', type=valid_n_workers, default=cpu_count()-1, help='The number of worker threads to use for preprocessing')
 parser.add_argument('--config', metavar='FILE', default='default.yaml', help='The config containing all hyperparams.')
 args = parser.parse_args()
 
 
 if __name__ == '__main__':
+    simple_table([
+        ('Path', args.path),
+        ('Metafile', args.metafile),
+        ('Config', args.config),
+    ])
 
     config = read_config(args.config)
     wav_files = get_files(args.path, '.wav')
@@ -99,7 +110,8 @@ if __name__ == '__main__':
     print(f'\n{len(wav_files)} .wav files found in "{args.path}"')
     assert len(wav_files) > 0, f'Found no wav files in {args.path}, exiting.'
 
-    text_dict = ljspeech(args.path)
+    meta_path = Path(args.path) / args.metafile
+    text_dict, speaker_dict = read_metadata(meta_path)
     text_dict = {item_id: text for item_id, text in text_dict.items()
                  if item_id in wav_ids and len(text) > config['preprocessing']['min_text_len']}
     wav_files = [w for w in wav_files if w.stem in text_dict]
@@ -119,7 +131,8 @@ if __name__ == '__main__':
         ('Sample Rate', dsp.sample_rate),
         ('Hop Length', dsp.hop_length),
         ('CPU Usage', f'{n_workers}/{cpu_count()}'),
-        ('Num Validation', nval)
+        ('Num Validation', nval),
+        ('Pitch Extraction', config['preprocessing']['pitch_extractor'])
     ])
 
     pool = Pool(processes=n_workers)
@@ -135,10 +148,18 @@ if __name__ == '__main__':
                                 cleaner=cleaner,
                                 lang=config['preprocessing']['language'])
 
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    voice_encoder = VoiceEncoder().to(device)
+
     for i, dp in tqdm.tqdm(enumerate(pool.imap_unordered(preprocessor, wav_files), 1), total=len(wav_files)):
         if dp is not None and dp.item_id in text_dict:
-            dataset += [(dp.item_id, dp.mel_len)]
-            cleaned_texts += [(dp.item_id, dp.text)]
+            try:
+                emb = voice_encoder.embed_utterance(dp.reference_wav)
+                np.save(paths.speaker_emb / f'{dp.item_id}.npy', emb, allow_pickle=False)
+                dataset += [(dp.item_id, dp.mel_len)]
+                cleaned_texts += [(dp.item_id, dp.text)]
+            except Exception as e:
+                print(traceback.format_exc())
 
     dataset.sort()
     random = Random(42)
@@ -153,6 +174,7 @@ if __name__ == '__main__':
     text_dict = {id: text for id, text in cleaned_texts}
 
     pickle_binary(text_dict, paths.data/'text_dict.pkl')
+    pickle_binary(speaker_dict, paths.data/'speaker_dict.pkl')
     pickle_binary(train_dataset, paths.data/'train_dataset.pkl')
     pickle_binary(val_dataset, paths.data/'val_dataset.pkl')
 

@@ -1,37 +1,43 @@
 import math
-from utils.files import get_files
 from pathlib import Path
-from typing import Union, Tuple
+from typing import Tuple
+
 import pandas as pd
 
 
-def ljspeech(path: Union[str, Path]):
-    csv_file = get_files(path, extension='.csv')
-    assert len(csv_file) == 1
+def read_metadata(path: Path) -> Tuple[dict, dict]:
+    if not path.is_file():
+        raise ValueError(f'Could not find metafile: {path}, '
+                         f'please make sure that you set the correct path and metafile name!')
+    if str(path).endswith('csv'):
+        return read_ljspeech(path)
+    elif str(path).endswith('tsv'):
+        return read_multispeaker(path)
+    else:
+        raise ValueError(f'Metafile has unexpected ending: {path.stem}, expected [.csv, .tsv]"')
+
+
+def read_ljspeech(path: Path) -> Tuple[dict, dict]:
     text_dict = {}
-    with open(str(csv_file[0]), encoding='utf-8') as f:
+    speaker_dict = {}
+    with open(str(path), encoding='utf-8') as f:
         for line in f:
             split = line.split('|')
-            text_dict[split[0]] = split[-1]
-    return text_dict
+            file_id, text = split[0], split[1]
+            text_dict[file_id] = text
+            speaker_dict[file_id] = 'singlespeaker'
+    return text_dict, speaker_dict
 
 
-def multispeaker(path: Union[str, Path]):
-    df = pd.read_csv(path, sep='\t', encoding='utf-8')
-
+def read_multispeaker(path: Path) -> Tuple[dict, dict]:
+    df = pd.read_csv(str(path), sep='\t', encoding='utf-8')
     text_dict = {}
-    text_prob = {}
-    text_sim = {}
     speaker_dict = {}
-
     for index, row in df.iterrows():
         id = row['file_id']
-        text_dict[id] = row['text_phonemized']
-        text_prob[id] = get_value(row, 'transcription_probability', default_value=1)
-        text_sim[id] = get_value(row, 'levenshtein_similarity', default_value=1)
-        speaker_dict[id] = row['speaker_id'] + '_' + row['book_id']
-
-    return text_dict, speaker_dict, text_prob, text_sim
+        text_dict[id] = row['text']
+        speaker_dict[id] = row['speaker_id']
+    return text_dict, speaker_dict
 
 
 def read_line(file: Path) -> Tuple[Path, str]:
