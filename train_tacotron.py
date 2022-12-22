@@ -90,7 +90,7 @@ def create_gta_features(model: Tacotron,
     for i, batch in enumerate(dataset, 1):
         batch = to_device(batch, device=device)
         with torch.no_grad():
-            _, gta, _ = model(batch['x'], batch['mel'])
+            _, gta, _ = model(batch)
         gta = gta.cpu().numpy()
         for j, item_id in enumerate(batch['item_id']):
             mel = gta[j][:, :batch['mel_len'][j]]

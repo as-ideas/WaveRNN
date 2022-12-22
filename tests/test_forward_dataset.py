@@ -27,12 +27,14 @@ class TestForwardDataset(unittest.TestCase):
         durs = [np.full(1, fill_value=2), np.full(2, fill_value=3)]
         pitches = [np.full(1, fill_value=5), np.full(2, fill_value=6)]
         energies = [np.full(1, fill_value=6), np.full(2, fill_value=7)]
+        speaker_embs = [np.full(1, fill_value=6), np.full(1, fill_value=7)]
 
         for i in range(2):
             np.save(str(paths.mel / f'{i}.npy'), mels[i])
             np.save(str(paths.alg / f'{i}.npy'), durs[i])
             np.save(str(paths.phon_pitch / f'{i}.npy'), pitches[i])
             np.save(str(paths.phon_energy / f'{i}.npy'), energies[i])
+            np.save(str(paths.speaker_emb / f'{i}.npy'), speaker_embs[i])
 
         dataset = ForwardDataset(paths=paths,
                                  dataset_ids=['0', '1'],
@@ -49,6 +51,8 @@ class TestForwardDataset(unittest.TestCase):
         np.testing.assert_allclose(data[1]['pitch'], pitches[1], rtol=1e-10)
         np.testing.assert_allclose(data[0]['energy'], energies[0], rtol=1e-10)
         np.testing.assert_allclose(data[1]['energy'], energies[1], rtol=1e-10)
+        np.testing.assert_allclose(data[0]['speaker_emb'], speaker_embs[0], rtol=1e-10)
+        np.testing.assert_allclose(data[1]['speaker_emb'], speaker_embs[1], rtol=1e-10)
 
         self.assertEqual(1, data[0]['x_len'])
         self.assertEqual(2, data[1]['x_len'])

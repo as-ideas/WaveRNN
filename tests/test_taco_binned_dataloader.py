@@ -23,6 +23,7 @@ class TestTacoBinnedDataloader(unittest.TestCase):
         pickle_binary(self.text_dict, self.paths.data / 'text_dict.pkl')
         for id, mel_len in self.dataset:
             np.save(self.paths.mel / f'{id}.npy', np.ones((5, mel_len)), allow_pickle=False)
+            np.save(self.paths.speaker_emb / f'{id}.npy', np.ones((1, mel_len)), allow_pickle=False)
 
     def tearDown(self) -> None:
         self.temp_dir.cleanup()

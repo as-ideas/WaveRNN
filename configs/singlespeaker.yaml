@@ -62,6 +62,8 @@ tacotron:
     encoder_dims: 128
     decoder_dims: 256
     postnet_dims: 128
+    speaker_emb_dim: 0               # dimension of speaker embedding,
+                                     # set to 0 for no speaker conditioning, to 256 for speaker conditioning
     encoder_k: 16
     lstm_dims: 512
     postnet_k: 8

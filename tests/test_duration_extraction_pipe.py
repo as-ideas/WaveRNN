@@ -2,7 +2,7 @@ import os
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Tuple
+from typing import Tuple, Dict
 from unittest.mock import patch
 
 import numpy as np
@@ -26,8 +26,10 @@ def new_diagonal_attention(dims: Tuple[int, int, int]) -> torch.Tensor:
 
 class MockTacotron(torch.nn.Module):
 
-    def __call__(self, x: torch.Tensor, mel: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def __call__(self, batch: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """ We just use the mock model to get the returned diagonal attention matrix. """
+        mel = batch['mel']
+        x = batch['x']
         return x, x, new_diagonal_attention((1, mel.size(-1), x.size(-1)))
 
 
@@ -47,6 +49,7 @@ class TestDurationExtractionPipe(unittest.TestCase):
         pickle_binary(self.text_dict, self.paths.data / 'text_dict.pkl')
         for id, mel_len in self.train_dataset + self.val_dataset:
             np.save(self.paths.mel / f'{id}.npy', np.ones((5, mel_len)), allow_pickle=False)
+            np.save(self.paths.speaker_emb / f'{id}.npy', np.ones(1), allow_pickle=False)
 
     def tearDown(self) -> None:
         self.temp_dir.cleanup()
