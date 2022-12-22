@@ -19,7 +19,7 @@ from utils.dsp import *
 from utils.files import get_files, pickle_binary, read_config
 from utils.paths import Paths
 from utils.text.cleaners import Cleaner
-from utils.text.recipes import read_ljspeech, read_metadata
+from utils.text.recipes import read_metadata
 
 
 def valid_n_workers(num):
@@ -92,7 +92,7 @@ parser = argparse.ArgumentParser(description='Preprocessing for WaveRNN and Taco
 parser.add_argument('--path', '-p', help='directly point to dataset')
 parser.add_argument('--metafile', '-m', default='metadata.csv', help='name of the metafile in the dataset dir')
 parser.add_argument('--num_workers', '-w', metavar='N', type=valid_n_workers, default=cpu_count()-1, help='The number of worker threads to use for preprocessing')
-parser.add_argument('--config', metavar='FILE', default='default.yaml', help='The config containing all hyperparams.')
+parser.add_argument('--config', metavar='FILE', default='configs/singlespeaker.yaml', help='The config containing all hyperparams.')
 args = parser.parse_args()
 
 
@@ -116,11 +116,8 @@ if __name__ == '__main__':
                  if item_id in wav_ids and len(text) > config['preprocessing']['min_text_len']}
     wav_files = [w for w in wav_files if w.stem in text_dict]
     print(f'Using {len(wav_files)} wav files that are indexed in metafile.\n')
-
     n_workers = max(1, args.num_workers)
-
     dsp = DSP.from_config(config)
-
     nval = config['preprocessing']['n_val']
 
     if nval > len(wav_files):
