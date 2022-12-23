@@ -1,7 +1,7 @@
 
 voc_model_id: 'ljspeech_voc'
 tts_model_id: 'ljspeech_tts'
-data_path: 'data/'                                        # output data path
+data_path: 'data_bild/'                                        # output data path
 
 tts_model: 'forward_tacotron'                             # choices: [forward_tacotron, fast_pitch]
 

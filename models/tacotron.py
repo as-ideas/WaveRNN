@@ -12,14 +12,15 @@ from utils.text.symbols import phonemes
 class Encoder(nn.Module):
     def __init__(self, embed_dims, num_chars, cbhg_channels, K, num_highways, dropout):
         super().__init__()
-        self.embedding = nn.Embedding(num_chars, embed_dims)
-        self.pre_net = PreNet(embed_dims)
+        #self.embedding = nn.Embedding(num_chars, embed_dims)
+        self.pre_net = PreNet(80)
         self.cbhg = CBHG(K=K, in_channels=cbhg_channels, channels=cbhg_channels,
                          proj_channels=[cbhg_channels, cbhg_channels],
                          num_highways=num_highways)
 
     def forward(self, x):
-        x = self.embedding(x)
+        #x = self.embedding(x)
+        x = x.transpose(1, 2)
         x = self.pre_net(x)
         x.transpose_(1, 2)
         x = self.cbhg(x)
@@ -240,7 +241,7 @@ class Tacotron(nn.Module):
 
         # Project the encoder outputs to avoid
         # unnecessary matmuls in the decoder loop
-        encoder_seq = self.encoder(x)
+        encoder_seq = self.encoder(m)
         encoder_seq_proj = self.encoder_proj(encoder_seq)
 
         # Need a couple of lists for outputs
@@ -294,7 +295,7 @@ class Tacotron(nn.Module):
 
         # Project the encoder outputs to avoid
         # unnecessary matmuls in the decoder loop
-        encoder_seq = self.encoder(x)
+        encoder_seq = self.encoder(m)
         encoder_seq_proj = self.encoder_proj(encoder_seq)
 
         # Need a couple of lists for outputs
