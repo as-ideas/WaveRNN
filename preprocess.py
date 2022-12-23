@@ -1,5 +1,9 @@
 import warnings
 # Ignore future warnings by librosa in resemblyzer
+from collections import Counter
+
+from utils.text.recipes import read_ljspeech_format
+
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 import argparse
@@ -19,7 +23,6 @@ from utils.dsp import *
 from utils.files import get_files, pickle_binary, read_config
 from utils.paths import Paths
 from utils.text.cleaners import Cleaner
-from utils.text.recipes import read_metadata
 
 
 def valid_n_workers(num):
@@ -111,11 +114,18 @@ if __name__ == '__main__':
     assert len(wav_files) > 0, f'Found no wav files in {args.path}, exiting.'
 
     meta_path = Path(args.path) / args.metafile
-    text_dict, speaker_dict = read_metadata(meta_path)
+    text_dict, speaker_dict = read_ljspeech_format(meta_path)
     text_dict = {item_id: text for item_id, text in text_dict.items()
                  if item_id in wav_ids and len(text) > config['preprocessing']['min_text_len']}
+    speaker_dict = {item_id: speaker for item_id, speaker in speaker_dict.items() if item_id in wav_ids}
+    speaker_counts = Counter(speaker_dict.values())
+    print('Speaker\tCount   ')
+    for speaker, count in speaker_counts.most_common():
+        print(f'{speaker}\t{count}')
+
     wav_files = [w for w in wav_files if w.stem in text_dict]
     print(f'Using {len(wav_files)} wav files that are indexed in metafile.\n')
+
     n_workers = max(1, args.num_workers)
     dsp = DSP.from_config(config)
     nval = config['preprocessing']['n_val']
@@ -174,5 +184,6 @@ if __name__ == '__main__':
     pickle_binary(speaker_dict, paths.data/'speaker_dict.pkl')
     pickle_binary(train_dataset, paths.data/'train_dataset.pkl')
     pickle_binary(val_dataset, paths.data/'val_dataset.pkl')
+
 
     print('\n\nCompleted. Ready to run "python train_tacotron.py". \n')

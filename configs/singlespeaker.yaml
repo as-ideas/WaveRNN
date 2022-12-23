@@ -39,9 +39,9 @@ preprocessing:
   pitch_min_freq: 30                    # Minimum value for pitch frequency to remove outliers (Common pitch range is
                                         # about 60-300)
   pitch_max_freq: 600                   # Maximum value for pitch frequency to remove outliers (Common pitch range is
-                                        # about 60-300)
+                                        # about 60-300)¡
   pitch_extractor: librosa              # choice of pitch extraction library, choices: [librosa, pyworld]
-  pitch_frame_length: 2048              # Frame length for extracting pittch with librosa.pyin
+  pitch_frame_length: 2048              # Frame length for extracting pitch with librosa
 
 
 duration_extraction:
@@ -73,7 +73,7 @@ tacotron:
 
   training:
     schedule:
-      - 5,  1e-3,  10_000,  2      # progressive training schedule
+      - 5,  1e-3,  10_000,  32      # progressive training schedule
       - 3,   1e-4,  20_000,  16     # (r, lr, step, batch_size)
       - 2,   1e-4,  30_000,  8
       - 1,   1e-4,  40_000,  8
