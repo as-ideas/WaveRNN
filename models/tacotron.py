@@ -271,7 +271,7 @@ class Tacotron(nn.Module):
         return mel_outputs, linear, attn_scores
 
     def generate(self, m: torch.tensor, steps=2000) -> Tuple[torch.tensor, torch.tensor, torch.tensor]:
-        self.eval()
+        #self.eval()
         device = next(self.parameters()).device  # use same device as parameters
 
         batch_size = 1
