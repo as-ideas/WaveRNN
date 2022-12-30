@@ -2,7 +2,7 @@ import warnings
 # Ignore future warnings by librosa in resemblyzer
 from collections import Counter
 
-from utils.text.recipes import read_ljspeech_format
+from utils.text.recipes import read_ljspeech_format, read_metadata
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -110,21 +110,24 @@ if __name__ == '__main__':
     wav_files = get_files(args.path, '.wav')
     wav_ids = {w.stem for w in wav_files}
     paths = Paths(config['data_path'], config['tts_model_id'])
-    print(f'\n{len(wav_files)} .wav files found in "{args.path}"')
+    print(f'\n{len(wav_files)} wav files found in "{args.path}"')
     assert len(wav_files) > 0, f'Found no wav files in {args.path}, exiting.'
 
     meta_path = Path(args.path) / args.metafile
-    text_dict, speaker_dict = read_ljspeech_format(meta_path)
+    text_dict, speaker_dict = read_metadata(meta_path, multispeaker=config['preprocessing']['multispeaker'])
     text_dict = {item_id: text for item_id, text in text_dict.items()
                  if item_id in wav_ids and len(text) > config['preprocessing']['min_text_len']}
     speaker_dict = {item_id: speaker for item_id, speaker in speaker_dict.items() if item_id in wav_ids}
     speaker_counts = Counter(speaker_dict.values())
-    print('Speaker\tCount   ')
-    for speaker, count in speaker_counts.most_common():
-        print(f'{speaker}\t{count}')
 
     wav_files = [w for w in wav_files if w.stem in text_dict]
     print(f'Using {len(wav_files)} wav files that are indexed in metafile.\n')
+
+    print(f'\n{"Speaker":20} {"Count":5}')
+    print(f'------------------|---------------')
+    for speaker, count in speaker_counts.most_common():
+        print(f'{speaker:20} {count:5}')
+    print()
 
     n_workers = max(1, args.num_workers)
     dsp = DSP.from_config(config)
@@ -132,7 +135,7 @@ if __name__ == '__main__':
 
     if nval > len(wav_files):
         nval = len(wav_files) // 5
-        print(f'WARJNING: Using nval={nval} since the preset nval exceeds number of training files.')
+        print(f'\nWARNING: Using nval={nval} since the preset nval exceeds number of training files.')
 
     simple_table([
         ('Sample Rate', dsp.sample_rate),

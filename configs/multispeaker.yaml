@@ -29,7 +29,7 @@ dsp:
 
 preprocessing:
 
-  multispeaker: False                   # If set to 'True' the preprocessor considers speaker names in the metafile.
+  multispeaker: True                    # If set to 'True' the preprocessor considers speaker names in the metafile.
   seed: 42
   n_val: 200
   language: 'en-us'
