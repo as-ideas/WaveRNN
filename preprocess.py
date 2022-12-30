@@ -25,6 +25,9 @@ from utils.paths import Paths
 from utils.text.cleaners import Cleaner
 
 
+SPEAKER_EMB_DIM = 256
+
+
 def valid_n_workers(num):
     n = int(num)
     if n < 1:
@@ -100,33 +103,27 @@ args = parser.parse_args()
 
 
 if __name__ == '__main__':
-    simple_table([
-        ('Path', args.path),
-        ('Metafile', args.metafile),
-        ('Config', args.config),
-    ])
-
     config = read_config(args.config)
     wav_files = get_files(args.path, '.wav')
     wav_ids = {w.stem for w in wav_files}
     paths = Paths(config['data_path'], config['tts_model_id'])
-    print(f'\n{len(wav_files)} wav files found in "{args.path}"')
+
+    print(f'\nFound {len(wav_files)} wav files in "{args.path}".')
     assert len(wav_files) > 0, f'Found no wav files in {args.path}, exiting.'
 
     meta_path = Path(args.path) / args.metafile
     text_dict, speaker_dict = read_metadata(meta_path, multispeaker=config['preprocessing']['multispeaker'])
     text_dict = {item_id: text for item_id, text in text_dict.items()
                  if item_id in wav_ids and len(text) > config['preprocessing']['min_text_len']}
+    wav_files = [w for w in wav_files if w.stem in text_dict]
     speaker_dict = {item_id: speaker for item_id, speaker in speaker_dict.items() if item_id in wav_ids}
     speaker_counts = Counter(speaker_dict.values())
 
-    wav_files = [w for w in wav_files if w.stem in text_dict]
-    print(f'Using {len(wav_files)} wav files that are indexed in metafile.\n')
-
-    print(f'\n{"Speaker":20} {"Count":5}')
-    print(f'------------------|---------------')
+    print(f'Will use {len(wav_files)} wav files that are indexed in metafile.\n')
+    print(f'\n{"Speaker":30} {"Count":5}')
+    print(f'------------------------------|-------')
     for speaker, count in speaker_counts.most_common():
-        print(f'{speaker:20} {count:5}')
+        print(f'{speaker:30} {count:5}')
     print()
 
     n_workers = max(1, args.num_workers)
@@ -171,22 +168,39 @@ if __name__ == '__main__':
             except Exception as e:
                 print(traceback.format_exc())
 
+    # create stratified train / val split
     dataset.sort()
     random = Random(42)
     random.shuffle(dataset)
-    train_dataset = dataset[nval:]
-    val_dataset = dataset[:nval]
+    val_ratio = nval / len(dataset)
+    desired_val_counts = {speaker: max(count * val_ratio, 1) for speaker, count in speaker_counts.most_common()}
+    val_speaker_counts = Counter()
+    train_dataset, val_dataset = [], []
+    for file_id, mel_len in dataset:
+        speaker = speaker_dict[file_id]
+        if val_speaker_counts.get(speaker, 0) < desired_val_counts[speaker]:
+            val_dataset.append((file_id, mel_len))
+            val_speaker_counts.update([speaker])
+        else:
+            train_dataset.append((file_id, mel_len))
 
     # sort val dataset longest to shortest
     val_dataset.sort(key=lambda d: -d[1])
-    print(f'First val sample: {val_dataset[0][0]}')
-
     text_dict = {id: text for id, text in cleaned_texts}
-
     pickle_binary(text_dict, paths.data/'text_dict.pkl')
     pickle_binary(speaker_dict, paths.data/'speaker_dict.pkl')
     pickle_binary(train_dataset, paths.data/'train_dataset.pkl')
     pickle_binary(val_dataset, paths.data/'val_dataset.pkl')
 
+    print('Averaging speaker embeddings...')
+
+    mean_speaker_embs = {speaker: np.zeros(SPEAKER_EMB_DIM, dtype=float) for speaker in speaker_dict.values()}
+    for file_id, speaker in tqdm.tqdm(speaker_dict.items(), total=len(speaker_dict)):
+        emb = np.load(paths.speaker_emb / f'{file_id}.npy')
+        mean_speaker_embs[speaker] += emb
+    for speaker, emb in mean_speaker_embs.items():
+        emb = emb / speaker_counts[speaker]
+        emb = emb / np.linalg.norm(emb, 2)
+        np.save(paths.mean_speaker_emb / f'{speaker}.npy', emb, allow_pickle=False)
 
     print('\n\nCompleted. Ready to run "python train_tacotron.py". \n')
