@@ -74,10 +74,10 @@ tacotron:
 
   training:
     schedule:
-      - 5,  1e-3,  10_000,  32      # progressive training schedule
-      - 3,   1e-4,  20_000,  16     # (r, lr, step, batch_size)
-      - 2,   1e-4,  30_000,  8
-      - 1,   1e-4,  40_000,  8
+      - 8,  1e-3,  30_000,  32      # progressive training schedule
+      - 4,   1e-4,  31_000,  16     # (r, lr, step, batch_size)
+      - 2,   1e-4,  32_000,  8
+      - 1,   1e-4,  35_000,  8
 
     max_mel_len: 1250                # if you have a couple of extremely long spectrograms you might want to use this
     clip_grad_norm: 1.0              # clips the gradient norm to prevent explosion - set to None if not needed
@@ -136,95 +136,3 @@ forward_tacotron:
     filter_attention: True               # whether to filter data with bad attention scores
     min_attention_sharpness: 0.5         # filter data with bad attention sharpness score, if 0 then no filter
     min_attention_alignment: 0.95        # filter data with bad attention alignment score, if 0 then no filter
-
-
-fast_pitch:
-
-  model:
-    durpred_d_model: 128
-    durpred_n_heads: 2
-    durpred_layers: 4
-    durpred_d_fft: 128
-    durpred_dropout: 0.5
-
-    pitch_d_model: 128
-    pitch_n_heads: 2
-    pitch_layers: 4
-    pitch_d_fft: 128
-    pitch_dropout: 0.5
-    pitch_strength: 1.0
-
-    energy_d_model: 128
-    energy_n_heads: 2
-    energy_layers: 4
-    energy_d_fft: 128
-    energy_dropout: 0.5
-    energy_strength: 1.0
-
-    d_model: 256
-    conv1_kernel: 9
-    conv2_kernel: 1
-
-    prenet_layers: 4
-    prenet_heads: 2
-    prenet_fft: 1024
-    prenet_dropout: 0.1
-
-    postnet_layers: 4
-    postnet_heads: 2
-    postnet_fft: 1024
-    postnet_dropout: 0.1
-
-
-  training:
-    schedule:
-      - 1e-5,  5_000,  32         # progressive training schedule
-      - 5e-5,  100_000,  32       # lr, step, batch_size
-      - 2e-5,  300_000,  32
-    dur_loss_factor: 0.1
-    pitch_loss_factor: 0.1
-    energy_loss_factor: 0.1
-    pitch_zoneout: 0.             # zoneout may regularize conditioning on pitch
-    energy_zoneout: 0.            # zoneout may regularize conditioning on energy
-
-    max_mel_len: 1250
-    clip_grad_norm: 1.0           # clips the gradient norm to prevent explosion - set to None if not needed
-    checkpoint_every: 10_000      # checkpoints the model every x steps
-    plot_every: 1000
-
-    filter_attention: True               # whether to filter data with bad attention scores
-    min_attention_sharpness: 0.5         # filter data with bad attention sharpness score, if 0 then no filter
-    min_attention_alignment: 0.95        # filter data with bad attention alignment score, if 0 then no filter
-
-
-vocoder:
-
-  model:
-    mode: 'RAW'                     # choices ['RAW', 'MOL']
-                                    # 'RAW' = softmax on raw bits,  'MOL' = sample from mixture of logistics
-    upsample_factors: [4, 8, 8]     # NB - this needs to correctly factorise hop_length
-    rnn_dims: 512
-    fc_dims: 512
-    compute_dims: 128
-    res_out_dims: 128
-    res_blocks: 10
-    pad: 2                         # this will pad the input so that the resnet can 'see' wider than input length
-
-  training:
-    schedule:
-      - 1e-4,  300_000,  32        # progressive training schedule
-      - 1e-5,  600_000,  32        # lr, step, batch_size
-
-    checkpoint_every: 25_000
-    gen_samples_every: 5000        # how often to generate samples for cherry-picking models
-    num_gen_samples: 3             # number of samples to generate for cherry-picking models
-    keep_top_k: 3                  # how many top performing models to keep
-    seq_len: 1280                  # must be a multiple of hop_length
-    clip_grad_norm: 4              # set to None if no gradient clipping needed
-    max_mel_len: 20000
-
-    # Generating / Synthesizing
-    gen_batched: True              # very fast (realtime+) single utterance batched generation
-    target: 11_000                 # target number of samples to be generated in each batch entry
-    overlap: 550                   # number of samples for crossfading between batches
-

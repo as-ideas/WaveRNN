@@ -195,36 +195,3 @@ fast_pitch:
     filter_attention: True               # whether to filter data with bad attention scores
     min_attention_sharpness: 0.5         # filter data with bad attention sharpness score, if 0 then no filter
     min_attention_alignment: 0.95        # filter data with bad attention alignment score, if 0 then no filter
-
-
-vocoder:
-
-  model:
-    mode: 'RAW'                     # choices ['RAW', 'MOL']
-                                    # 'RAW' = softmax on raw bits,  'MOL' = sample from mixture of logistics
-    upsample_factors: [4, 8, 8]     # NB - this needs to correctly factorise hop_length
-    rnn_dims: 512
-    fc_dims: 512
-    compute_dims: 128
-    res_out_dims: 128
-    res_blocks: 10
-    pad: 2                         # this will pad the input so that the resnet can 'see' wider than input length
-
-  training:
-    schedule:
-      - 1e-4,  300_000,  32        # progressive training schedule
-      - 1e-5,  600_000,  32        # lr, step, batch_size
-
-    checkpoint_every: 25_000
-    gen_samples_every: 5000        # how often to generate samples for cherry-picking models
-    num_gen_samples: 3             # number of samples to generate for cherry-picking models
-    keep_top_k: 3                  # how many top performing models to keep
-    seq_len: 1280                  # must be a multiple of hop_length
-    clip_grad_norm: 4              # set to None if no gradient clipping needed
-    max_mel_len: 20000
-
-    # Generating / Synthesizing
-    gen_batched: True              # very fast (realtime+) single utterance batched generation
-    target: 11_000                 # target number of samples to be generated in each batch entry
-    overlap: 550                   # number of samples for crossfading between batches
-

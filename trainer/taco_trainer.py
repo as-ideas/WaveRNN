@@ -140,7 +140,7 @@ class TacoTrainer:
         device = next(model.parameters()).device
         batch = session.val_sample
         batch = to_device(batch, device=device)
-        m1_hat, m2_hat, att = model(batch['x'], batch['mel'])
+        m1_hat, m2_hat, att = model(batch)
         att = np_now(att)[0]
         m1_hat = np_now(m1_hat)[0, :600, :]
         m2_hat = np_now(m2_hat)[0, :600, :]

@@ -158,7 +158,8 @@ if __name__ == '__main__':
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     voice_encoder = VoiceEncoder().to(device)
 
-    for i, dp in tqdm.tqdm(enumerate(pool.imap_unordered(preprocessor, wav_files), 1), total=len(wav_files)):
+    for i, dp in tqdm.tqdm(enumerate(pool.imap_unordered(preprocessor, wav_files), 1),
+                           total=len(wav_files), smoothing=1e-4):
         if dp is not None and dp.item_id in text_dict:
             try:
                 emb = voice_encoder.embed_utterance(dp.reference_wav)
@@ -195,7 +196,7 @@ if __name__ == '__main__':
     print('Averaging speaker embeddings...')
 
     mean_speaker_embs = {speaker: np.zeros(SPEAKER_EMB_DIM, dtype=float) for speaker in speaker_dict.values()}
-    for file_id, speaker in tqdm.tqdm(speaker_dict.items(), total=len(speaker_dict)):
+    for file_id, speaker in tqdm.tqdm(speaker_dict.items(), total=len(speaker_dict), smoothing=1e-4):
         emb = np.load(paths.speaker_emb / f'{file_id}.npy')
         mean_speaker_embs[speaker] += emb
     for speaker, emb in mean_speaker_embs.items():
