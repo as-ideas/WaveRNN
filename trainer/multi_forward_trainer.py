@@ -1,17 +1,15 @@
-import numpy as np
 import time
-from typing import Dict, Any, Union
+from typing import Dict, Any
 
+import numpy as np
 import torch
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from models.fast_pitch import FastPitch
-from models.forward_tacotron import ForwardTacotron
 from models.multi_forward_tacotron import MultiForwardTacotron
 from trainer.common import Averager, TTSSession, MaskedL1, to_device, np_now
-from utils.checkpoints import  save_checkpoint
+from utils.checkpoints import save_checkpoint
 from utils.dataset import get_forward_datasets
 from utils.decorators import ignore_exception
 from utils.display import stream, simple_table, plot_mel, plot_pitch
@@ -34,9 +32,12 @@ class MultiForwardTrainer:
         self.writer = SummaryWriter(log_dir=paths.forward_log, comment='v1')
         self.l1_loss = MaskedL1()
         self.ce_loss = torch.nn.CrossEntropyLoss(ignore_index=0)
-        self.speakers = sorted(list(unpickle_binary(paths.data / 'speaker_dict.pkl').values()))
-        self.speaker_embs = {speaker: np.load(paths.mean_speaker_emb / f'{speaker}.npy')
-                             for speaker in self.speakers}
+        self.speakers = sorted(list(set(unpickle_binary(paths.data / 'speaker_dict.pkl').values())))
+        self.speaker_embs = {}
+        for speaker in self.speakers:
+            speaker_emb = np.load(paths.mean_speaker_emb / f'{speaker}.npy')
+            speaker_emb = torch.from_numpy(speaker_emb).float().unsqueeze(0)
+            self.speaker_embs[speaker] = speaker_emb
 
     def train(self, model: MultiForwardTacotron, optimizer: Optimizer) -> None:
         forward_schedule = self.train_cfg['schedule']
@@ -124,6 +125,7 @@ class MultiForwardTrainer:
                 self.writer.add_scalar('Pitch_Loss/train', pitch_loss, model.get_step())
                 self.writer.add_scalar('Energy_Loss/train', energy_loss, model.get_step())
                 self.writer.add_scalar('Duration_Loss/train', dur_loss, model.get_step())
+                self.writer.add_scalar('Pitch_Cond_Loss/train', pitch_cond_loss, model.get_step())
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
                 self.writer.add_scalar('Params/learning_rate', session.lr, model.get_step())
 
@@ -144,10 +146,10 @@ class MultiForwardTrainer:
 
     def evaluate(self, model: MultiForwardTacotron, val_set: DataLoader) -> Dict[str, float]:
         model.eval()
-        m_val_loss = 0
-        dur_val_loss = 0
-        pitch_val_loss = 0
-        energy_val_loss = 0
+        val_losses = {
+            'mel_loss': 0, 'dur_loss': 0, 'pitch_loss': 0,
+            'energy_loss': 0, 'pitch_cond_loss': 0,
+        }
         device = next(model.parameters()).device
         for i, batch in enumerate(val_set, 1):
             batch = to_device(batch, device=device)
@@ -158,16 +160,13 @@ class MultiForwardTrainer:
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
                 pitch_loss = self.l1_loss(pred['pitch'], batch['pitch'].unsqueeze(1), batch['x_len'])
                 energy_loss = self.l1_loss(pred['energy'], batch['energy'].unsqueeze(1), batch['x_len'])
-                pitch_val_loss += pitch_loss
-                energy_val_loss += energy_loss
-                m_val_loss += m1_loss.item() + m2_loss.item()
-                dur_val_loss += dur_loss.item()
-        return {
-            'mel_loss': m_val_loss / len(val_set),
-            'dur_loss': dur_val_loss / len(val_set),
-            'pitch_loss': pitch_val_loss / len(val_set),
-            'energy_loss': energy_val_loss / len(val_set)
-        }
+                pitch_cond_loss = self.ce_loss(pred['pitch_cond'].transpose(1, 2), batch['pitch_cond'])
+                val_losses['pitch_loss'] += pitch_loss
+                val_losses['energy_loss'] += energy_loss
+                val_losses['mel_loss'] += m1_loss.item() + m2_loss.item()
+                val_losses['dur_loss'] += dur_loss
+                val_losses['pitch_cond_loss'] += pitch_cond_loss
+        return val_losses
 
     @ignore_exception
     def generate_plots(self, model: MultiForwardTacotron, session: TTSSession) -> None:
@@ -207,8 +206,10 @@ class MultiForwardTrainer:
             tag='Ground_Truth_Aligned/postnet_wav', snd_tensor=m2_hat_wav,
             global_step=model.step, sample_rate=self.dsp.sample_rate)
 
+        self.writer.add_figure(f'Generated/target', m_target_fig, model.step)
+
         for speaker in self.speakers:
-            speaker_emb = torch.from_numpy(self.speaker_embs[speaker]).unsqueeze(0).to(device)
+            speaker_emb = self.speaker_embs[speaker].to(device)
             gen = model.generate(batch['x'][0:1, :batch['x_len'][0]], speaker_emb=speaker_emb)
             m1_hat = np_now(gen['mel'].squeeze())
             m2_hat = np_now(gen['mel_post'].squeeze())
@@ -221,7 +222,6 @@ class MultiForwardTrainer:
 
             self.writer.add_figure(f'Pitch/generated/{speaker}', pitch_gen_fig, model.step)
             self.writer.add_figure(f'Energy/generated/{speaker}', energy_gen_fig, model.step)
-            self.writer.add_figure(f'Generated/target/{speaker}', m_target_fig, model.step)
             self.writer.add_figure(f'Generated/linear/{speaker}', m1_hat_fig, model.step)
             self.writer.add_figure(f'Generated/postnet/{speaker}', m2_hat_fig, model.step)
 

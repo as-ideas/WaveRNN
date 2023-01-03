@@ -176,7 +176,7 @@ class MultiForwardTacotron(nn.Module):
 
     def __repr__(self):
         num_params = sum([np.prod(p.size()) for p in self.parameters()])
-        return f'ForwardTacotron, num params: {num_params}'
+        return f'MultiForwardTacotron, num params: {num_params}'
 
     def forward(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         x = batch['x']
