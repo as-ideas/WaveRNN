@@ -106,6 +106,10 @@ multi_forward_tacotron:
     energy_dropout: 0.5
     energy_strength: 1.             # set to 0 if you want no energy conditioning
 
+    pitch_cond_conv_dims: 256       # predictor for pitch prior (predicts unvoiced phonemes with zero pitch)
+    pitch_cond_rnn_dims: 128
+    pitch_cond_dropout: 0.5
+
     prenet_dims: 256
     prenet_k: 16
     prenet_dropout: 0.5
@@ -130,7 +134,7 @@ multi_forward_tacotron:
     max_mel_len: 1250
     clip_grad_norm: 1.0           # clips the gradient norm to prevent explosion - set to None if not needed
     checkpoint_every: 10_000      # checkpoints the model every x steps
-    plot_every: 2              # generates samples and plots every x steps
+    plot_every: 1000              # generates samples and plots every x steps
 
     filter_attention: False               # whether to filter data with bad attention scores
     min_attention_sharpness: 0.5         # filter data with bad attention sharpness score, if 0 then no filter

@@ -105,6 +105,9 @@ class MultiForwardTacotron(nn.Module):
                  pitch_rnn_dims: int,
                  pitch_dropout: float,
                  pitch_strength: float,
+                 pitch_cond_conv_dims: int,
+                 pitch_cond_rnn_dims: int,
+                 pitch_cond_dropout: float,
                  energy_conv_dims: int,
                  energy_rnn_dims: int,
                  energy_dropout: float,
@@ -135,9 +138,9 @@ class MultiForwardTacotron(nn.Module):
                                                    dropout=durpred_dropout)
         self.pitch_cond_pred = SeriesPredictor(num_chars=num_chars,
                                                emb_dim=series_embed_dims,
-                                               conv_dims=pitch_conv_dims,
-                                               rnn_dims=pitch_rnn_dims,
-                                               dropout=pitch_dropout,
+                                               conv_dims=pitch_cond_conv_dims,
+                                               rnn_dims=pitch_cond_rnn_dims,
+                                               dropout=pitch_cond_dropout,
                                                out_dim=3)
         self.pitch_pred = ConditionalSeriesPredictor(num_chars=num_chars,
                                                      emb_dim=series_embed_dims,
