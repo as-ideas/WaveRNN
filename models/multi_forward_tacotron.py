@@ -74,11 +74,11 @@ class ConditionalSeriesPredictor(nn.Module):
 
     def forward(self,
                 x: torch.Tensor,
-                x_p: torch.Tensor,
+                x_cond: torch.Tensor,
                 speaker_emb: torch.Tensor,
                 alpha: float = 1.0) -> torch.Tensor:
         x = self.embedding(x)
-        x_cond = self.pitch_cond_embedding(x_p)
+        x_cond = self.pitch_cond_embedding(x_cond)
         speaker_emb = speaker_emb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
         x = torch.cat([x, x_cond, speaker_emb], dim=2)
