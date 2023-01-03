@@ -121,8 +121,7 @@ class MultiForwardTacotron(nn.Module):
                  n_mels: int,
                  speaker_emb_dims: int = 256,
                  cond_emb_dims: int = 8,
-                 padding_value=-11.5129,
-                 speaker_names: list = []):
+                 padding_value=-11.5129):
         super().__init__()
         self.rnn_dims = rnn_dims
         self.padding_value = padding_value
@@ -174,8 +173,6 @@ class MultiForwardTacotron(nn.Module):
         self.energy_strength = energy_strength
         self.pitch_proj = nn.Conv1d(1, 2 * prenet_dims + speaker_emb_dims, kernel_size=3, padding=1)
         self.energy_proj = nn.Conv1d(1, 2 * prenet_dims + speaker_emb_dims, kernel_size=3, padding=1)
-        for speaker_name in speaker_names:
-            self.register_buffer(speaker_name, torch.zeros(speaker_emb_dims, dtype=torch.float))
 
     def __repr__(self):
         num_params = sum([np.prod(p.size()) for p in self.parameters()])
@@ -240,26 +237,26 @@ class MultiForwardTacotron(nn.Module):
 
     def generate(self,
                  x: torch.Tensor,
-                 semb: torch.Tensor,
+                 speaker_emb: torch.Tensor,
                  pitch_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x,
                  energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, torch.Tensor]:
         self.eval()
         with torch.no_grad():
-            pitch_cond_hat = self.pitch_cond_pred(x, semb).squeeze(-1)
+            pitch_cond_hat = self.pitch_cond_pred(x, speaker_emb).squeeze(-1)
             pitch_cond_hat = torch.argmax(pitch_cond_hat.squeeze(), dim=1).long().unsqueeze(0)
-            dur_hat = self.dur_pred(x, pitch_cond_hat, semb).squeeze(-1)
+            dur_hat = self.dur_pred(x, pitch_cond_hat, speaker_emb).squeeze(-1)
             if torch.sum(dur_hat.long()) <= 0:
                 torch.fill_(dur_hat, value=2.)
-            pitch_hat = self.pitch_pred(x, pitch_cond_hat, semb).transpose(1, 2)
+            pitch_hat = self.pitch_pred(x, pitch_cond_hat, speaker_emb).transpose(1, 2)
             pitch_hat = pitch_function(pitch_hat)
-            energy_hat = self.energy_pred(x, semb).transpose(1, 2)
+            energy_hat = self.energy_pred(x, speaker_emb).transpose(1, 2)
             energy_hat = energy_function(energy_hat)
             return self._generate_mel(x=x,
                                       dur_hat=dur_hat,
                                       pitch_hat=pitch_hat,
                                       energy_hat=energy_hat,
                                       pitch_cond_hat=pitch_cond_hat,
-                                      semb=semb)
+                                      semb=speaker_emb)
 
     def get_step(self) -> int:
         return self.step.data.item()
@@ -308,11 +305,9 @@ class MultiForwardTacotron(nn.Module):
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> 'MultiForwardTacotron':
-        speaker_names = config['speaker_names']
         model_config = config['multi_forward_tacotron']['model']
         model_config['num_chars'] = len(phonemes)
         model_config['n_mels'] = config['dsp']['num_mels']
-        model_config['speaker_names'] = speaker_names
         return MultiForwardTacotron(**model_config)
 
     @classmethod

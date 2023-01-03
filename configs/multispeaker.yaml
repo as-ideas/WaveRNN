@@ -3,7 +3,7 @@ voc_model_id: 'ljspeech_voc'
 tts_model_id: 'ljspeech_tts'
 data_path: 'data/'                                        # output data path
 
-tts_model: 'forward_tacotron'                             # choices: [forward_tacotron, fast_pitch]
+tts_model: 'multi_forward_tacotron'                             # choices: [forward_tacotron, fast_pitch]
 
 
 dsp:
@@ -86,7 +86,7 @@ tacotron:
     num_workers: 2                   # number of workers for dataloader
 
 
-forward_tacotron:
+multi_forward_tacotron:
 
   model:
     embed_dims: 256                 # embedding dimension for main model
@@ -125,14 +125,13 @@ forward_tacotron:
     dur_loss_factor: 0.1
     pitch_loss_factor: 0.1
     energy_loss_factor: 0.1
-    pitch_zoneout: 0.             # zoneout may regularize conditioning on pitch
-    energy_zoneout: 0.            # zoneout may regularize conditioning on energy
+    pitch_cond_loss_factor: 0.1
 
     max_mel_len: 1250
     clip_grad_norm: 1.0           # clips the gradient norm to prevent explosion - set to None if not needed
     checkpoint_every: 10_000      # checkpoints the model every x steps
     plot_every: 1000              # generates samples and plots every x steps
 
-    filter_attention: True               # whether to filter data with bad attention scores
+    filter_attention: False               # whether to filter data with bad attention scores
     min_attention_sharpness: 0.5         # filter data with bad attention sharpness score, if 0 then no filter
     min_attention_alignment: 0.95        # filter data with bad attention alignment score, if 0 then no filter

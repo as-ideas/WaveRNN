@@ -5,16 +5,20 @@ import torch
 import torch.optim.optimizer
 from models.fast_pitch import FastPitch
 from models.forward_tacotron import ForwardTacotron
+from models.multi_forward_tacotron import MultiForwardTacotron
 from models.tacotron import Tacotron
 
 
 def save_checkpoint(model: torch.nn.Module,
                     optim: torch.optim.Optimizer,
                     config: Dict[str, Any],
-                    path: Path) -> None:
-    torch.save({'model': model.state_dict(),
-                'optim': optim.state_dict(),
-                'config': config}, str(path))
+                    path: Path,
+                    meta: Dict[str, Any] = None) -> None:
+    checkpoint = {'model': model.state_dict(),
+                  'optim': optim.state_dict(),
+                  'config': config}
+    checkpoint.update(meta)
+    torch.save(checkpoint, str(path))
 
 
 def restore_checkpoint(model: Union[FastPitch, ForwardTacotron, Tacotron],
@@ -34,6 +38,8 @@ def init_tts_model(config: Dict[str, Any]) -> Union[ForwardTacotron, FastPitch]:
         model = ForwardTacotron.from_config(config)
     elif model_type == 'fast_pitch':
         model = FastPitch.from_config(config)
+    elif model_type == 'multi_forward_tacotron':
+        model = MultiForwardTacotron.from_config(config)
     else:
         raise ValueError(f'Model type not supported: {model_type}')
     return model

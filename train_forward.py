@@ -12,14 +12,17 @@ from torch.utils.data.dataloader import DataLoader
 
 from models.fast_pitch import FastPitch
 from models.forward_tacotron import ForwardTacotron
+from models.multi_forward_tacotron import MultiForwardTacotron
 from models.tacotron import Tacotron
 from trainer.common import to_device
 from trainer.forward_trainer import ForwardTrainer
+from trainer.multi_forward_trainer import MultiForwardTrainer
 from utils.checkpoints import restore_checkpoint, init_tts_model
-from utils.dataset import get_tts_datasets
+from utils.dataset import get_forward_datasets
+
 from utils.display import *
 from utils.dsp import DSP
-from utils.files import read_config
+from utils.files import read_config, unpickle_binary
 from utils.paths import Paths
 
 
@@ -55,7 +58,7 @@ def create_gta_features(model: Union[ForwardTacotron, FastPitch],
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train ForwardTacotron TTS')
     parser.add_argument('--force_gta', '-g', action='store_true', help='Force the model to create GTA features')
-    parser.add_argument('--config', metavar='FILE', default='default.yaml', help='The config containing all hyperparams.')
+    parser.add_argument('--config', metavar='FILE', default='configs/singlespeaker.yaml', help='The config containing all hyperparams.')
     args = parser.parse_args()
 
     config = read_config(args.config)
@@ -81,11 +84,14 @@ if __name__ == '__main__':
 
     if force_gta:
         print('Creating Ground Truth Aligned Dataset...\n')
-        train_set, val_set = get_tts_datasets(
-            paths.data, 8, r=1, model_type='forward',
-            filter_attention=False, max_mel_len=None)
+        train_set, val_set = get_forward_datasets(
+            paths.data, 8, filter_attention=False, max_mel_len=None)
         create_gta_features(model, train_set, val_set, paths.gta)
         print('\n\nYou can now train WaveRNN on GTA features - use python train_wavernn.py --gta\n')
+    elif config['tts_model'] == 'multi_forward_tacotron':
+        assert isinstance(model, MultiForwardTacotron)
+        trainer = MultiForwardTrainer(paths=paths, dsp=dsp, config=config)
+        trainer.train(model, optimizer)
     else:
         trainer = ForwardTrainer(paths=paths, dsp=dsp, config=config)
         trainer.train(model, optimizer)

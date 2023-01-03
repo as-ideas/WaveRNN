@@ -95,9 +95,12 @@ class ForwardDataset(Dataset):
         pitch = np.load(str(self.paths.phon_pitch/f'{item_id}.npy'))
         energy = np.load(str(self.paths.phon_energy/f'{item_id}.npy'))
         speaker_emb = np.load(str(self.paths.speaker_emb/f'{item_id}.npy'))
+        pitch_cond = np.ones(pitch.shape)
+        pitch_cond[pitch != 0] = 2
+
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
                 'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy,
-                'speaker_emb': speaker_emb}
+                'speaker_emb': speaker_emb, 'pitch_cond': pitch_cond}
 
     def __len__(self):
         return len(self.metadata)
@@ -307,10 +310,13 @@ class ForwardCollator:
         pitch = stack_to_tensor(pitch).float()
         energy = [pad1d(b['energy'][:max_x_len], max_x_len) for b in batch]
         energy = stack_to_tensor(energy).float()
+        pitch_cond = [pad1d(b['pitch_cond'][:max_x_len], max_x_len) for b in batch]
+        pitch_cond = stack_to_tensor(pitch_cond).long()
         output.update({
             'pitch': pitch,
             'energy': energy,
             'dur': dur,
+            'pitch_cond': pitch_cond
         })
         return output
 
