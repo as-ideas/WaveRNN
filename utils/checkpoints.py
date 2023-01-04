@@ -17,7 +17,8 @@ def save_checkpoint(model: torch.nn.Module,
     checkpoint = {'model': model.state_dict(),
                   'optim': optim.state_dict(),
                   'config': config}
-    checkpoint.update(meta)
+    if meta is not None:
+        checkpoint.update(meta)
     torch.save(checkpoint, str(path))
 
 
