@@ -142,9 +142,9 @@ class TacoTrainer:
         batch = to_device(batch, device=device)
         m1_hat, m2_hat, att = model(batch)
         att = np_now(att)[0]
-        m1_hat = np_now(m1_hat)[0, :, :600]
-        m2_hat = np_now(m2_hat)[0, :, :600]
-        m_target = np_now(batch['mel'])[0, :, :600]
+        m1_hat = np_now(m1_hat)[0, :, :]
+        m2_hat = np_now(m2_hat)[0, :, :]
+        m_target = np_now(batch['mel'])[0, :, :]
         speaker = batch['speaker_name'][0]
 
         att_fig = plot_attention(att)
