@@ -173,7 +173,7 @@ if __name__ == '__main__':
     file_id_audio_list = list(file_id_to_audio.items())
 
     for i, dp in tqdm.tqdm(enumerate(pool.imap_unordered(preprocessor, file_id_audio_list), 1),
-                           total=len(audio_files), smoothing=0.01):
+                           total=len(audio_files), smoothing=0.1):
         if dp is not None and dp.item_id in text_dict:
             try:
                 emb = voice_encoder.embed_utterance(dp.reference_wav)
@@ -210,7 +210,7 @@ if __name__ == '__main__':
     print('Averaging speaker embeddings...')
 
     mean_speaker_embs = {speaker: np.zeros(SPEAKER_EMB_DIM, dtype=float) for speaker in speaker_dict.values()}
-    for file_id, speaker in tqdm.tqdm(speaker_dict.items(), total=len(speaker_dict), smoothing=0.01):
+    for file_id, speaker in tqdm.tqdm(speaker_dict.items(), total=len(speaker_dict), smoothing=0.1):
         emb = np.load(paths.speaker_emb / f'{file_id}.npy')
         mean_speaker_embs[speaker] += emb
     for speaker, emb in mean_speaker_embs.items():
