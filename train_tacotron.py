@@ -40,7 +40,7 @@ def normalize_values(phoneme_val) -> Tuple[float, float]:
 # 0b27e359a5869cd23294c1707c92f989c0bf201e/PyTorch/SpeechSynthesis/FastPitch/extract_mels.py
 def extract_pitch_energy(save_path_pitch: Path,
                          save_path_energy: Path,
-                         pich_min_freq: float,
+                         pitch_min_freq: float,
                          pitch_max_freq: float) -> Tuple[float, float]:
     train_data = unpickle_binary(paths.data / 'train_dataset.pkl')
     val_data = unpickle_binary(paths.data / 'val_dataset.pkl')
@@ -149,7 +149,7 @@ if __name__ == '__main__':
         print('Extracting Pitch and Energy Values...')
         mean, var = extract_pitch_energy(save_path_pitch=paths.phon_pitch,
                                          save_path_energy=paths.phon_energy,
-                                         pich_min_freq=config['preprocessing']['pitch_min_freq'],
+                                         pitch_min_freq=config['preprocessing']['pitch_min_freq'],
                                          pitch_max_freq=config['preprocessing']['pitch_max_freq'])
         print('\n\nYou can now train ForwardTacotron - use python train_forward.py\n')
         exit()

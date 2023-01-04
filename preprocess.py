@@ -1,6 +1,7 @@
 import warnings
 # Ignore future warnings by librosa in resemblyzer
 from collections import Counter
+from typing import Tuple
 
 from utils.text.recipes import read_ljspeech_format, read_metadata
 
@@ -61,9 +62,10 @@ class Preprocessor:
         self.dsp = dsp
         self.pitch_extractor = pitch_extractor
 
-    def __call__(self, path: Path) -> Union[DataPoint, None]:
+    def __call__(self, id_path: Tuple[str, Path]) -> Union[DataPoint, None]:
+        item_id, path = id_path
         try:
-            dp = self._convert_file(path)
+            dp = self._convert_file(item_id, path)
             np.save(self.paths.mel/f'{dp.item_id}.npy', dp.mel, allow_pickle=False)
             np.save(self.paths.raw_pitch/f'{dp.item_id}.npy', dp.pitch, allow_pickle=False)
             return dp
@@ -71,7 +73,7 @@ class Preprocessor:
             print(traceback.format_exc())
             return None
 
-    def _convert_file(self, path: Path) -> DataPoint:
+    def _convert_file(self, item_id: str, path: Path) -> DataPoint:
         y = self.dsp.load_wav(path)
         reference_wav = preprocess_resemblyzer(y, source_sr=self.dsp.sample_rate)
         if self.dsp.should_trim_long_silences:
@@ -83,7 +85,6 @@ class Preprocessor:
             y /= peak
         mel = self.dsp.wav_to_mel(y)
         pitch = self.pitch_extractor(y)
-        item_id = path.stem
         text = self.text_dict[item_id]
         text = self.cleaner(text)
         return DataPoint(item_id=item_id,
@@ -94,44 +95,55 @@ class Preprocessor:
                          reference_wav=reference_wav)
 
 
-parser = argparse.ArgumentParser(description='Preprocessing for WaveRNN and Tacotron')
+parser = argparse.ArgumentParser(description='Dataset preprocessing')
 parser.add_argument('--path', '-p', help='directly point to dataset')
-parser.add_argument('--metafile', '-m', default='metadata.csv', help='name of the metafile in the dataset dir')
-parser.add_argument('--num_workers', '-w', metavar='N', type=valid_n_workers, default=cpu_count()-1, help='The number of worker threads to use for preprocessing')
-parser.add_argument('--config', metavar='FILE', default='configs/singlespeaker.yaml', help='The config containing all hyperparams.')
+parser.add_argument('--config', metavar='FILE', default='configs/singlespeaker.yaml',
+                    help='The config containing all hyperparams.')
+parser.add_argument('--metafile', '-m', default='metadata.csv',
+                    help='name of the metafile in the dataset dir')
+parser.add_argument('--num_workers', '-w', metavar='N', type=valid_n_workers,
+                    default=cpu_count()-1, help='The number of worker threads to use for preprocessing')
 args = parser.parse_args()
 
 
 if __name__ == '__main__':
     config = read_config(args.config)
-    wav_files = get_files(args.path, '.wav')
-    wav_ids = {w.stem for w in wav_files}
+    audio_format = config['preprocessing']['audio_format']
+    audio_files = get_files(Path(args.path), audio_format)
+    file_id_to_audio = {w.name.replace(audio_format, ''): w for w in audio_files}
+    audio_ids = set(file_id_to_audio.keys())
     paths = Paths(config['data_path'], config['tts_model_id'])
+    n_workers = max(1, args.num_workers)
 
-    print(f'\nFound {len(wav_files)} wav files in "{args.path}".')
-    assert len(wav_files) > 0, f'Found no wav files in {args.path}, exiting.'
+    print(f'\nFound {len(audio_files)} {audio_format} files in "{args.path}".')
+    assert len(audio_files) > 0, f'Found no {audio_format} files in {args.path}, exiting.'
 
-    meta_path = Path(args.path) / args.metafile
-    text_dict, speaker_dict = read_metadata(meta_path, multispeaker=config['preprocessing']['multispeaker'])
+    text_dict, speaker_dict_raw = read_metadata(path=Path(args.path),
+                                                metafile=args.metafile,
+                                                format=config['preprocessing']['metafile_format'],
+                                                n_workers=n_workers)
     text_dict = {item_id: text for item_id, text in text_dict.items()
-                 if item_id in wav_ids and len(text) > config['preprocessing']['min_text_len']}
-    wav_files = [w for w in wav_files if w.stem in text_dict]
-    speaker_dict = {item_id: speaker for item_id, speaker in speaker_dict.items() if item_id in wav_ids}
+                 if item_id in audio_ids and len(text) > config['preprocessing']['min_text_len']}
+    audio_files = [w for w in audio_files if w.name.replace(audio_format, '') in text_dict]
+    speaker_dict = {item_id: speaker for item_id, speaker in speaker_dict_raw.items() if item_id in audio_ids}
     speaker_counts = Counter(speaker_dict.values())
 
-    print(f'Will use {len(wav_files)} wav files that are indexed in metafile.\n')
+    assert len(audio_files) > 0, f'No audio file is indexed in metadata, exiting. ' \
+                                 f'Pease make sure the audio ids match the ids in the metadata. ' \
+                                 f'\nAudio ids: {sorted(list(audio_ids))[:5]}... ' \
+                                 f'\nText ids: {sorted(list(speaker_dict_raw.keys()))[:5]}...'
+    print(f'Will use {len(audio_files)} {audio_format} files that are indexed in metafile.\n')
     print(f'\n{"Speaker":30} {"Count":5}')
     print(f'------------------------------|-------')
     for speaker, count in speaker_counts.most_common():
         print(f'{speaker:30} {count:5}')
     print()
 
-    n_workers = max(1, args.num_workers)
     dsp = DSP.from_config(config)
     nval = config['preprocessing']['n_val']
 
-    if nval > len(wav_files):
-        nval = len(wav_files) // 5
+    if nval > len(audio_files):
+        nval = len(audio_files) // 5
         print(f'\nWARNING: Using nval={nval} since the preset nval exceeds number of training files.')
 
     simple_table([
@@ -157,9 +169,10 @@ if __name__ == '__main__':
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     voice_encoder = VoiceEncoder().to(device)
+    file_id_audio_list = list(file_id_to_audio.items())
 
-    for i, dp in tqdm.tqdm(enumerate(pool.imap_unordered(preprocessor, wav_files), 1),
-                           total=len(wav_files), smoothing=1e-4):
+    for i, dp in tqdm.tqdm(enumerate(pool.imap_unordered(preprocessor, file_id_audio_list), 1),
+                           total=len(audio_files), smoothing=1e-4):
         if dp is not None and dp.item_id in text_dict:
             try:
                 emb = voice_encoder.embed_utterance(dp.reference_wav)

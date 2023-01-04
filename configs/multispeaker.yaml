@@ -1,9 +1,8 @@
 
-voc_model_id: 'ljspeech_voc'
-tts_model_id: 'ljspeech_tts'
-data_path: 'data/'                                        # output data path
+tts_model_id: 'vctk_tts'
+data_path: 'data_vctk'                                        # output data path
 
-tts_model: 'multi_forward_tacotron'                             # choices: [forward_tacotron, fast_pitch]
+tts_model: 'multi_forward_tacotron'
 
 
 dsp:
@@ -29,7 +28,8 @@ dsp:
 
 preprocessing:
 
-  multispeaker: True                    # If set to 'True' the preprocessor considers speaker names in the metafile.
+  metafile_format: 'vctk'               # If set to 'True' the preprocessor considers speaker names in the metafile.
+  audio_format: '_mic1.flac'
   seed: 42
   n_val: 200
   language: 'en-us'

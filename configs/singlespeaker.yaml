@@ -1,5 +1,4 @@
 
-voc_model_id: 'ljspeech_voc'
 tts_model_id: 'ljspeech_tts'
 data_path: 'data/'                                        # output data path
 
@@ -29,12 +28,13 @@ dsp:
 
 preprocessing:
 
-  multispeaker: False                   # If set to 'True' the preprocessor considers speaker names in the metafile.
+  metafile_format: 'ljspeech'          # If set to 'True' the preprocessor considers speaker names in the metafile.
+  audio_format: '.wav'
   seed: 42
   n_val: 200
   language: 'de'
-  cleaner_name: 'no_cleaners'      # choices: ['english_cleaners', 'no_cleaners'], expands numbers and abbreviations.
-  use_phonemes: False                    # whether to phonemize the text
+  cleaner_name: 'no_cleaners'           # choices: ['english_cleaners', 'no_cleaners'], expands numbers and abbreviations.
+  use_phonemes: False                   # whether to phonemize the text
                                         # if set to False, you have to provide the phonemized text yourself
   min_text_len: 2
   pitch_min_freq: 30                    # Minimum value for pitch frequency to remove outliers (Common pitch range is

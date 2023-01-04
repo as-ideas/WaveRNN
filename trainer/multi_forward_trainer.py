@@ -95,6 +95,9 @@ class MultiForwardTrainer:
                        + self.train_cfg['energy_loss_factor'] * energy_loss \
                        + self.train_cfg['pitch_cond_loss_factor'] * pitch_cond_loss
 
+                pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
+                pitch_cond_acc = pitch_cond_true_pos.sum() / (batch['pitch_cond'] != 0).sum()
+
                 optimizer.zero_grad()
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(),
@@ -125,6 +128,7 @@ class MultiForwardTrainer:
                 self.writer.add_scalar('Energy_Loss/train', energy_loss, model.get_step())
                 self.writer.add_scalar('Duration_Loss/train', dur_loss, model.get_step())
                 self.writer.add_scalar('Pitch_Cond_Loss/train', pitch_cond_loss, model.get_step())
+                self.writer.add_scalar('Pitch_Cond_Acc/train', pitch_cond_acc, model.get_step())
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
                 self.writer.add_scalar('Params/learning_rate', session.lr, model.get_step())
 
@@ -135,6 +139,8 @@ class MultiForwardTrainer:
             self.writer.add_scalar('Duration_Loss/val', val_out['dur_loss'], model.get_step())
             self.writer.add_scalar('Pitch_Loss/val', val_out['pitch_loss'], model.get_step())
             self.writer.add_scalar('Energy_Loss/val', val_out['energy_loss'], model.get_step())
+            self.writer.add_scalar('Pitch_Cond_Loss/val', val_out['pitch_cond_loss'], model.get_step())
+            self.writer.add_scalar('Pitch_Cond_Acc/val', val_out['pitch_cond_acc'], model.get_step())
             save_checkpoint(model=model, optim=optimizer, config=self.config,
                             path=self.paths.forward_checkpoints / 'latest_model.pt',
                             meta={'speaker_embeddings': self.speaker_embs})
@@ -147,7 +153,7 @@ class MultiForwardTrainer:
         model.eval()
         val_losses = {
             'mel_loss': 0, 'dur_loss': 0, 'pitch_loss': 0,
-            'energy_loss': 0, 'pitch_cond_loss': 0,
+            'energy_loss': 0, 'pitch_cond_loss': 0, 'pitch_cond_acc': 0
         }
         device = next(model.parameters()).device
         for i, batch in enumerate(val_set, 1):
@@ -160,11 +166,14 @@ class MultiForwardTrainer:
                 pitch_loss = self.l1_loss(pred['pitch'], batch['pitch'].unsqueeze(1), batch['x_len'])
                 energy_loss = self.l1_loss(pred['energy'], batch['energy'].unsqueeze(1), batch['x_len'])
                 pitch_cond_loss = self.ce_loss(pred['pitch_cond'].transpose(1, 2), batch['pitch_cond'])
+                pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
+                pitch_cond_acc = pitch_cond_true_pos.sum() / (batch['pitch_cond'] != 0).sum()
                 val_losses['pitch_loss'] += pitch_loss
                 val_losses['energy_loss'] += energy_loss
                 val_losses['mel_loss'] += m1_loss.item() + m2_loss.item()
                 val_losses['dur_loss'] += dur_loss
                 val_losses['pitch_cond_loss'] += pitch_cond_loss
+                val_losses['pitch_cond_acc'] += pitch_cond_acc
         return val_losses
 
     @ignore_exception

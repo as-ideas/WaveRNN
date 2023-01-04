@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import Union, List, Any, Dict, Tuple
 
 
-def get_files(path: Union[str, Path], extension='.wav') -> List[Path]:
-    if isinstance(path, str): path = Path(path).expanduser().resolve()
+def get_files(path: Path, extension='.wav') -> List[Path]:
+    path = path.expanduser().resolve()
     return list(path.rglob(f'*{extension}'))
 
 
