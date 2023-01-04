@@ -100,7 +100,7 @@ class TacoTrainer:
                 _, att_score = attention_score(attention, batch['mel_len'])
                 att_score = torch.mean(att_score)
                 self.writer.add_scalar('Attention_Score/train', att_score, model.get_step())
-                self.writer.add_scalar('Loss/train', loss, model.get_step())
+                self.writer.add_scalar('Mel_Loss/train', loss, model.get_step())
                 self.writer.add_scalar('Params/reduction_factor', session.r, model.get_step())
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
                 self.writer.add_scalar('Params/learning_rate', session.lr, model.get_step())
@@ -142,28 +142,29 @@ class TacoTrainer:
         batch = to_device(batch, device=device)
         m1_hat, m2_hat, att = model(batch)
         att = np_now(att)[0]
-        m1_hat = np_now(m1_hat)[0, :600, :]
-        m2_hat = np_now(m2_hat)[0, :600, :]
-        m_target = np_now(batch['mel'])[0, :600, :]
+        m1_hat = np_now(m1_hat)[0, :, :600]
+        m2_hat = np_now(m2_hat)[0, :, :600]
+        m_target = np_now(batch['mel'])[0, :, :600]
+        speaker = batch['speaker_name'][0]
 
         att_fig = plot_attention(att)
         m1_hat_fig = plot_mel(m1_hat)
         m2_hat_fig = plot_mel(m2_hat)
         m_target_fig = plot_mel(m_target)
 
-        self.writer.add_figure('Ground_Truth_Aligned/attention', att_fig, model.step)
-        self.writer.add_figure('Ground_Truth_Aligned/target', m_target_fig, model.step)
-        self.writer.add_figure('Ground_Truth_Aligned/linear', m1_hat_fig, model.step)
-        self.writer.add_figure('Ground_Truth_Aligned/postnet', m2_hat_fig, model.step)
+        self.writer.add_figure(f'Ground_Truth_Aligned/attention/{speaker}', att_fig, model.step)
+        self.writer.add_figure(f'Ground_Truth_Aligned/target/{speaker}', m_target_fig, model.step)
+        self.writer.add_figure(f'Ground_Truth_Aligned/linear/{speaker}', m1_hat_fig, model.step)
+        self.writer.add_figure(f'Ground_Truth_Aligned/postnet/{speaker}', m2_hat_fig, model.step)
 
         m2_hat_wav = self.dsp.griffinlim(m2_hat)
         target_wav = self.dsp.griffinlim(m_target)
 
         self.writer.add_audio(
-            tag='Ground_Truth_Aligned/target_wav', snd_tensor=target_wav,
+            tag=f'Ground_Truth_Aligned/target_wav/{speaker}', snd_tensor=target_wav,
             global_step=model.step, sample_rate=self.dsp.sample_rate)
         self.writer.add_audio(
-            tag='Ground_Truth_Aligned/postnet_wav', snd_tensor=m2_hat_wav,
+            tag=f'Ground_Truth_Aligned/postnet_wav/{speaker}', snd_tensor=m2_hat_wav,
             global_step=model.step, sample_rate=self.dsp.sample_rate)
 
         m1_hat, m2_hat, att = model.generate(batch['x'][0:1], steps=batch['mel_len'][0] + 20)
@@ -171,16 +172,16 @@ class TacoTrainer:
         m1_hat_fig = plot_mel(m1_hat)
         m2_hat_fig = plot_mel(m2_hat)
 
-        self.writer.add_figure('Generated/attention', att_fig, model.step)
-        self.writer.add_figure('Generated/target', m_target_fig, model.step)
-        self.writer.add_figure('Generated/linear', m1_hat_fig, model.step)
-        self.writer.add_figure('Generated/postnet', m2_hat_fig, model.step)
+        self.writer.add_figure(f'Generated/attention/{speaker}', att_fig, model.step)
+        self.writer.add_figure(f'Generated/target/{speaker}', m_target_fig, model.step)
+        self.writer.add_figure(f'Generated/linear/{speaker}', m1_hat_fig, model.step)
+        self.writer.add_figure(f'Generated/postnet/{speaker}', m2_hat_fig, model.step)
 
         m2_hat_wav = self.dsp.griffinlim(m2_hat)
 
         self.writer.add_audio(
-            tag='Generated/target_wav', snd_tensor=target_wav,
+            tag=f'Generated/target_wav/{speaker}', snd_tensor=target_wav,
             global_step=model.step, sample_rate=self.dsp.sample_rate)
         self.writer.add_audio(
-            tag='Generated/postnet_wav', snd_tensor=m2_hat_wav,
+            tag=f'Generated/postnet_wav/{speaker}', snd_tensor=m2_hat_wav,
             global_step=model.step, sample_rate=self.dsp.sample_rate)

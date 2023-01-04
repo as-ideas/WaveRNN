@@ -27,8 +27,7 @@ class MultiForwardTrainer:
         self.paths = paths
         self.dsp = dsp
         self.config = config
-        model_type = config.get('tts_model', 'forward_tacotron')
-        self.train_cfg = config[model_type]['training']
+        self.train_cfg = config['multi_forward_tacotron']['training']
         self.writer = SummaryWriter(log_dir=paths.forward_log, comment='v1')
         self.l1_loss = MaskedL1()
         self.ce_loss = torch.nn.CrossEntropyLoss(ignore_index=0)
@@ -208,8 +207,10 @@ class MultiForwardTrainer:
             global_step=model.step, sample_rate=self.dsp.sample_rate)
 
         self.writer.add_figure(f'Generated/target//{speaker}', m_target_fig, model.step)
+        speakers_to_plot = self.train_cfg['plot_speakers'] + self.speakers[:self.train_cfg['plot_n_speakers']]
+        speakers_to_plot = sorted(list({s for s in speakers_to_plot if s in self.speakers}))
 
-        for speaker in self.speakers:
+        for speaker in speakers_to_plot:
             speaker_emb = self.speaker_embs[speaker].to(device)
             gen = model.generate(batch['x'][0:1, :batch['x_len'][0]], speaker_emb=speaker_emb)
             m1_hat = np_now(gen['mel'].squeeze())
