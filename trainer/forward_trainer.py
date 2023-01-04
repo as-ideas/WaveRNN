@@ -178,9 +178,9 @@ class ForwardTrainer:
         batch = to_device(batch, device=device)
 
         pred = model(batch)
-        m1_hat = np_now(pred['mel'])[0, :600, :]
-        m2_hat = np_now(pred['mel_post'])[0, :600, :]
-        m_target = np_now(batch['mel'])[0, :600, :]
+        m1_hat = np_now(pred['mel'])[0, :, :]
+        m2_hat = np_now(pred['mel_post'])[0, :, :]
+        m_target = np_now(batch['mel'])[0, :, :]
 
         m1_hat_fig = plot_mel(m1_hat)
         m2_hat_fig = plot_mel(m2_hat)
