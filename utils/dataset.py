@@ -53,21 +53,25 @@ class TacoDataset(Dataset):
                  paths: Paths,
                  dataset_ids: List[str],
                  text_dict: Dict[str, str],
+                 speaker_dict: Dict[str, str],
                  tokenizer: Tokenizer) -> None:
         self.paths = paths
         self.metadata = dataset_ids
         self.text_dict = text_dict
+        self.speaker_dict = speaker_dict
         self.tokenizer = tokenizer
 
     def __getitem__(self, index: int) -> Dict[str, torch.tensor]:
         item_id = self.metadata[index]
         text = self.text_dict[item_id]
+        speaker_name = self.speaker_dict[item_id]
         x = self.tokenizer(text)
         mel = np.load(str(self.paths.mel/f'{item_id}.npy'))
         mel_len = mel.shape[-1]
         speaker_emb = np.load(str(self.paths.speaker_emb/f'{item_id}.npy'))
         return {'x': x, 'mel': mel, 'item_id': item_id,
-                'mel_len': mel_len, 'x_len': len(x), 'speaker_emb': speaker_emb}
+                'mel_len': mel_len, 'x_len': len(x),
+                'speaker_emb': speaker_emb, 'speaker_name': speaker_name}
 
     def __len__(self):
         return len(self.metadata)
@@ -79,15 +83,18 @@ class ForwardDataset(Dataset):
                  paths: Paths,
                  dataset_ids: List[str],
                  text_dict: Dict[str, str],
+                 speaker_dict: Dict[str, str],
                  tokenizer: Tokenizer):
         self.paths = paths
         self.metadata = dataset_ids
         self.text_dict = text_dict
+        self.speaker_dict = speaker_dict
         self.tokenizer = tokenizer
 
     def __getitem__(self, index: int) -> Dict[str, torch.tensor]:
         item_id = self.metadata[index]
         text = self.text_dict[item_id]
+        speaker_name = self.speaker_dict[item_id]
         x = self.tokenizer(text)
         mel = np.load(str(self.paths.mel/f'{item_id}.npy'))
         mel_len = mel.shape[-1]
@@ -100,7 +107,7 @@ class ForwardDataset(Dataset):
 
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
                 'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy,
-                'speaker_emb': speaker_emb, 'pitch_cond': pitch_cond}
+                'speaker_emb': speaker_emb, 'pitch_cond': pitch_cond, 'speaker_name': speaker_name}
 
     def __len__(self):
         return len(self.metadata)
@@ -172,6 +179,7 @@ def get_taco_datasets(paths: Paths,
     train_data = unpickle_binary(paths.data/'train_dataset.pkl')
     val_data = unpickle_binary(paths.data/'val_dataset.pkl')
     text_dict = unpickle_binary(paths.data/'text_dict.pkl')
+    speaker_dict = unpickle_binary(paths.data/'speaker_dict.pkl')
     train_data = filter_max_len(train_data, max_mel_len)
     val_data = filter_max_len(val_data, max_mel_len)
 
@@ -179,9 +187,11 @@ def get_taco_datasets(paths: Paths,
     val_ids, val_lens = zip(*val_data)
 
     train_dataset = TacoDataset(paths=paths, dataset_ids=train_ids,
-                                text_dict=text_dict, tokenizer=tokenizer)
+                                text_dict=text_dict, speaker_dict=speaker_dict,
+                                tokenizer=tokenizer)
     val_dataset = TacoDataset(paths=paths, dataset_ids=val_ids,
-                              text_dict=text_dict, tokenizer=tokenizer)
+                              text_dict=text_dict, speaker_dict=speaker_dict,
+                              tokenizer=tokenizer)
     train_sampler = BinnedLengthSampler(train_lens, batch_size, batch_size * 3)
     collator = TacoCollator(r=r)
 
@@ -215,6 +225,7 @@ def get_forward_datasets(paths: Paths,
     train_data = unpickle_binary(paths.data/'train_dataset.pkl')
     val_data = unpickle_binary(paths.data/'val_dataset.pkl')
     text_dict = unpickle_binary(paths.data/'text_dict.pkl')
+    speaker_dict = unpickle_binary(paths.data/'speaker_dict.pkl')
     train_data = filter_max_len(train_data, max_mel_len)
     val_data = filter_max_len(val_data, max_mel_len)
     train_len_original = len(train_data)
@@ -236,9 +247,11 @@ def get_forward_datasets(paths: Paths,
     val_ids, val_lens = zip(*val_data)
 
     train_dataset = ForwardDataset(paths=paths, dataset_ids=train_ids,
-                                   text_dict=text_dict, tokenizer=tokenizer)
+                                   text_dict=text_dict, speaker_dict=speaker_dict,
+                                   tokenizer=tokenizer)
     val_dataset = ForwardDataset(paths=paths, dataset_ids=val_ids,
-                                 text_dict=text_dict, tokenizer=tokenizer)
+                                 text_dict=text_dict, speaker_dict=speaker_dict,
+                                 tokenizer=tokenizer)
     train_sampler = BinnedLengthSampler(train_lens, batch_size, batch_size * 3)
     collator = ForwardCollator(taco_collator=TacoCollator(r=1))
 
@@ -285,13 +298,15 @@ class TacoCollator:
         mel = [pad2d(b['mel'], max_spec_len) for b in batch]
         mel = stack_to_tensor(mel)
         item_id = [b['item_id'] for b in batch]
+        speaker_name = [b['speaker_name'] for b in batch]
         mel_lens = [b['mel_len'] for b in batch]
         mel_lens = torch.tensor(mel_lens)
         speaker_emb = [b['speaker_emb'] for b in batch]
         speaker_emb = stack_to_tensor(speaker_emb)
 
         return {'x': text, 'mel': mel, 'item_id': item_id,
-                'x_len': x_len, 'mel_len': mel_lens, 'speaker_emb': speaker_emb}
+                'x_len': x_len, 'mel_len': mel_lens,
+                'speaker_emb': speaker_emb, 'speaker_name': speaker_name}
 
 
 class ForwardCollator:

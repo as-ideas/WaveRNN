@@ -179,6 +179,7 @@ class MultiForwardTrainer:
         m1_hat = np_now(pred['mel'])[0, :, :600]
         m2_hat = np_now(pred['mel_post'])[0, :, :600]
         m_target = np_now(batch['mel'])[0, :, :600]
+        speaker = batch['speaker_name'][0]
 
         m1_hat_fig = plot_mel(m1_hat)
         m2_hat_fig = plot_mel(m2_hat)
@@ -188,25 +189,25 @@ class MultiForwardTrainer:
         energy_fig = plot_pitch(np_now(batch['energy'][0]))
         energy_gta_fig = plot_pitch(np_now(pred['energy'].squeeze()[0]))
 
-        self.writer.add_figure('Pitch/target', pitch_fig, model.step)
-        self.writer.add_figure('Pitch/ground_truth_aligned', pitch_gta_fig, model.step)
-        self.writer.add_figure('Energy/target', energy_fig, model.step)
-        self.writer.add_figure('Energy/ground_truth_aligned', energy_gta_fig, model.step)
-        self.writer.add_figure('Ground_Truth_Aligned/target', m_target_fig, model.step)
-        self.writer.add_figure('Ground_Truth_Aligned/linear', m1_hat_fig, model.step)
-        self.writer.add_figure('Ground_Truth_Aligned/postnet', m2_hat_fig, model.step)
+        self.writer.add_figure(f'Pitch/target/{speaker}', pitch_fig, model.step)
+        self.writer.add_figure(f'Pitch/ground_truth_aligned/{speaker}', pitch_gta_fig, model.step)
+        self.writer.add_figure(f'Energy/target/{speaker}', energy_fig, model.step)
+        self.writer.add_figure(f'Energy/ground_truth_aligned/{speaker}', energy_gta_fig, model.step)
+        self.writer.add_figure(f'Ground_Truth_Aligned/target/{speaker}', m_target_fig, model.step)
+        self.writer.add_figure(f'Ground_Truth_Aligned/linear/{speaker}', m1_hat_fig, model.step)
+        self.writer.add_figure(f'Ground_Truth_Aligned/postnet/{speaker}', m2_hat_fig, model.step)
 
         m2_hat_wav = self.dsp.griffinlim(m2_hat)
         target_wav = self.dsp.griffinlim(m_target)
 
         self.writer.add_audio(
-            tag='Ground_Truth_Aligned/target_wav', snd_tensor=target_wav,
+            tag=f'Ground_Truth_Aligned/target_wav/{speaker}', snd_tensor=target_wav,
             global_step=model.step, sample_rate=self.dsp.sample_rate)
         self.writer.add_audio(
-            tag='Ground_Truth_Aligned/postnet_wav', snd_tensor=m2_hat_wav,
+            tag=f'Ground_Truth_Aligned/postnet_wav/{speaker}', snd_tensor=m2_hat_wav,
             global_step=model.step, sample_rate=self.dsp.sample_rate)
 
-        self.writer.add_figure(f'Generated/target', m_target_fig, model.step)
+        self.writer.add_figure(f'Generated/target//{speaker}', m_target_fig, model.step)
 
         for speaker in self.speakers:
             speaker_emb = self.speaker_embs[speaker].to(device)

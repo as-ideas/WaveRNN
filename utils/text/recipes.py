@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Tuple
 import pandas as pd
 
-DEFAULT_SPEAKER_NAME = 'default'
+DEFAULT_SPEAKER_NAME = 'default_speaker'
 
 
 def read_metadata(path: Path, multispeaker: bool = False) -> Tuple[dict, dict]:
