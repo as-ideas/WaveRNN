@@ -28,8 +28,8 @@ dsp:
 
 preprocessing:
 
-  metafile_format: 'ljspeech'          # If set to 'True' the preprocessor considers speaker names in the metafile.
-  audio_format: '.wav'
+  metafile_format: 'ljspeech'          # not to be changed, we use the simplest format for singlespeaker models
+  audio_format: '.wav'                 # extension for audio files (e.g. .wav or .flac)
   seed: 42
   n_val: 200
   language: 'de'

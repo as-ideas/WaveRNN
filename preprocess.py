@@ -118,6 +118,7 @@ if __name__ == '__main__':
     print(f'\nFound {len(audio_files)} {audio_format} files in "{args.path}".')
     assert len(audio_files) > 0, f'Found no {audio_format} files in {args.path}, exiting.'
 
+    print('Preparing metadata...')
     text_dict, speaker_dict_raw = read_metadata(path=Path(args.path),
                                                 metafile=args.metafile,
                                                 format=config['preprocessing']['metafile_format'],
