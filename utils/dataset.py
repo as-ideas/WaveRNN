@@ -136,6 +136,7 @@ class BinnedTacoDataLoader:
         tokenizer = Tokenizer()
         file_id_text_lens = []
         text_dict = unpickle_binary(paths.data / 'text_dict.pkl')
+        speaker_dict = unpickle_binary(paths.data / 'speaker_dict.pkl')
         for item_id, _ in dataset:
             toks = tokenizer(text_dict[item_id])
             file_id_text_lens.append((item_id, len(toks)))
@@ -156,7 +157,8 @@ class BinnedTacoDataLoader:
         Random(SHUFFLE_SEED).shuffle(all_batches)
         self.all_batches = all_batches
         self.taco_dataset = TacoDataset(paths=paths, dataset_ids=dataset_ids,
-                                        text_dict=text_dict, tokenizer=tokenizer)
+                                        text_dict=text_dict, speaker_dict=speaker_dict,
+                                        tokenizer=tokenizer)
         self.collator = TacoCollator(r=1)
 
     def __iter__(self) -> Iterator:
