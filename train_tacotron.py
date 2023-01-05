@@ -52,7 +52,7 @@ def extract_pitch_energy(save_path_pitch: Path,
     all_data = train_data + val_data
 
     for speaker_name in tqdm(speaker_names, total=len(speaker_names), smoothing=0.1):
-        all_data_speaker = [item_id for item_id, _ in all_data if speaker_dict[item_id] == speaker_name]
+        all_data_speaker = [(item_id, mel_len) for item_id, mel_len in all_data if speaker_dict[item_id] == speaker_name]
         phoneme_pitches = []
         phoneme_energies = []
         for prog_idx, (item_id, mel_len) in enumerate(all_data_speaker, 1):
