@@ -219,6 +219,10 @@ class MultiForwardTrainer:
         speakers_to_plot = self.train_cfg['plot_speakers'] + self.speakers[:self.train_cfg['plot_n_speakers']]
         speakers_to_plot = sorted(list({s for s in speakers_to_plot if s in self.speakers}))
 
+        self.writer.add_audio(
+            tag=f'Generated/target_wav/{speaker}', snd_tensor=target_wav,
+            global_step=model.step, sample_rate=self.dsp.sample_rate)
+
         for speaker in speakers_to_plot:
             speaker_emb = self.speaker_embs[speaker].to(device)
             gen = model.generate(batch['x'][0:1, :batch['x_len'][0]], speaker_emb=speaker_emb)
@@ -238,9 +242,6 @@ class MultiForwardTrainer:
 
             m2_hat_wav = self.dsp.griffinlim(m2_hat)
 
-            self.writer.add_audio(
-                tag=f'Generated/target_wav/{speaker}', snd_tensor=target_wav,
-                global_step=model.step, sample_rate=self.dsp.sample_rate)
             self.writer.add_audio(
                 tag=f'Generated/postnet_wav/{speaker}', snd_tensor=m2_hat_wav,
                 global_step=model.step, sample_rate=self.dsp.sample_rate)

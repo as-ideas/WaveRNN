@@ -26,7 +26,6 @@ def normalize_values(phoneme_val):
                                for item_id, v in phoneme_val])
     mean, std = np.mean(nonzeros), np.std(nonzeros)
     if not std > 0:
-        print('Std was zero!')
         std = 1e10
     for item_id, v in phoneme_val:
         zero_idxs = np.where(v == 0.0)[0]
@@ -53,7 +52,7 @@ def extract_pitch_energy(save_path_pitch: Path,
     all_data = train_data + val_data
 
     for speaker_name in tqdm(speaker_names, total=len(speaker_names), smoothing=0.1):
-        all_data_speaker = [d for d in all_data if speaker_dict[d[0]] == speaker_name]
+        all_data_speaker = [item_id for item_id, _ in all_data if speaker_dict[item_id] == speaker_name]
         phoneme_pitches = []
         phoneme_energies = []
         for prog_idx, (item_id, mel_len) in enumerate(all_data_speaker, 1):
@@ -86,8 +85,6 @@ def extract_pitch_energy(save_path_pitch: Path,
         mean, var = normalize_values(phoneme_pitches)
         for item_id, phoneme_pitch in phoneme_pitches:
             np.save(str(save_path_pitch / f'{item_id}.npy'), phoneme_pitch, allow_pickle=False)
-
-        print(f'\nPitch mean: {mean} var: {var}')
 
     return mean, var
 
