@@ -54,6 +54,8 @@ class DurationExtractionDataset(Dataset):
         x = self.text_dict[item_id]
         x = self.tokenizer(x)
         mel = np.load(self.paths.mel / f'{item_id}.npy')
+        raw_pitch = np.load(self.paths.raw_pitch / f'{item_id}.npy')
+        raw_pitch = torch.from_numpy(raw_pitch)
         mel = torch.from_numpy(mel)
         x = torch.tensor(x)
         attention_npy = np.load(str(self.paths.att_pred / f'{item_id}.npy'))
@@ -62,7 +64,8 @@ class DurationExtractionDataset(Dataset):
         mel_len = torch.tensor(mel_len).unsqueeze(0)
         align_score, _ = attention_score(attention.unsqueeze(0), mel_len, r=1)
         align_score = float(align_score)
-        durations, att_score = self.duration_extractor(x=x, mel=mel, attention=attention)
+        durations, att_score = self.duration_extractor(x=x, mel=mel,
+                                                       raw_pitch=raw_pitch, attention=attention)
         att_score = float(att_score)
         durations_npy = durations.cpu().numpy()
         if np.sum(durations_npy) != mel_len:

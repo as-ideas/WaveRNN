@@ -23,6 +23,7 @@ class DurationExtractor:
     def __call__(self,
                  x: torch.Tensor,
                  mel: torch.Tensor,
+                 raw_pitch: torch.Tensor,
                  attention: torch.Tensor) -> Tuple[torch.tensor, float]:
         """
         Extracts durations from the attention matrix by finding the shortest monotonic path from
@@ -39,9 +40,9 @@ class DurationExtractor:
         # We add a little probability to silent phonemes within unvoiced parts of the spec where the tacotron attention
         # is usually very unreliable. As a result we get more accurate (larger) durations for unvoiced parts and
         # avoid 'leakage' of durations into surrounding word phonemes.
-        sil_mask = mel.mean(dim=0) < self.silence_threshold
-        sil_mel_inds = sil_mask.nonzero().squeeze()
+        sil_mel_inds = raw_pitch.nonzero().squeeze()
         sil_mel_inds = list(sil_mel_inds) if len(sil_mel_inds.size()) > 0 else []
+        print(sil_mel_inds)
 
         sil_phon_inds = torch.tensor(silent_phonemes_indices)
         for i in sil_mel_inds:
