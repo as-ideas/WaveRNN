@@ -68,7 +68,7 @@ def extract_pitch_energy(save_path_pitch: Path,
                 energy_char = np.zeros((dur.shape[0],), dtype=np.float32)
                 for idx, a, b in zip(range(mel_len), durs_cum[:-1], durs_cum[1:]):
                     values = pitch[a:b][np.where(pitch[a:b] != 0.0)[0]]
-                    values = values[np.where(pitch_min_freq <= values <= pitch_max_freq)[0]]
+                    values = values[np.where((values >= pitch_min_freq) & (values <= pitch_max_freq))[0]]
                     pitch_char[idx] = np.mean(values) if len(values) > 0 else 0.0
                     energy_values = energy[a:b]
                     energy_char[idx] = np.mean(energy_values)if len(energy_values) > 0 else 0.0
