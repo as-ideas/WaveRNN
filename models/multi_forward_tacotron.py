@@ -241,13 +241,14 @@ class MultiForwardTacotron(nn.Module):
     def generate(self,
                  x: torch.Tensor,
                  speaker_emb: torch.Tensor,
+                 alpha=1.0,
                  pitch_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x,
                  energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, torch.Tensor]:
         self.eval()
         with torch.no_grad():
             pitch_cond_hat = self.pitch_cond_pred(x, speaker_emb).squeeze(-1)
             pitch_cond_hat = torch.argmax(pitch_cond_hat.squeeze(), dim=1).long().unsqueeze(0)
-            dur_hat = self.dur_pred(x, pitch_cond_hat, speaker_emb).squeeze(-1)
+            dur_hat = self.dur_pred(x, pitch_cond_hat, speaker_emb, alpha=alpha).squeeze(-1)
             if torch.sum(dur_hat.long()) <= 0:
                 torch.fill_(dur_hat, value=2.)
             pitch_hat = self.pitch_pred(x, pitch_cond_hat, speaker_emb).transpose(1, 2)

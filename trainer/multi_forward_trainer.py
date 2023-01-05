@@ -128,7 +128,7 @@ class MultiForwardTrainer:
                 self.writer.add_scalar('Energy_Loss/train', energy_loss, model.get_step())
                 self.writer.add_scalar('Duration_Loss/train', dur_loss, model.get_step())
                 self.writer.add_scalar('Pitch_Cond_Loss/train', pitch_cond_loss, model.get_step())
-                self.writer.add_scalar('Pitch_Cond_Acc/train', pitch_cond_acc, model.get_step())
+                self.writer.add_scalar('Pitch_Cond_Accuracy/train', pitch_cond_acc, model.get_step())
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
                 self.writer.add_scalar('Params/learning_rate', session.lr, model.get_step())
 
@@ -140,7 +140,7 @@ class MultiForwardTrainer:
             self.writer.add_scalar('Pitch_Loss/val', val_out['pitch_loss'], model.get_step())
             self.writer.add_scalar('Energy_Loss/val', val_out['energy_loss'], model.get_step())
             self.writer.add_scalar('Pitch_Cond_Loss/val', val_out['pitch_cond_loss'], model.get_step())
-            self.writer.add_scalar('Pitch_Cond_Acc/val', val_out['pitch_cond_acc'], model.get_step())
+            self.writer.add_scalar('Pitch_Cond_Accuracy/val', val_out['pitch_cond_acc'], model.get_step())
             save_checkpoint(model=model, optim=optimizer, config=self.config,
                             path=self.paths.forward_checkpoints / 'latest_model.pt',
                             meta={'speaker_embeddings': self.speaker_embs})

@@ -1,12 +1,7 @@
 import argparse
 from pathlib import Path
-from typing import Tuple, Dict, Any, Union
 import numpy as np
 import torch
-
-from models.fast_pitch import FastPitch
-from models.fatchord_version import WaveRNN
-from models.forward_tacotron import ForwardTacotron
 from utils.checkpoints import init_tts_model
 from utils.display import simple_table
 from utils.dsp import DSP
@@ -14,27 +9,6 @@ from utils.files import read_config
 from utils.paths import Paths
 from utils.text.cleaners import Cleaner
 from utils.text.tokenizer import Tokenizer
-
-
-def load_tts_model(checkpoint_path: str) -> Tuple[Union[ForwardTacotron, FastPitch], Dict[str, Any]]:
-    print(f'Loading tts checkpoint {checkpoint_path}')
-    checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'))
-    config = checkpoint['config']
-    tts_model = init_tts_model(config)
-    tts_model.load_state_dict(checkpoint['model'])
-    print(f'Initialized tts model: {tts_model}')
-    print(f'Restored model with step {tts_model.get_step()}')
-    return tts_model, config
-
-
-def load_wavernn(checkpoint_path: str) -> Tuple[WaveRNN, Dict[str, Any]]:
-    print(f'Loading voc checkpoint {checkpoint_path}')
-    checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'))
-    config = checkpoint['config']
-    voc_model = WaveRNN.from_config(config)
-    voc_model.load_state_dict(checkpoint['model'])
-    print(f'Loaded model with step {voc_model.get_step()}')
-    return voc_model, config
 
 
 if __name__ == '__main__':
@@ -45,6 +19,8 @@ if __name__ == '__main__':
     parser.add_argument('--checkpoint', type=str, default=None, help='[string/path] path to .pt model file.')
     parser.add_argument('--config', metavar='FILE', default='default.yaml', help='The config containing all hyperparams. Only'
                                                                                 'used if no checkpoint is set.')
+    parser.add_argument('--speaker', type=str, default=None, help='Speaker to generate audio for (only multispeaker).')
+
     parser.add_argument('--alpha', type=float, default=1., help='Parameter for controlling length regulator for speedup '
                                                                 'or slow-down of generated speech, e.g. alpha=2.0 is double-time')
     parser.add_argument('--amp', type=float, default=1., help='Parameter for controlling pitch amplification')
@@ -62,15 +38,30 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     assert args.vocoder in {'griffinlim', 'melgan', 'hifigan'}, \
-        'Please provide a valid vocoder! Choices: [\'griffinlim\', \'wavernn\', \'melgan\', \'hifigan\']'
+        'Please provide a valid vocoder! Choices: [griffinlim, melgan, hifigan]'
 
     checkpoint_path = args.checkpoint
     if checkpoint_path is None:
         config = read_config(args.config)
-        paths = Paths(config['data_path'], config['voc_model_id'], config['tts_model_id'])
+        paths = Paths(config['data_path'], config['tts_model_id'])
         checkpoint_path = paths.forward_checkpoints / 'latest_model.pt'
 
-    tts_model, config = load_tts_model(checkpoint_path)
+    checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'))
+    config = checkpoint['config']
+    tts_model = init_tts_model(config)
+    tts_model.load_state_dict(checkpoint['model'])
+    speaker_embedding = None
+    if args.speaker is not None:
+        assert 'speaker_embeddings' in checkpoint, 'Could not find speaker embeddings in checkpoint! Make sure you ' \
+                                                   'use trained multispeaker model!'
+        speaker_embeddings = checkpoint.get('speaker_embeddings', None)
+        assert args.speaker in speaker_embeddings, \
+            f'Provided speaker not found in speaker embeddings: {args.speaker},\n' \
+            f'Available speakers: {checkpoint["speaker_embeddings"].keys()}'
+        speaker_embedding = speaker_embeddings[args.speaker]
+
+    print(f'Initialized tts model: {tts_model}')
+    print(f'Restored model with step {tts_model.get_step()}')
     dsp = DSP.from_config(config)
 
     voc_model, voc_dsp = None, None
@@ -105,12 +96,19 @@ if __name__ == '__main__':
         x = tokenizer(x)
         x = torch.as_tensor(x, dtype=torch.long, device=device).unsqueeze(0)
 
-        wav_name = f'{i}_forward_{tts_k}k_alpha{args.alpha}_amp{args.amp}_{args.vocoder}'
+        speaker_name = args.speaker if args.speaker is not None else 'default_speaker'
+        wav_name = f'{i}_forward_{tts_k}k_{speaker_name}_alpha{args.alpha}_amp{args.amp}_{args.vocoder}'
 
-        gen = tts_model.generate(x=x,
-                                 alpha=args.alpha,
-                                 pitch_function=pitch_function,
-                                 energy_function=energy_function)
+        input = {
+            'x': x,
+            'alpha': args.alpha,
+            'pitch_function': pitch_function,
+            'energy_function': energy_function
+        }
+        if speaker_embedding is not None:
+            input.update({'speaker_emb': speaker_embedding})
+
+        gen = tts_model.generate(**input)
 
         m = gen['mel_post'].cpu()
         if args.vocoder == 'melgan':
