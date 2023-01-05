@@ -1,6 +1,6 @@
 
 tts_model_id: 'vctk_tts'
-data_path: 'data_vctk'                                        # output data path
+data_path: 'data'                                        # output data path
 
 tts_model: 'multi_forward_tacotron'
 

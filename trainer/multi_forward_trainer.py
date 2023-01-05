@@ -96,7 +96,7 @@ class MultiForwardTrainer:
                        + self.train_cfg['pitch_cond_loss_factor'] * pitch_cond_loss
 
                 pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
-                pitch_cond_acc = pitch_cond_true_pos.sum() / (batch['pitch_cond'] != 0).sum()
+                pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -167,13 +167,14 @@ class MultiForwardTrainer:
                 energy_loss = self.l1_loss(pred['energy'], batch['energy'].unsqueeze(1), batch['x_len'])
                 pitch_cond_loss = self.ce_loss(pred['pitch_cond'].transpose(1, 2), batch['pitch_cond'])
                 pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
-                pitch_cond_acc = pitch_cond_true_pos.sum() / (batch['pitch_cond'] != 0).sum()
+                pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()
                 val_losses['pitch_loss'] += pitch_loss
                 val_losses['energy_loss'] += energy_loss
                 val_losses['mel_loss'] += m1_loss.item() + m2_loss.item()
                 val_losses['dur_loss'] += dur_loss
                 val_losses['pitch_cond_loss'] += pitch_cond_loss
                 val_losses['pitch_cond_acc'] += pitch_cond_acc
+        val_losses = {k: v / len(val_set) for k, v in val_losses.items()}
         return val_losses
 
     @ignore_exception
