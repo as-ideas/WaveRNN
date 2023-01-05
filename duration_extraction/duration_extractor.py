@@ -40,7 +40,8 @@ class DurationExtractor:
         # We add a little probability to silent phonemes within unvoiced parts of the spec where the tacotron attention
         # is usually very unreliable. As a result we get more accurate (larger) durations for unvoiced parts and
         # avoid 'leakage' of durations into surrounding word phonemes.
-        sil_mel_inds = raw_pitch.nonzero().squeeze()
+        sil_mask = raw_pitch == 0
+        sil_mel_inds = sil_mask.nonzero().squeeze()
         sil_mel_inds = list(sil_mel_inds) if len(sil_mel_inds.size()) > 0 else []
         print(sil_mel_inds)
 
