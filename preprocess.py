@@ -83,6 +83,7 @@ class Preprocessor:
         peak = np.abs(y).max()
         if self.dsp.should_peak_norm or peak > 1.0:
             y /= peak
+            y = y * 0.95
         mel = self.dsp.wav_to_mel(y)
         pitch = self.pitch_extractor(y)
         text = self.text_dict[item_id]
