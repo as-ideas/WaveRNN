@@ -172,6 +172,7 @@ if __name__ == '__main__':
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     voice_encoder = VoiceEncoder().to(device)
     file_id_audio_list = list(file_id_to_audio.items())
+    successful_ids = set()
 
     for i, dp in tqdm.tqdm(enumerate(pool.imap_unordered(preprocessor, file_id_audio_list), 1),
                            total=len(audio_files), smoothing=0.1):
@@ -181,8 +182,14 @@ if __name__ == '__main__':
                 np.save(paths.speaker_emb / f'{dp.item_id}.npy', emb, allow_pickle=False)
                 dataset += [(dp.item_id, dp.mel_len)]
                 cleaned_texts += [(dp.item_id, dp.text)]
+                successful_ids.add(dp.item_id)
             except Exception as e:
                 print(traceback.format_exc())
+
+    # filter according to successfully preprocessed datapoints
+    text_dict = {k: v for k, v in text_dict.items() if k in successful_ids}
+    speaker_dict = {k: v for k, v in speaker_dict.items() if k in successful_ids}
+    speaker_counts = Counter(speaker_dict.values())
 
     # create stratified train / val split
     dataset.sort()
