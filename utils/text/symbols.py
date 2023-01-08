@@ -24,3 +24,8 @@ phonemes = list(
 
 phonemes_set = set(phonemes)
 silent_phonemes_indices = [i for i, p in enumerate(phonemes) if p in _pad + _punctuation]
+
+
+silent_phonemes = {'ʜ', '!', 'ɫ', '̩', '_', 'ʑ', 'ʍ', '͡', 'ʢ', 'ˑ', "'", 'ɥ', 'ɧ', '̯', '̍', 'ɕ', ')',
+                   ',', 'ː', ':', '̃', 'ʡ', '?', '-', 'ˈ', '̥', '˞', 'ɚ', 'ˌ', '(', ';', 'ɺ'}
+
