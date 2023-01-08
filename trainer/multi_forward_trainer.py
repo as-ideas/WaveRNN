@@ -216,9 +216,9 @@ class MultiForwardTrainer:
             tag=f'Ground_Truth_Aligned/postnet_wav/{speaker}', snd_tensor=m2_hat_wav,
             global_step=model.step, sample_rate=self.dsp.sample_rate)
 
-        self.writer.add_figure(f'Generated/target//{speaker}', m_target_fig, model.step)
+        self.writer.add_figure(f'Generated/target/{speaker}', m_target_fig, model.step)
         speakers_to_plot = self.train_cfg['plot_speakers'] + self.speakers[:self.train_cfg['plot_n_speakers']]
-        speakers_to_plot = sorted(list({s for s in speakers_to_plot if s in self.speakers}))
+        speakers_to_plot = [speaker] + sorted(list({s for s in speakers_to_plot if s in self.speakers}))
 
         self.writer.add_audio(
             tag=f'Generated/target_wav/{speaker}', snd_tensor=target_wav,
