@@ -1,6 +1,6 @@
 
 tts_model_id: 'vctk_tts'
-data_path: 'data_vctk_peak'                                        # output data path
+data_path: 'data_vctk'                                        # output data path
 
 tts_model: 'multi_forward_tacotron'
 
@@ -74,7 +74,7 @@ tacotron:
 
   training:
     schedule:
-      - 8,  1e-3,  30_000,  32      # progressive training schedule
+      - 6,  1e-3,  30_000,  32      # progressive training schedule
       - 4,   1e-4,  31_000,  16     # (r, lr, step, batch_size)
       - 2,   1e-4,  32_000,  8
       - 1,   1e-4,  35_000,  8

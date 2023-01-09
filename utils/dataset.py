@@ -9,6 +9,7 @@ from torch.utils.data.sampler import Sampler
 from utils.dsp import *
 from utils.files import unpickle_binary
 from utils.paths import Paths
+from utils.text.symbols import silent_phonemes
 from utils.text.tokenizer import Tokenizer
 
 
@@ -65,12 +66,14 @@ class TacoDataset(Dataset):
         item_id = self.metadata[index]
         text = self.text_dict[item_id]
         speaker_name = self.speaker_dict[item_id]
+        #print(text)
+        #print(''.join([t for t in text if t not in silent_phonemes]))
         x = self.tokenizer(text)
         mel = np.load(str(self.paths.mel/f'{item_id}.npy'))
         mel_len = mel.shape[-1]
         speaker_emb = np.load(str(self.paths.speaker_emb/f'{item_id}.npy'))
         return {'x': x, 'mel': mel, 'item_id': item_id,
-                'mel_len': mel_len, 'x_len': len(x),
+                'mel_len': mel_len, 'x_len': x.shape[-1],
                 'speaker_emb': speaker_emb, 'speaker_name': speaker_name}
 
     def __len__(self):
@@ -291,7 +294,7 @@ class TacoCollator:
         x_len = [b['x_len'] for b in batch]
         x_len = torch.tensor(x_len)
         max_x_len = max(x_len)
-        text = [pad1d(b['x'], max_x_len) for b in batch]
+        text = [pad2d(b['x'], max_x_len, pad_value=0) for b in batch]
         text = stack_to_tensor(text).long()
         spec_lens = [b['mel_len'] for b in batch]
         max_spec_len = max(spec_lens) + 1
@@ -367,8 +370,8 @@ def pad1d(x, max_len) -> np.array:
     return np.pad(x, (0, max_len - len(x)), mode='constant')
 
 
-def pad2d(x, max_len) -> np.array:
-    return np.pad(x, ((0, 0), (0, max_len - x.shape[-1])), constant_values=-11.5129, mode='constant')
+def pad2d(x, max_len, pad_value=-11.5129) -> np.array:
+    return np.pad(x, ((0, 0), (0, max_len - x.shape[-1])), constant_values=pad_value, mode='constant')
 
 
 def batchify(input: List[Any], batch_size: int) -> List[List[Any]]:
