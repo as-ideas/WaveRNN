@@ -37,7 +37,7 @@ def read_ljspeech_format(path: Path, multispeaker: bool = False) -> Tuple[dict, 
             split = line.split('|')
             speaker_name = split[-2] if multispeaker and len(split) > 2 else DEFAULT_SPEAKER_NAME
             file_id, text = split[0], split[-1]
-            text_dict[file_id] = text
+            text_dict[file_id] = text.replace('\n', '')
             speaker_dict[file_id] = speaker_name
     return text_dict, speaker_dict
 
