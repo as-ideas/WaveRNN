@@ -76,10 +76,10 @@ class ForwardTrainer:
                 pitch_zoneout_mask = torch.rand(batch['x'].size()) > self.train_cfg['pitch_zoneout']
                 energy_zoneout_mask = torch.rand(batch['x'].size()) > self.train_cfg['energy_zoneout']
 
-                pitch_target = batch['pitch'].detach().clone()
+                pitch_target = batch['cwt'].detach().clone()
                 energy_target = batch['energy'].detach().clone()
-                batch['pitch'] = batch['pitch'] * pitch_zoneout_mask.to(device).float()
-                batch['energy'] = batch['energy'] * energy_zoneout_mask.to(device).float()
+                #batch['pitch'] = batch['pitch'] * pitch_zoneout_mask.to(device).float()
+                #batch['energy'] = batch['energy'] * energy_zoneout_mask.to(device).float()
 
                 pred = model(batch)
 
@@ -87,7 +87,7 @@ class ForwardTrainer:
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
-                pitch_loss = self.l1_loss(pred['pitch'], pitch_target.unsqueeze(1), batch['x_len'])
+                pitch_loss = self.l1_loss(pred['pitch'], pitch_target, batch['x_len'])
                 energy_loss = self.l1_loss(pred['energy'], energy_target.unsqueeze(1), batch['x_len'])
 
                 loss = m1_loss + m2_loss \
@@ -157,7 +157,7 @@ class ForwardTrainer:
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
-                pitch_loss = self.l1_loss(pred['pitch'], batch['pitch'].unsqueeze(1), batch['x_len'])
+                pitch_loss = self.l1_loss(pred['pitch'], batch['cwt'], batch['x_len'])
                 energy_loss = self.l1_loss(pred['energy'], batch['energy'].unsqueeze(1), batch['x_len'])
                 pitch_val_loss += pitch_loss
                 energy_val_loss += energy_loss

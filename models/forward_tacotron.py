@@ -13,7 +13,7 @@ from utils.text.symbols import phonemes
 
 class SeriesPredictor(nn.Module):
 
-    def __init__(self, num_chars, emb_dim=64, conv_dims=256, rnn_dims=64, dropout=0.5):
+    def __init__(self, num_chars, emb_dim=64, conv_dims=256, rnn_dims=64, dropout=0.5, out_dim=1):
         super().__init__()
         self.embedding = Embedding(num_chars, emb_dim)
         self.convs = torch.nn.ModuleList([
@@ -22,7 +22,7 @@ class SeriesPredictor(nn.Module):
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
         ])
         self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
-        self.lin = nn.Linear(2 * rnn_dims, 1)
+        self.lin = nn.Linear(2 * rnn_dims, out_dim)
         self.dropout = dropout
 
     def forward(self,
@@ -97,7 +97,8 @@ class ForwardTacotron(nn.Module):
                                           emb_dim=series_embed_dims,
                                           conv_dims=pitch_conv_dims,
                                           rnn_dims=pitch_rnn_dims,
-                                          dropout=pitch_dropout)
+                                          dropout=pitch_dropout,
+                                          out_dim=10)
         self.energy_pred = SeriesPredictor(num_chars=num_chars,
                                            emb_dim=series_embed_dims,
                                            conv_dims=energy_conv_dims,
@@ -124,7 +125,7 @@ class ForwardTacotron(nn.Module):
         self.post_proj = nn.Linear(2 * postnet_dims, n_mels, bias=False)
         self.pitch_strength = pitch_strength
         self.energy_strength = energy_strength
-        self.pitch_proj = nn.Conv1d(1, 2 * prenet_dims, kernel_size=3, padding=1)
+        self.pitch_proj = nn.Conv1d(10, 2 * prenet_dims, kernel_size=3, padding=1)
         self.energy_proj = nn.Conv1d(1, 2 * prenet_dims, kernel_size=3, padding=1)
 
     def __repr__(self):
@@ -137,6 +138,7 @@ class ForwardTacotron(nn.Module):
         dur = batch['dur']
         mel_lens = batch['mel_len']
         pitch = batch['pitch'].unsqueeze(1)
+        cwt = batch['cwt']
         energy = batch['energy'].unsqueeze(1)
 
         if self.training:
@@ -150,7 +152,7 @@ class ForwardTacotron(nn.Module):
         x = x.transpose(1, 2)
         x = self.prenet(x)
 
-        pitch_proj = self.pitch_proj(pitch)
+        pitch_proj = self.pitch_proj(cwt)
         pitch_proj = pitch_proj.transpose(1, 2)
         x = x + pitch_proj * self.pitch_strength
 

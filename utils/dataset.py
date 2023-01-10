@@ -1,18 +1,73 @@
-import torch
 from torch.utils.data.sampler import Sampler
+import random
+from pathlib import Path
+from typing import List, Tuple
+
+import torch
+from pycwt import wavelet
+from scipy.interpolate import interp1d
 from torch.utils.data import Dataset, DataLoader
-from typing import List, Dict, Union, Tuple
+from torch.utils.data.sampler import Sampler
 
 from utils.dsp import *
 from utils.files import unpickle_binary
-from pathlib import Path
-import random
-
-
 ###################################################################################
 # WaveRNN/Vocoder Dataset #########################################################
 ###################################################################################
 from utils.text.tokenizer import Tokenizer
+
+
+def convert_continuos_f0(f0):
+    """CONVERT F0 TO CONTINUOUS F0
+    Args:
+        f0 (ndarray): original f0 sequence with the shape (T)
+    Return:
+        (ndarray): continuous f0 with the shape (T)
+    """
+    # get uv information as binary
+    f0 = np.copy(f0)
+    uv = np.float32(f0 != 0)
+
+    # get start and end of f0
+    if (f0 == 0).all():
+        print("| all of the f0 values are 0.")
+        return uv, f0
+    start_f0 = f0[f0 != 0][0]
+    end_f0 = f0[f0 != 0][-1]
+
+    # padding start and end of f0 sequence
+    start_idx = np.where(f0 == start_f0)[0][0]
+    end_idx = np.where(f0 == end_f0)[0][-1]
+    f0[:start_idx] = start_f0
+    f0[end_idx:] = end_f0
+
+    # get non-zero frame index
+    nz_frames = np.where(f0 != 0)[0]
+
+    # perform linear interpolation
+    f = interp1d(nz_frames, f0[nz_frames])
+    cont_f0 = f(np.arange(0, f0.shape[0]))
+
+    return uv, cont_f0
+
+
+def get_lf0_cwt(lf0):
+    """
+    input:
+        signal of shape (N)
+    output:
+        Wavelet_lf0 of shape(10, N), scales of shape(10)
+    """
+    mother = wavelet.MexicanHat()
+    dt = 0.005
+    dj = 1
+    s0 = dt * 2
+    J = 9
+
+    Wavelet_lf0, scales, _, _, _, _ = wavelet.cwt(np.squeeze(lf0), dt, dj, s0, J, mother)
+    # Wavelet.shape => (J + 1, len(lf0))
+    Wavelet_lf0 = np.real(Wavelet_lf0).T
+    return Wavelet_lf0, scales
 
 
 class VocoderDataset(Dataset):
@@ -264,8 +319,13 @@ class ForwardDataset(Dataset):
         dur = np.load(str(self.path/'alg'/f'{item_id}.npy'))
         pitch = np.load(str(self.path/'phon_pitch'/f'{item_id}.npy'))
         energy = np.load(str(self.path/'phon_energy'/f'{item_id}.npy'))
+
+        _, pitch = convert_continuos_f0(pitch)
+        cwt, scales = get_lf0_cwt(pitch)
+        cwt = np.transpose(cwt)
+
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
-                'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy}
+                'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy, 'cwt': cwt}
 
     def __len__(self):
         return len(self.metadata)
@@ -275,8 +335,8 @@ def pad1d(x, max_len):
     return np.pad(x, (0, max_len - len(x)), mode='constant')
 
 
-def pad2d(x, max_len):
-    return np.pad(x, ((0, 0), (0, max_len - x.shape[-1])), constant_values=-11.5129, mode='constant')
+def pad2d(x, max_len, pad_val=-11.5129):
+    return np.pad(x, ((0, 0), (0, max_len - x.shape[-1])), constant_values=pad_val, mode='constant')
 
 
 def collate_tts(batch: List[Dict[str, Union[str, torch.tensor]]], r: int) -> Dict[str, torch.tensor]:
@@ -297,7 +357,7 @@ def collate_tts(batch: List[Dict[str, Union[str, torch.tensor]]], r: int) -> Dic
     mel_lens = [b['mel_len'] for b in batch]
     mel_lens = torch.tensor(mel_lens)
 
-    dur, pitch, energy = None, None, None
+    dur, pitch, energy, cwt = None, None, None, None
     if 'dur' in batch[0]:
         dur = [pad1d(b['dur'][:max_x_len], max_x_len) for b in batch]
         dur = np.stack(dur)
@@ -310,9 +370,13 @@ def collate_tts(batch: List[Dict[str, Union[str, torch.tensor]]], r: int) -> Dic
         energy = [pad1d(b['energy'][:max_x_len], max_x_len) for b in batch]
         energy = np.stack(energy)
         energy = torch.tensor(energy).float()
+    if 'cwt' in batch[0]:
+        cwt = [pad2d(b['cwt'][:, :max_x_len], max_x_len, pad_val=0) for b in batch]
+        cwt = np.stack(cwt)
+        cwt = torch.tensor(cwt).float()
 
     return {'x': text, 'mel': mel, 'item_id': item_id, 'x_len': x_len,
-            'mel_len': mel_lens, 'dur': dur, 'pitch': pitch, 'energy': energy}
+            'mel_len': mel_lens, 'dur': dur, 'pitch': pitch, 'energy': energy, 'cwt': cwt}
 
 
 class BinnedLengthSampler(Sampler):
