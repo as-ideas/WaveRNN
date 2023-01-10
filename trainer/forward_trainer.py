@@ -185,8 +185,8 @@ class ForwardTrainer:
         m1_hat_fig = plot_mel(m1_hat)
         m2_hat_fig = plot_mel(m2_hat)
         m_target_fig = plot_mel(m_target)
-        pitch_fig = plot_pitch(np_now(batch['pitch'][0]))
-        pitch_gta_fig = plot_pitch(np_now(pred['pitch'].squeeze()[0]))
+        pitch_fig = plot_mel(np_now(batch['cwt'][0]))
+        pitch_gta_fig = plot_mel(np_now(pred['pitch'].squeeze()[0]))
         energy_fig = plot_pitch(np_now(batch['energy'][0]))
         energy_gta_fig = plot_pitch(np_now(pred['energy'].squeeze()[0]))
 
