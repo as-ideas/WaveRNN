@@ -46,7 +46,9 @@ class TestDurationExtractionPipe(unittest.TestCase):
         pickle_binary(self.train_dataset, self.paths.data / 'train_dataset.pkl')
         pickle_binary(self.val_dataset, self.paths.data / 'val_dataset.pkl')
         self.text_dict = {file_id: 'a' * length for file_id, length in self.train_dataset + self.val_dataset}
+        self.speaker_dict = {file_id: 'default_speaker' for file_id, _ in self.train_dataset + self.val_dataset}
         pickle_binary(self.text_dict, self.paths.data / 'text_dict.pkl')
+        pickle_binary(self.speaker_dict, self.paths.data / 'speaker_dict.pkl')
         for id, mel_len in self.train_dataset + self.val_dataset:
             np.save(self.paths.mel / f'{id}.npy', np.ones((5, mel_len)), allow_pickle=False)
             np.save(self.paths.speaker_emb / f'{id}.npy', np.ones(1), allow_pickle=False)

@@ -17,8 +17,10 @@ class TestDataset(unittest.TestCase):
                 'x_len': 2,
                 'dur': np.full(2, fill_value=3.),
                 'pitch': np.full(2, fill_value=4.),
+                'pitch_cond': np.full(2, fill_value=5.),
                 'energy': np.full(2, fill_value=5.),
-                'speaker_emb': np.full(1, fill_value=4.)
+                'speaker_emb': np.full(1, fill_value=4.),
+                'speaker_name': 'speaker_1'
             },
             {
                 'item_id': 1,
@@ -28,8 +30,10 @@ class TestDataset(unittest.TestCase):
                 'x_len': 3,
                 'dur': np.full(3, fill_value=3.),
                 'pitch': np.full(3, fill_value=4.),
+                'pitch_cond': np.full(3, fill_value=5.),
                 'energy': np.full(3, fill_value=5.),
-                'speaker_emb': np.full(1, fill_value=5.)
+                'speaker_emb': np.full(1, fill_value=5.),
+                'speaker_name': 'speaker_2'
             }
         ]
 
@@ -51,8 +55,12 @@ class TestDataset(unittest.TestCase):
         self.assertEqual([3., 3., 3.], batch['dur'][1].tolist())
         self.assertEqual([4., 4., 0], batch['pitch'][0].tolist())
         self.assertEqual([4., 4., 4.], batch['pitch'][1].tolist())
+        self.assertEqual([5., 5., 0.], batch['pitch_cond'][0].tolist())
+        self.assertEqual([5., 5., 5.], batch['pitch_cond'][1].tolist())
         self.assertEqual([5., 5., 0], batch['energy'][0].tolist())
         self.assertEqual([5., 5., 5.], batch['energy'][1].tolist())
         self.assertEqual([4.], batch['speaker_emb'][0].tolist())
         self.assertEqual([5.], batch['speaker_emb'][1].tolist())
+        self.assertEqual('speaker_1', batch['speaker_name'][0])
+        self.assertEqual('speaker_2', batch['speaker_name'][1])
 

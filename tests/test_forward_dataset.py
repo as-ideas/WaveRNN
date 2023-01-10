@@ -19,6 +19,7 @@ class TestForwardDataset(unittest.TestCase):
 
     def test_get_items(self) -> None:
         text_dict = {'0': 'a', '1': 'bc'}
+        speaker_dict = {'0': 'speaker_0', '1': 'speaker_1'}
         data_dir = Path(self.temp_dir.name + '/data')
         paths = Paths(data_path=data_dir, tts_id='test_forward')
         paths.data = data_dir
@@ -39,6 +40,7 @@ class TestForwardDataset(unittest.TestCase):
         dataset = ForwardDataset(paths=paths,
                                  dataset_ids=['0', '1'],
                                  text_dict=text_dict,
+                                 speaker_dict=speaker_dict,
                                  tokenizer=Tokenizer())
 
         data = [dataset[i] for i in range(len(dataset))]
@@ -60,3 +62,5 @@ class TestForwardDataset(unittest.TestCase):
         self.assertEqual('1', data[1]['item_id'])
         self.assertEqual(2, data[0]['mel_len'])
         self.assertEqual(3, data[1]['mel_len'])
+        self.assertEqual('speaker_0', data[0]['speaker_name'])
+        self.assertEqual('speaker_1', data[1]['speaker_name'])
