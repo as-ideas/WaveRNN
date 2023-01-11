@@ -152,10 +152,13 @@ class ForwardTrainer:
             batch = to_device(batch, device=device)
             with torch.no_grad():
                 pred = model(batch)
+                pitch_target = batch['cwt'].detach().clone()
+                pitch_pred = pred['pitch'].transpose(1, 2)
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
-                pitch_loss = self.l1_loss(pred['pitch'], batch['cwt'], batch['x_len'])
+                pitch_loss = self.l1_loss(pitch_pred[:, :, :pitch_target.size(-1)],
+                                          pitch_target[:, :, :pitch_pred.size(-1)], batch['mel_len'])
                 energy_loss = self.l1_loss(pred['energy'], batch['energy'].unsqueeze(1), batch['x_len'])
                 pitch_val_loss += pitch_loss
                 energy_val_loss += energy_loss
@@ -184,7 +187,7 @@ class ForwardTrainer:
         m2_hat_fig = plot_mel(m2_hat)
         m_target_fig = plot_mel(m_target)
         pitch_fig = plot_mel(np_now(batch['cwt'][0]))
-        pitch_gta_fig = plot_mel(np_now(pred['pitch'].squeeze()[0]))
+        pitch_gta_fig = plot_mel(np_now(pred['pitch'].transpose(1, 2).squeeze()[0]))
         energy_fig = plot_pitch(np_now(batch['energy'][0]))
         energy_gta_fig = plot_pitch(np_now(pred['energy'].squeeze()[0]))
 
@@ -213,7 +216,7 @@ class ForwardTrainer:
         m1_hat_fig = plot_mel(m1_hat)
         m2_hat_fig = plot_mel(m2_hat)
 
-        pitch_gen_fig = plot_mel(np_now(gen['pitch'].squeeze()))
+        pitch_gen_fig = plot_mel(np_now(gen['pitch'].transpose(1, 2).squeeze()))
         energy_gen_fig = plot_pitch(np_now(gen['energy'].squeeze()))
 
         self.writer.add_figure('Pitch/generated', pitch_gen_fig, model.step)

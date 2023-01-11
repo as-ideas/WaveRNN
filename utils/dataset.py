@@ -318,11 +318,11 @@ class ForwardDataset(Dataset):
         mel = np.load(str(self.path/'mel'/f'{item_id}.npy'))
         mel_len = mel.shape[-1]
         dur = np.load(str(self.path/'alg'/f'{item_id}.npy'))
-        pitch = np.load(str(self.path/'phon_pitch'/f'{item_id}.npy'))
         pitch_raw = np.load(str(self.path/'raw_pitch'/f'{item_id}.npy'))
         energy = np.load(str(self.path/'phon_energy'/f'{item_id}.npy'))
 
         _, pitch = convert_continuos_f0(pitch_raw)
+        np.clip(pitch, a_min=1.e-5, a_max=None)
         pitch = np.log(pitch)
         std = np.std(pitch)
         if std == 0 or np.isnan(std) or np.isinf(std):
@@ -330,6 +330,7 @@ class ForwardDataset(Dataset):
         pitch = (pitch - np.mean(pitch)) / std
         cwt, scales = get_lf0_cwt(pitch)
         cwt = np.transpose(cwt)
+        #print(cwt)
 
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
                 'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy, 'cwt': cwt}

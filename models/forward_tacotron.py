@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn import Embedding, Sequential, Linear, ReLU
+from torch.nn import Embedding, Sequential, Linear, ReLU, GRU
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence
 
 from models.common_layers import CBHG, LengthRegulator
@@ -38,6 +38,17 @@ class SeriesPredictor(nn.Module):
         x = self.lin(x)
         return x / alpha
 
+
+class PitchPred(nn.Module):
+
+    def __init__(self, in_dim):
+        super(PitchPred, self).__init__()
+        self.gru = GRU(in_dim, 64, bidirectional=True)
+        self.lin = Linear(128, 10)
+
+    def forward(self, x):
+        x, _ = self.gru(x)
+        return self.lin(x)
 
 class BatchNormConv(nn.Module):
 
@@ -93,11 +104,7 @@ class ForwardTacotron(nn.Module):
                                         conv_dims=durpred_conv_dims,
                                         rnn_dims=durpred_rnn_dims,
                                         dropout=durpred_dropout)
-        self.pitch_pred = Sequential(
-            Linear(2 * prenet_dims, 256),
-            ReLU(),
-            Linear(256, 10)
-        )
+        self.pitch_pred = PitchPred(2* prenet_dims)
 
         self.energy_pred = SeriesPredictor(num_chars=num_chars,
                                            emb_dim=series_embed_dims,
