@@ -330,6 +330,7 @@ class ForwardDataset(Dataset):
         pitch = (pitch - np.mean(pitch)) / std
         cwt, scales = get_lf0_cwt(pitch)
         cwt = np.transpose(cwt)
+        cwt = np.nan_to_num(cwt)
         #print(cwt)
 
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
