@@ -73,21 +73,19 @@ class ForwardTrainer:
                 start = time.time()
                 model.train()
 
-                pitch_zoneout_mask = torch.rand(batch['x'].size()) > self.train_cfg['pitch_zoneout']
-                energy_zoneout_mask = torch.rand(batch['x'].size()) > self.train_cfg['energy_zoneout']
-
                 pitch_target = batch['cwt'].detach().clone()
                 energy_target = batch['energy'].detach().clone()
-                #batch['pitch'] = batch['pitch'] * pitch_zoneout_mask.to(device).float()
-                #batch['energy'] = batch['energy'] * energy_zoneout_mask.to(device).float()
 
                 pred = model(batch)
+
+                pitch_pred = pred['pitch'].transpose(1, 2)
 
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
-                pitch_loss = self.l1_loss(pred['pitch'], pitch_target, batch['x_len'])
+                pitch_loss = self.l1_loss(pitch_pred[:, :, :pitch_target.size(-1)],
+                                          pitch_target[:, :, :pitch_pred.size(-1)], batch['mel_len'])
                 energy_loss = self.l1_loss(pred['energy'], energy_target.unsqueeze(1), batch['x_len'])
 
                 loss = m1_loss + m2_loss \
@@ -215,7 +213,7 @@ class ForwardTrainer:
         m1_hat_fig = plot_mel(m1_hat)
         m2_hat_fig = plot_mel(m2_hat)
 
-        pitch_gen_fig = plot_pitch(np_now(gen['pitch'].squeeze()))
+        pitch_gen_fig = plot_mel(np_now(gen['pitch'].squeeze()))
         energy_gen_fig = plot_pitch(np_now(gen['energy'].squeeze()))
 
         self.writer.add_figure('Pitch/generated', pitch_gen_fig, model.step)

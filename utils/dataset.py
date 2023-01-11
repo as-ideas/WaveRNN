@@ -1,3 +1,4 @@
+import numpy as np
 from torch.utils.data.sampler import Sampler
 import random
 from pathlib import Path
@@ -318,9 +319,15 @@ class ForwardDataset(Dataset):
         mel_len = mel.shape[-1]
         dur = np.load(str(self.path/'alg'/f'{item_id}.npy'))
         pitch = np.load(str(self.path/'phon_pitch'/f'{item_id}.npy'))
+        pitch_raw = np.load(str(self.path/'raw_pitch'/f'{item_id}.npy'))
         energy = np.load(str(self.path/'phon_energy'/f'{item_id}.npy'))
 
-        _, pitch = convert_continuos_f0(pitch)
+        _, pitch = convert_continuos_f0(pitch_raw)
+        pitch = np.log(pitch)
+        std = np.std(pitch)
+        if std == 0 or np.isnan(std) or np.isinf(std):
+            std = 1e10
+        pitch = (pitch - np.mean(pitch)) / std
         cwt, scales = get_lf0_cwt(pitch)
         cwt = np.transpose(cwt)
 
@@ -371,7 +378,7 @@ def collate_tts(batch: List[Dict[str, Union[str, torch.tensor]]], r: int) -> Dic
         energy = np.stack(energy)
         energy = torch.tensor(energy).float()
     if 'cwt' in batch[0]:
-        cwt = [pad2d(b['cwt'][:, :max_x_len], max_x_len, pad_val=0) for b in batch]
+        cwt = [pad2d(b['cwt'][:, :max_spec_len], max_spec_len, pad_val=0) for b in batch]
         cwt = np.stack(cwt)
         cwt = torch.tensor(cwt).float()
 

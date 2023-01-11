@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn import Embedding
+from torch.nn import Embedding, Sequential, Linear, ReLU
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence
 
 from models.common_layers import CBHG, LengthRegulator
@@ -93,12 +93,12 @@ class ForwardTacotron(nn.Module):
                                         conv_dims=durpred_conv_dims,
                                         rnn_dims=durpred_rnn_dims,
                                         dropout=durpred_dropout)
-        self.pitch_pred = SeriesPredictor(num_chars=num_chars,
-                                          emb_dim=series_embed_dims,
-                                          conv_dims=pitch_conv_dims,
-                                          rnn_dims=pitch_rnn_dims,
-                                          dropout=pitch_dropout,
-                                          out_dim=10)
+        self.pitch_pred = Sequential(
+            Linear(2 * prenet_dims, 256),
+            ReLU(),
+            Linear(256, 10)
+        )
+
         self.energy_pred = SeriesPredictor(num_chars=num_chars,
                                            emb_dim=series_embed_dims,
                                            conv_dims=energy_conv_dims,
@@ -110,7 +110,7 @@ class ForwardTacotron(nn.Module):
                            proj_channels=[prenet_dims, embed_dims],
                            num_highways=prenet_num_highways,
                            dropout=prenet_dropout)
-        self.lstm = nn.LSTM(2 * prenet_dims,
+        self.lstm = nn.LSTM(2 * prenet_dims + 10,
                             rnn_dims,
                             batch_first=True,
                             bidirectional=True)
@@ -145,22 +145,17 @@ class ForwardTacotron(nn.Module):
             self.step += 1
 
         dur_hat = self.dur_pred(x).squeeze(-1)
-        pitch_hat = self.pitch_pred(x).transpose(1, 2)
         energy_hat = self.energy_pred(x).transpose(1, 2)
 
         x = self.embedding(x)
         x = x.transpose(1, 2)
         x = self.prenet(x)
 
-        pitch_proj = self.pitch_proj(cwt)
-        pitch_proj = pitch_proj.transpose(1, 2)
-        x = x + pitch_proj * self.pitch_strength
-
-        energy_proj = self.energy_proj(energy)
-        energy_proj = energy_proj.transpose(1, 2)
-        x = x + energy_proj * self.energy_strength
-
         x = self.lr(x, dur)
+
+        pitch_hat = self.pitch_pred(x)
+
+        x = torch.cat([x, cwt.transpose(1, 2)[:, :x.size(1), :]], dim=-1)
 
         x = pack_padded_sequence(x, lengths=mel_lens.cpu(), enforce_sorted=False,
                                  batch_first=True)
@@ -193,12 +188,9 @@ class ForwardTacotron(nn.Module):
             dur_hat = dur_hat.squeeze(2)
             if torch.sum(dur_hat.long()) <= 0:
                 torch.fill_(dur_hat, value=2.)
-            pitch_hat = self.pitch_pred(x).transpose(1, 2)
-            pitch_hat = pitch_function(pitch_hat)
             energy_hat = self.energy_pred(x).transpose(1, 2)
             energy_hat = energy_function(energy_hat)
             return self._generate_mel(x=x, dur_hat=dur_hat,
-                                      pitch_hat=pitch_hat,
                                       energy_hat=energy_hat)
 
     @torch.jit.export
@@ -223,21 +215,19 @@ class ForwardTacotron(nn.Module):
     def _generate_mel(self,
                       x: torch.Tensor,
                       dur_hat: torch.Tensor,
-                      pitch_hat: torch.Tensor,
                       energy_hat: torch.Tensor) -> Dict[str, torch.Tensor]:
         x = self.embedding(x)
         x = x.transpose(1, 2)
         x = self.prenet(x)
-
-        pitch_proj = self.pitch_proj(pitch_hat)
-        pitch_proj = pitch_proj.transpose(1, 2)
-        x = x + pitch_proj * self.pitch_strength
 
         energy_proj = self.energy_proj(energy_hat)
         energy_proj = energy_proj.transpose(1, 2)
         x = x + energy_proj * self.energy_strength
 
         x = self.lr(x, dur_hat)
+
+        pitch_hat = self.pitch_pred(x)
+        x = torch.cat([x, pitch_hat[:, :x.size(1), :]], dim=-1)
 
         x, _ = self.lstm(x)
 
