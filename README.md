@@ -57,7 +57,7 @@ Then install the rest with pip:
 pip install -r requirements.txt
 ```
 
-## 🚀 Training your own Model
+## 🚀 Training your own Model (Singlespeaker)
 
 Change the params in the config.yaml according to your needs and follow the steps below:
 
@@ -92,11 +92,6 @@ python gen_forward.py --input_text 'this is whatever you want it to be' hifigan
 ```
 To vocode the resulting .mel or .npy files use the inference.py script from the MelGAN or HiFiGAN repo and point to the model output folder.
 
-As in the original repo you can also use a trained WaveRNN vocoder:
-```
-python gen_forward.py --input_text 'this is whatever you want it to be' wavernn
-```
-
 For training the model on your own dataset just bring it to the LJSpeech-like format:
 ```
 |- dataset_folder/
@@ -125,6 +120,31 @@ Here is what the ForwardTacotron tensorboard looks like:
   <b>Figure 2:</b> Tensorboard example for training a ForwardTacotron model.
 </p>
 
+
+## 🚀🚀 Multispeaker Training
+Prepare the data in ljspeech format:
+```
+|- dataset_folder/
+|   |- metadata.csv
+|   |- wav/
+|       |- file1.wav
+|       |- ...
+```
+The metadata.csv is expected to have the speaker id in the second column:
+```
+id_001|speaker_1|this is the first text.
+id_002|speaker_1|this is the second text.
+id_003|speaker_2|this is the third text.
+...
+```
+We also support vctk-like and a pandas-like format (can be set in the config multispeaker.yaml under preprocesing.metafile_format)
+
+Follow the same steps as for singlespaker, but provide the multispeaker config:
+ ```
+python preprocess.py --config configs/multispeaker.yaml --path /path/to/ljspeech
+python train_tacotron.py --config configs/multispeaker.yaml
+python train_forward.py --config configs/multispeaker.yaml
+```
 
 ## Pretrained Models
 
@@ -169,6 +189,7 @@ gen_forward.py
 * [FastPitch: Parallel Text-to-speech with Pitch Prediction](https://arxiv.org/abs/2006.06873)
 * [HiFi-GAN: Generative Adversarial Networks for Efficient and High Fidelity Speech Synthesis](https://arxiv.org/abs/2010.05646)
 * [MelGAN: Generative Adversarial Networks for Conditional Waveform Synthesis](https://arxiv.org/abs/1910.06711)
+* [Transfer Learning from Speaker Verification to Multispeaker Text-To-Speech Synthesis](https://arxiv.org/abs/1806.04558)
 
 ## Acknowlegements
 
@@ -179,6 +200,7 @@ gen_forward.py
 * [https://github.com/xcmyz/LightSpeech](https://github.com/xcmyz/LightSpeech)
 * [https://github.com/resemble-ai/Resemblyzer](https://github.com/resemble-ai/Resemblyzer)
 * [https://github.com/NVIDIA/DeepLearningExamples/tree/master/PyTorch/SpeechSynthesis/FastPitch](https://github.com/NVIDIA/DeepLearningExamples/tree/master/PyTorch/SpeechSynthesis/FastPitch)
+* [https://github.com/resemble-ai/Resemblyzer](https://github.com/resemble-ai/Resemblyzer)
 
 ## Maintainers
 
