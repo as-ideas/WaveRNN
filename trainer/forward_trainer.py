@@ -208,7 +208,7 @@ class ForwardTrainer:
             tag='Ground_Truth_Aligned/postnet_wav', snd_tensor=m2_hat_wav,
             global_step=model.step, sample_rate=self.dsp.sample_rate)
 
-        gen = model.generate(batch['x'][0:1, :batch['x_len'][0]])
+        gen = model.generate(batch['x'][0:1, :batch['x_len'][0]], pitch_factor=1.)
         m1_hat = np_now(gen['mel'].squeeze())
         m2_hat = np_now(gen['mel_post'].squeeze())
 
@@ -231,4 +231,24 @@ class ForwardTrainer:
             global_step=model.step, sample_rate=self.dsp.sample_rate)
         self.writer.add_audio(
             tag='Generated/postnet_wav', snd_tensor=m2_hat_wav,
+            global_step=model.step, sample_rate=self.dsp.sample_rate)
+
+        gen = model.generate(batch['x'][0:1, :batch['x_len'][0]], pitch_factor=2.)
+        m1_hat = np_now(gen['mel'].squeeze())
+        m2_hat = np_now(gen['mel_post'].squeeze())
+
+        m2_hat_fig = plot_mel(m2_hat)
+
+        pitch_gen_fig = plot_pitch(np_now(gen['pitch'].squeeze()))
+
+        self.writer.add_figure('Pitch_2/generated', pitch_gen_fig, model.step)
+        self.writer.add_figure('Generated_2/postnet', m2_hat_fig, model.step)
+
+        m2_hat_wav = self.dsp.griffinlim(m2_hat)
+
+        self.writer.add_audio(
+            tag='Generated/target_wav', snd_tensor=target_wav,
+            global_step=model.step, sample_rate=self.dsp.sample_rate)
+        self.writer.add_audio(
+            tag='Generated/postnet_2_wav', snd_tensor=m2_hat_wav,
             global_step=model.step, sample_rate=self.dsp.sample_rate)

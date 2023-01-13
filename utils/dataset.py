@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from torch.utils.data.sampler import Sampler
 from torch.utils.data import Dataset, DataLoader
@@ -263,9 +264,15 @@ class ForwardDataset(Dataset):
         mel_len = mel.shape[-1]
         dur = np.load(str(self.path/'alg'/f'{item_id}.npy'))
         pitch = np.load(str(self.path/'phon_pitch'/f'{item_id}.npy'))
+        raw_pitch = np.load(str(self.path/'raw_pitch'/f'{item_id}.npy'))
+        raw_pitch = raw_pitch[raw_pitch != 0]
+        raw_pitch = raw_pitch[raw_pitch < 300]
+        std = np.std(raw_pitch) / 20.
+        if np.isnan(std) or not std < 10.:
+            std = 0.
         energy = np.load(str(self.path/'phon_energy'/f'{item_id}.npy'))
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
-                'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy}
+                'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy, 'std': std}
 
     def __len__(self):
         return len(self.metadata)
@@ -310,9 +317,13 @@ def collate_tts(batch: List[Dict[str, Union[str, torch.tensor]]], r: int) -> Dic
         energy = [pad1d(b['energy'][:max_x_len], max_x_len) for b in batch]
         energy = np.stack(energy)
         energy = torch.tensor(energy).float()
+    if 'std' in batch[0]:
+        std = [b['std'] for b in batch]
+        std = np.stack(std)
+        std = torch.tensor(std).float()
 
     return {'x': text, 'mel': mel, 'item_id': item_id, 'x_len': x_len,
-            'mel_len': mel_lens, 'dur': dur, 'pitch': pitch, 'energy': energy}
+            'mel_len': mel_lens, 'dur': dur, 'pitch': pitch, 'energy': energy, 'std': std}
 
 
 class BinnedLengthSampler(Sampler):
