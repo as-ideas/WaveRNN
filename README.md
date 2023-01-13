@@ -18,19 +18,10 @@ The model has following advantages:
 does not use any attention. Hence, the required memory grows linearly with text size, which makes it possible to synthesize large articles at once.
 
 
-## UPDATE FastPitch (24.08.2021)
-- Implemented a modified [FastPitch](https://arxiv.org/abs/2006.06873) model as an alternative tts model
-- Simply set the tts_model type in the config [fast_pitch, forward_tacotron]
-- Check out the pretrained FastPitch model in [colab](https://colab.research.google.com/github/as-ideas/ForwardTacotron/blob/master/notebooks/synthesize.ipynb)!
-
-
-Check out the latest [audio samples](https://as-ideas.github.io/ForwardTacotron/) (ForwardTacotron + HiFiGAN)!
-
-
-Energy conditioning reduces mel validation loss:
-<p align="center">
-  <img src="assets/energy_tb.png" width="700" />
-</p>
+## UPDATE Multispeaker (13.01.2022)
+- Implemented speaker embedding conditioning as in [paper](https://arxiv.org/abs/1806.04558)
+- No external embedding required, we use [Resemblyzer](https://github.com/resemble-ai/Resemblyzer)
+- Multispeaker models can easily be fine-tuned to a smaller dataset.
 
 ## 🔈 Samples
 
@@ -121,7 +112,7 @@ Here is what the ForwardTacotron tensorboard looks like:
 </p>
 
 
-## 🚀🚀 Multispeaker Training
+## Multispeaker Training
 Prepare the data in ljspeech format:
 ```
 |- dataset_folder/
