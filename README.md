@@ -137,7 +137,8 @@ id_002|speaker_1|this is the second text.
 id_003|speaker_2|this is the third text.
 ...
 ```
-We also support vctk-like and a pandas-like format (can be set in the config multispeaker.yaml under preprocesing.metafile_format)
+We also support the VCTK and a pandas format 
+(can be set in the config multispeaker.yaml under preprocesing.metafile_format)
 
 Follow the same steps as for singlespaker, but provide the multispeaker config:
  ```
@@ -148,11 +149,10 @@ python train_forward.py --config configs/multispeaker.yaml
 
 ## Pretrained Models
 
-| Model | Dataset | Commit |
-|---|---|---|
-|[forward_tacotron](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/ForwardTacotron/forward_step90k.pt)| ljspeech | latest |
-|[wavernn](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/ForwardTacotron/wave_step575k.pt)| ljspeech | latest |
-|[fastpitch](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/ForwardTacotron/thorsten_fastpitch_50k.pt)| [thorstenmueller (german)](https://github.com/thorstenMueller/deep-learning-german-tts) | latest |
+| Model | Dataset | Commit Tag |
+|---|---|------------|
+|[forward_tacotron](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/ForwardTacotron/forward_step90k.pt)| ljspeech | v3.1     |
+|[fastpitch](https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/ForwardTacotron/thorsten_fastpitch_50k.pt)| [thorstenmueller (german)](https://github.com/thorstenMueller/deep-learning-german-tts) | v3.1     |
 
 Our pre-trained LJSpeech model is compatible with the pre-trained vocoders:
 - [MelGAN](https://github.com/seungwonpark/melgan)
