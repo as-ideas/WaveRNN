@@ -1,6 +1,6 @@
 
-tts_model_id: 'vctk_tts'
-data_path: 'data_vctk'                                        # output data path
+tts_model_id: 'multispeaker_tts'
+data_path: 'data_multispeaker'                                        # output data path
 
 tts_model: 'multi_forward_tacotron'
 
@@ -137,7 +137,7 @@ multi_forward_tacotron:
     max_mel_len: 1250
     clip_grad_norm: 1.0           # clips the gradient norm to prevent explosion - set to None if not needed
     checkpoint_every: 50_000      # checkpoints the model every x steps
-    plot_every: 5000                 # generates samples and plots every x steps
+    plot_every: 5000              # generates samples and plots every x steps
     plot_n_speakers: 3            # max number of speakers to generate plots for
     plot_speakers:                # speakers to generate plots for (additionally to plot_n_speakers)
       - default_speaker
