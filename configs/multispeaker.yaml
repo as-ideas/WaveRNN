@@ -28,8 +28,11 @@ dsp:
 
 preprocessing:
 
-  metafile_format: 'vctk'               # Choices [ljspeech_multi, vctk, pandas]
-  audio_format: '_mic1.flac'            # Audio extension, usually .wav (different for VCTK)
+  metafile_format: 'ljspeech_multi'     # Choices [ljspeech_multi, vctk, pandas]
+                                        # ljspeech_multi expects a .csv file with rows: 'file_id|speaker_id|text"
+                                        # pandas expects a .tsv with columns: ['file_id', 'speaker_id', 'text']
+                                        # expects VCTK version 0.92 (set audio_format to '_mic1.flac')
+  audio_format: '.wav'                  # Audio extension, usually .wav (different for VCTK)
   seed: 42
   n_val: 2000
   language: 'en'
@@ -75,9 +78,9 @@ tacotron:
   training:
     schedule:
       - 8,  1e-3,  30_000,  32      # progressive training schedule
-      - 4,   1e-4,  31_000,  16     # (r, lr, step, batch_size)
-      - 2,   1e-4,  32_000,  8
-      - 1,   1e-4,  35_000,  8
+      - 4,   1e-4,  40_000,  16     # (r, lr, step, batch_size)
+      - 2,   1e-4,  50_000,  8
+      - 1,   1e-4,  65_000,  8
 
     max_mel_len: 1250                # if you have a couple of extremely long spectrograms you might want to use this
     clip_grad_norm: 1.0              # clips the gradient norm to prevent explosion - set to None if not needed
