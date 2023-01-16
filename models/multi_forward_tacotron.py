@@ -55,6 +55,7 @@ class ConditionalSeriesPredictor(nn.Module):
     def __init__(self,
                  num_chars: int,
                  emb_dim: int = 64,
+                 cond_emb_size: int = 4,
                  cond_emb_dims: int = 8,
                  conv_dims: int = 256,
                  rnn_dims: int = 64,
@@ -62,7 +63,7 @@ class ConditionalSeriesPredictor(nn.Module):
                  speaker_emb_dims: int = 256):
         super().__init__()
         self.embedding = Embedding(num_chars, emb_dim)
-        self.pitch_cond_embedding = Embedding(3, cond_emb_dims)
+        self.pitch_cond_embedding = Embedding(cond_emb_size, cond_emb_dims)
         self.convs = torch.nn.ModuleList([
             BatchNormConv(emb_dim + cond_emb_dims + speaker_emb_dims, conv_dims, 5, relu=True),
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
@@ -122,8 +123,9 @@ class MultiForwardTacotron(nn.Module):
                  prenet_num_highways: int,
                  postnet_dropout: float,
                  n_mels: int,
-                 speaker_emb_dims: int = 256,
-                 cond_emb_dims: int = 8,
+                 speaker_emb_dims: int,
+                 pitch_cond_emb_dims: int,
+                 pitch_cond_categorical_dims: int,
                  padding_value=-11.5129):
         super().__init__()
         self.rnn_dims = rnn_dims
@@ -134,19 +136,19 @@ class MultiForwardTacotron(nn.Module):
                                                    emb_dim=series_embed_dims,
                                                    conv_dims=durpred_conv_dims,
                                                    rnn_dims=durpred_rnn_dims,
-                                                   cond_emb_dims=cond_emb_dims,
+                                                   cond_emb_dims=pitch_cond_emb_dims,
                                                    dropout=durpred_dropout)
         self.pitch_cond_pred = SeriesPredictor(num_chars=num_chars,
                                                emb_dim=series_embed_dims,
                                                conv_dims=pitch_cond_conv_dims,
                                                rnn_dims=pitch_cond_rnn_dims,
                                                dropout=pitch_cond_dropout,
-                                               out_dim=3)
+                                               out_dim=pitch_cond_categorical_dims)
         self.pitch_pred = ConditionalSeriesPredictor(num_chars=num_chars,
                                                      emb_dim=series_embed_dims,
                                                      conv_dims=pitch_conv_dims,
                                                      rnn_dims=pitch_rnn_dims,
-                                                     cond_emb_dims=cond_emb_dims,
+                                                     cond_emb_dims=pitch_cond_emb_dims,
                                                      dropout=pitch_dropout, )
         self.energy_pred = SeriesPredictor(num_chars=num_chars,
                                            emb_dim=series_embed_dims,
