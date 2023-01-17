@@ -13,11 +13,11 @@ class TestMultiForwardTacotron(unittest.TestCase):
     def setUp(self) -> None:
         test_path = os.path.dirname(os.path.abspath(__file__))
         self.base_path = Path(test_path).parent
-
-    def test_forward_pass_standard_config(self) -> None:
-        """ Simple test of happy path forward pass, useful for debugging purposes. """
         config = read_config(self.base_path / 'configs/multispeaker.yaml')
-        model = MultiForwardTacotron.from_config(config)
+        self.model = MultiForwardTacotron.from_config(config)
+
+    def test_forward(self) -> None:
+        """ Simple test of happy path forward pass, useful for debugging purposes. """
 
         batch = {
             'dur': torch.full((2, 10), fill_value=2).long(),
@@ -30,7 +30,7 @@ class TestMultiForwardTacotron(unittest.TestCase):
             'pitch_cond': torch.ones((2, 10)).long(),
         }
 
-        pred = model(batch)
+        pred = self.model(batch)
 
         self.assertEqual({'mel', 'mel_post', 'dur', 'pitch', 'energy', 'pitch_cond'}, pred.keys())
         self.assertEqual((2, 80, 20), pred['mel_post'].size())
@@ -39,7 +39,9 @@ class TestMultiForwardTacotron(unittest.TestCase):
         self.assertEqual((2, 1, 10), pred['energy'].size())
         self.assertEqual((2, 10, 3), pred['pitch_cond'].size())
 
-        gen = model.generate(x=torch.ones((1, 10)).long(), speaker_emb=torch.ones((1, 256)))
+
+    def test_generate(self) -> None:
+        gen = self.model.generate(x=torch.ones((1, 10)).long(), speaker_emb=torch.ones((1, 256)))
         self.assertEqual({'mel', 'mel_post', 'dur', 'pitch', 'energy', 'pitch_cond'}, gen.keys())
         self.assertEqual(80, gen['mel_post'].size(1))
         self.assertEqual((1, 10), gen['dur'].size())
