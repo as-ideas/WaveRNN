@@ -39,7 +39,6 @@ class TestMultiForwardTacotron(unittest.TestCase):
         self.assertEqual((2, 1, 10), pred['energy'].size())
         self.assertEqual((2, 10, 3), pred['pitch_cond'].size())
 
-
     def test_generate(self) -> None:
         gen = self.model.generate(x=torch.ones((1, 10)).long(), speaker_emb=torch.ones((1, 256)))
         self.assertEqual({'mel', 'mel_post', 'dur', 'pitch', 'energy', 'pitch_cond'}, gen.keys())
