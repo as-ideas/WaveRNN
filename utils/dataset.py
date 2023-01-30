@@ -254,6 +254,7 @@ class ForwardDataset(Dataset):
         self.metadata = dataset_ids
         self.text_dict = text_dict
         self.tokenizer = tokenizer
+        self.scaler = unpickle_binary('assets/bild_scaler.pkl')
 
     def __getitem__(self, index: int) -> Dict[str, torch.tensor]:
         item_id = self.metadata[index]
@@ -264,6 +265,9 @@ class ForwardDataset(Dataset):
         dur = np.load(str(self.path/'alg'/f'{item_id}.npy'))
         pitch = np.load(str(self.path/'phon_pitch'/f'{item_id}.npy'))
         energy = np.load(str(self.path/'phon_energy'/f'{item_id}.npy'))
+        mel = (mel - np.expand_dims(self.scaler.mean_, axis=1)) / np.expand_dims(self.scaler.scale_, axis=1)
+
+
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
                 'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy}
 

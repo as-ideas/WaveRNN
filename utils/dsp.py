@@ -8,6 +8,8 @@ import webrtcvad
 import soundfile as sf
 from scipy.ndimage import binary_dilation
 
+from utils.files import unpickle_binary
+
 
 class DSP:
 
@@ -40,6 +42,7 @@ class DSP:
         self.n_fft = n_fft
         self.fmin = fmin
         self.fmax = fmax
+        self.scaler = unpickle_binary('assets/bild_scaler.pkl')
 
         self.should_peak_norm = peak_norm
         self.should_trim_start_end_silence = trim_start_end_silence
@@ -107,6 +110,7 @@ class DSP:
         return np.log(mel)
 
     def denormalize(self, mel: np.array) -> np.array:
+        mel = (mel * np.expand_dims(self.scaler.scale_, axis=1) + np.expand_dims(self.scaler.mean_, axis=1))
         return np.exp(mel)
 
     def trim_silence(self, wav: np.array) -> np.array:
