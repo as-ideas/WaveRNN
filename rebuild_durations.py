@@ -61,7 +61,7 @@ if __name__ == '__main__':
     duration_extractor = DurationExtractor(silence_threshold=-11, silence_prob_shift=0.25)
     att_score_dict = {}
     sum_att_score = 0
-
+    att_score_dict_orig = unpickle_binary(paths.data / 'att_score_dict.pkl')
     num_failed = 0
     for i, id in enumerate(tqdm.tqdm(text_dict.keys(), total=len(text_dict), smoothing=0.1), 1):
         try:
@@ -132,12 +132,15 @@ if __name__ == '__main__':
             mean_att_score = sum_att_score / i
             np.save(paths.alg / f'{id}.npy', np.array(durs).astype(int))
             np.save(paths.mel / f'{id}.npy', mel)
-
-            print('mean att_score: ', mean_att_score, ' successful: ', i-num_failed, ' failed: ', num_failed)
+            att_score_orig = att_score_dict_orig[id][1]
+            print('mean att_score: ', mean_att_score, ' att score: ', att_score_orig, att_score, ' successful: ', i-num_failed, ' failed: ', num_failed)
             pickle_binary(att_score_dict, paths.data / 'att_score_dict_reextracted.pkl')
             durs_orig = np.load(f'data_bild/alg/{id}.npy')
             print(durs_orig.tolist())
             print(durs.tolist())
+
+            for t, d1, d2 in zip(text_dict[id], durs_orig, durs):
+                print(t, d1, d2)
         except Exception as e:
             num_failed += 1
             print(e)
