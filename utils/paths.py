@@ -10,9 +10,9 @@ class Paths:
         # Data Paths
         self.data = Path(data_path).expanduser().resolve()
         self.quant = self.data/'quant'
-        self.mel = self.data/'mel'
+        self.mel = self.data/'mel_reextracted'
         self.gta = self.data/'gta'
-        self.alg = self.data/'alg'
+        self.alg = self.data/'alg_reextracted'
         self.raw_pitch = self.data/'raw_pitch'
         self.phon_pitch = self.data/'phon_pitch'
         self.phon_energy = self.data/'phon_energy'
