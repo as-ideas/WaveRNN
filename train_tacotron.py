@@ -41,14 +41,14 @@ def extract_pitch_energy(save_path_pitch: Path,
                          save_path_energy: Path,
                          pitch_min_freq: float,
                          pitch_max_freq: float) -> Tuple[float, float]:
-    speaker_dict = unpickle_binary(paths.data / 'speaker_dict.pkl')
+    speaker_dict = unpickle_binary(paths.speaker_dict)
 
 
     speaker_names = set([v for v in speaker_dict.values() if len(v) > 1])
     mean, var = 0, 0
 
-    train_data = unpickle_binary(paths.data / 'train_dataset.pkl')
-    val_data = unpickle_binary(paths.data / 'val_dataset.pkl')
+    train_data = unpickle_binary(paths.train_dataset)
+    val_data = unpickle_binary(paths.val_dataset)
     all_data = train_data + val_data
 
     for speaker_name in tqdm(speaker_names, total=len(speaker_names), smoothing=0.1):
@@ -134,7 +134,7 @@ def create_align_features(model: Tacotron,
     print(f'Extracting durations from attention matrices (num workers={num_workers})...')
     att_score_dict = duration_extraction_pipe.extract_durations(num_workers=num_workers,
                                                                 sampler_bin_size=num_workers*4)
-    pickle_binary(att_score_dict, paths.data / 'att_score_dict.pkl')
+    pickle_binary(att_score_dict, paths.att_score_dict)
 
     print('Extracting Pitch Values...')
     extract_pitch_energy(save_path_pitch=paths.phon_pitch,

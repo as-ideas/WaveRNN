@@ -135,8 +135,8 @@ class BinnedTacoDataLoader:
 
         tokenizer = Tokenizer()
         file_id_text_lens = []
-        text_dict = unpickle_binary(paths.data / 'text_dict.pkl')
-        speaker_dict = unpickle_binary(paths.data / 'speaker_dict.pkl')
+        text_dict = unpickle_binary(paths.text_dict)
+        speaker_dict = unpickle_binary(paths.speaker_dict)
         for item_id, _ in dataset:
             toks = tokenizer(text_dict[item_id])
             file_id_text_lens.append((item_id, len(toks)))
@@ -178,10 +178,10 @@ def get_taco_datasets(paths: Paths,
                       num_workers=0) -> Tuple[DataLoader, DataLoader]:
 
     tokenizer = Tokenizer()
-    train_data = unpickle_binary(paths.data/'train_dataset.pkl')
-    val_data = unpickle_binary(paths.data/'val_dataset.pkl')
-    text_dict = unpickle_binary(paths.data/'text_dict.pkl')
-    speaker_dict = unpickle_binary(paths.data/'speaker_dict.pkl')
+    train_data = unpickle_binary(paths.train_dataset)
+    val_data = unpickle_binary(paths.val_dataset)
+    text_dict = unpickle_binary(paths.text_dict)
+    speaker_dict = unpickle_binary(paths.speaker_dict)
     train_data = filter_max_len(train_data, max_mel_len)
     val_data = filter_max_len(val_data, max_mel_len)
 
@@ -224,16 +224,16 @@ def get_forward_datasets(paths: Paths,
                          num_workers=0) -> Tuple[DataLoader, DataLoader]:
 
     tokenizer = Tokenizer()
-    train_data = unpickle_binary(paths.data/'train_dataset.pkl')
-    val_data = unpickle_binary(paths.data/'val_dataset.pkl')
-    text_dict = unpickle_binary(paths.data/'text_dict.pkl')
-    speaker_dict = unpickle_binary(paths.data/'speaker_dict.pkl')
+    train_data = unpickle_binary(paths.train_dataset)
+    val_data = unpickle_binary(paths.val_dataset)
+    text_dict = unpickle_binary(paths.text_dict)
+    speaker_dict = unpickle_binary(paths.speaker_dict)
     train_data = filter_max_len(train_data, max_mel_len)
     val_data = filter_max_len(val_data, max_mel_len)
     train_len_original = len(train_data)
 
     if filter_attention:
-        attention_score_dict = unpickle_binary(paths.data/'att_score_dict.pkl')
+        attention_score_dict = unpickle_binary(paths.att_score_dict)
         train_data = filter_bad_attentions(dataset=train_data,
                                            attention_score_dict=attention_score_dict,
                                            min_alignment=filter_min_alignment,
@@ -276,8 +276,8 @@ def get_forward_datasets(paths: Paths,
 
 
 def get_binned_taco_dataloader(paths: Paths, max_batch_size: int = 8) -> BinnedTacoDataLoader:
-    train_data = unpickle_binary(paths.data / 'train_dataset.pkl')
-    val_data = unpickle_binary(paths.data / 'val_dataset.pkl')
+    train_data = unpickle_binary(paths.train_dataset)
+    val_data = unpickle_binary(paths.val_dataset)
     dataset = train_data + val_data
     return BinnedTacoDataLoader(paths=paths, dataset=dataset, max_batch_size=max_batch_size)
 

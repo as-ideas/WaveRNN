@@ -5,6 +5,8 @@ from pathlib import Path
 class Paths:
     """Manages and configures the paths used by WaveRNN, Tacotron, and the data."""
     def __init__(self, data_path, tts_id):
+
+        # directories
         self.base = Path(__file__).parent.parent.expanduser().resolve()
         self.data = Path(data_path).expanduser().resolve()
         self.quant = self.data/'quant'
@@ -17,14 +19,18 @@ class Paths:
         self.raw_pitch = self.data/'raw_pitch'
         self.phon_pitch = self.data/'phon_pitch'
         self.phon_energy = self.data/'phon_energy'
-
         self.model_output = self.base / 'model_output'
-
         self.taco_checkpoints = self.base / 'checkpoints' / f'{tts_id}.tacotron'
         self.taco_log = self.taco_checkpoints / 'logs'
-
         self.forward_checkpoints = self.base/'checkpoints'/f'{tts_id}.forward'
         self.forward_log = self.forward_checkpoints/'logs'
+
+        # pickle objects
+        self.train_dataset = self.data / 'train_dataset.pkl'
+        self.val_dataset = self.data / 'val_dataset.pkl'
+        self.text_dict = self.data / 'text_dict.pkl'
+        self.speaker_dict = self.data / 'speaker_dict.pkl'
+        self.att_score_dict = self.data / 'att_score_dict.pkl'
 
         self.create_paths()
 
