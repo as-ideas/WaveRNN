@@ -141,9 +141,9 @@ class DurationExtractionPipeline:
         The durations are saved as numpy arrays in paths.alg.
         """
 
-        train_set = unpickle_binary(self.paths.data / 'train_dataset.pkl')
-        val_set = unpickle_binary(self.paths.data / 'val_dataset.pkl')
-        text_dict = unpickle_binary(self.paths.data / 'text_dict.pkl')
+        train_set = unpickle_binary(self.paths.train_dataset)
+        val_set = unpickle_binary(self.paths.val_dataset)
+        text_dict = unpickle_binary(self.paths.text_dict)
         dataset = train_set + val_set
         dataset = [(file_id, mel_len) for file_id, mel_len in dataset
                    if (self.paths.att_pred / f'{file_id}.npy').is_file()]

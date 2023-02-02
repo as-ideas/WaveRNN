@@ -210,10 +210,10 @@ if __name__ == '__main__':
     # sort val dataset longest to shortest
     val_dataset.sort(key=lambda d: -d[1])
     text_dict = {id: text for id, text in cleaned_texts}
-    pickle_binary(text_dict, paths.data/'text_dict.pkl')
-    pickle_binary(speaker_dict, paths.data/'speaker_dict.pkl')
-    pickle_binary(train_dataset, paths.data/'train_dataset.pkl')
-    pickle_binary(val_dataset, paths.data/'val_dataset.pkl')
+    pickle_binary(text_dict, paths.text_dict)
+    pickle_binary(speaker_dict, paths.speaker_dict)
+    pickle_binary(train_dataset, paths.train_dataset)
+    pickle_binary(val_dataset, paths.val_dataset)
 
     print('Averaging speaker embeddings...')
 
