@@ -1,6 +1,6 @@
 from multiprocessing import Pool
 from pathlib import Path
-from typing import Union, Tuple
+from typing import Tuple
 
 import pandas as pd
 import tqdm

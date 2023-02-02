@@ -26,7 +26,7 @@ from utils.paths import Paths
 from utils.text.cleaners import Cleaner
 
 
-SPEAKER_EMB_DIM = 256
+SPEAKER_EMB_DIM = 256  # fixed speaker dim from VoiceEncoder
 
 
 def valid_n_workers(num):
