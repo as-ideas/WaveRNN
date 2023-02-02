@@ -43,12 +43,12 @@ class TestDurationExtractionPipe(unittest.TestCase):
         self.paths = Paths(data_path=self.temp_dir.name + '/data', tts_id='tts_test_id')
         self.train_dataset = [('id_1', 5), ('id_2', 10), ('id_3', 15)]
         self.val_dataset = [('id_4', 6), ('id_5', 12)]
-        pickle_binary(self.train_dataset, self.paths.data / 'train_dataset.pkl')
-        pickle_binary(self.val_dataset, self.paths.data / 'val_dataset.pkl')
+        pickle_binary(self.train_dataset, self.paths.train_dataset)
+        pickle_binary(self.val_dataset, self.paths.val_dataset)
         self.text_dict = {file_id: 'a' * length for file_id, length in self.train_dataset + self.val_dataset}
         self.speaker_dict = {file_id: 'default_speaker' for file_id, _ in self.train_dataset + self.val_dataset}
-        pickle_binary(self.text_dict, self.paths.data / 'text_dict.pkl')
-        pickle_binary(self.speaker_dict, self.paths.data / 'speaker_dict.pkl')
+        pickle_binary(self.text_dict, self.paths.text_dict)
+        pickle_binary(self.speaker_dict, self.paths.speaker_dict)
         for id, mel_len in self.train_dataset + self.val_dataset:
             np.save(self.paths.mel / f'{id}.npy', np.ones((5, mel_len)), allow_pickle=False)
             np.save(self.paths.speaker_emb / f'{id}.npy', np.ones(1), allow_pickle=False)
