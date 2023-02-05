@@ -314,13 +314,16 @@ class TacoCollator:
         speaker_name = [b['speaker_name'] for b in batch]
         mel_lens = [b['mel_len'] for b in batch]
         mel_lens = torch.tensor(mel_lens)
+        mel_masked_lens = [b['mel_masked_len'] for b in batch]
+        mel_masked_lens = torch.tensor(mel_masked_lens)
         speaker_emb = [b['speaker_emb'] for b in batch]
         speaker_emb = stack_to_tensor(speaker_emb)
 
         return {'x': text, 'mel': mel, 'item_id': item_id,
                 'x_len': x_len, 'mel_len': mel_lens,
                 'speaker_emb': speaker_emb, 'speaker_name': speaker_name,
-                'mel_masked': mel_masked, 'mel_mask': mel_mask}
+                'mel_masked': mel_masked, 'mel_mask': mel_mask,
+                'mel_masked_len': mel_masked_lens}
 
 
 class ForwardCollator:

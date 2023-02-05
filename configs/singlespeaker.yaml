@@ -1,5 +1,5 @@
 
-tts_model_id: 'ljspeech_tts'
+tts_model_id: 'bild_masked_tts'
 data_path: 'data_bild_masked/'                                        # output data path
 
 tts_model: 'forward_tacotron'                             # choices: [forward_tacotron, fast_pitch]
