@@ -69,7 +69,7 @@ class TacoDataset(Dataset):
         mel = np.load(str(self.paths.mel/f'{item_id}.npy'))
         mel_len = mel.shape[-1]
 
-        mel_mask = np.load(str(self.paths.mel_sil_mask/f'{item_id}.npy'))
+        mel_mask = np.load(str(self.paths.mel_mask / f'{item_id}.npy'))
         mel_masked = mel[:, mel_mask]
         mel_masked_len = mel_masked.shape[-1]
 

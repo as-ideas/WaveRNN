@@ -62,7 +62,7 @@ class Preprocessor:
         item_id, path = id_path
         try:
             dp = self._convert_file(item_id, path)
-            np.save(self.paths.mel_sil_mask/f'{dp.item_id}.npy', dp.mel_sil_mask, allow_pickle=False)
+            np.save(self.paths.mel_mask / f'{dp.item_id}.npy', dp.mel_sil_mask, allow_pickle=False)
             return dp
         except Exception as e:
             print(traceback.format_exc())

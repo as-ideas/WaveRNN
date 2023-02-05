@@ -53,7 +53,7 @@ class DurationExtractionDataset(Dataset):
         x = self.text_dict[item_id]
         x = self.tokenizer(x)
         mel = np.load(self.paths.mel / f'{item_id}.npy')
-        mel_mask = np.load(self.paths.mel_sil_mask / f'{item_id}.npy')
+        mel_mask = np.load(self.paths.mel_mask / f'{item_id}.npy')
         mel_masked = mel[:, mel_mask]
         mel_masked = torch.from_numpy(mel_masked)
         mel = torch.from_numpy(mel)

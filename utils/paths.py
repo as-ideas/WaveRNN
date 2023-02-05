@@ -10,7 +10,7 @@ class Paths:
         self.base = Path(__file__).parent.parent.expanduser().resolve()
         self.data = Path(data_path).expanduser().resolve()
         self.quant = self.data/'quant'
-        self.mel_sil_mask = self.data/'mel_sil_mask'
+        self.mel_mask = self.data / 'mel_mask'
         self.mel = self.data/'mel_reextracted'
         self.gta = self.data/'gta'
         self.att_pred = self.data/'att_pred'
@@ -39,7 +39,7 @@ class Paths:
         os.makedirs(self.data, exist_ok=True)
         os.makedirs(self.quant, exist_ok=True)
         os.makedirs(self.mel, exist_ok=True)
-        os.makedirs(self.mel_sil_mask, exist_ok=True)
+        os.makedirs(self.mel_mask, exist_ok=True)
         os.makedirs(self.gta, exist_ok=True)
         os.makedirs(self.alg, exist_ok=True)
         os.makedirs(self.speaker_emb, exist_ok=True)
