@@ -1,6 +1,6 @@
 
 tts_model_id: 'ljspeech_tts'
-data_path: 'data/'                                        # output data path
+data_path: 'data_bild_masked/'                                        # output data path
 
 tts_model: 'forward_tacotron'                             # choices: [forward_tacotron, fast_pitch]
 
@@ -32,8 +32,8 @@ preprocessing:
   audio_format: '.wav'                 # extension for audio files (e.g. .wav or .flac)
   seed: 42
   n_val: 200
-  language: 'en-us'
-  cleaner_name: 'english_cleaners'      # choices: ['english_cleaners', 'no_cleaners'], expands numbers and abbreviations.
+  language: 'de'
+  cleaner_name: 'no_cleaners'      # choices: ['english_cleaners', 'no_cleaners'], expands numbers and abbreviations.
   use_phonemes: False                   # whether to phonemize the text
                                         # if set to False, you have to provide the phonemized text yourself
   min_text_len: 2
@@ -41,7 +41,7 @@ preprocessing:
                                         # about 60-300)
   pitch_max_freq: 600                   # Maximum value for pitch frequency to remove outliers (Common pitch range is
                                         # about 60-300)¡
-  pitch_extractor: pyworld              # choice of pitch extraction library, choices: [librosa, pyworld]
+  pitch_extractor: librosa              # choice of pitch extraction library, choices: [librosa, pyworld]
   pitch_frame_length: 2048              # Frame length for extracting pitch with librosa
 
 

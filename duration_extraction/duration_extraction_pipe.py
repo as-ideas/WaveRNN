@@ -56,6 +56,7 @@ class DurationExtractionDataset(Dataset):
         mel_mask = np.load(self.paths.mel_mask / f'{item_id}.npy')
         mel_masked = mel[:, mel_mask]
         mel_masked = torch.from_numpy(mel_masked)
+        mel_mask = torch.from_numpy(mel_mask)
         mel = torch.from_numpy(mel)
         split_points = self._get_split_points(mel_mask)
 
@@ -82,7 +83,6 @@ class DurationExtractionDataset(Dataset):
         align_score, _ = attention_score(attention.unsqueeze(0), mel_masked.shape[-1], r=1)
         align_score = float(align_score[0])
         attention = torch.cat(parts, dim=1)
-        align_score = float(align_score)
         durations, att_score = self.duration_extractor(x=x, mel=mel, attention=attention)
         att_score = float(att_score)
         durations_npy = durations.cpu().numpy()
