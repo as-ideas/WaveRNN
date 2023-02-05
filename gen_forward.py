@@ -27,10 +27,6 @@ if __name__ == '__main__':
 
     # name of subcommand goes to args.vocoder
     subparsers = parser.add_subparsers(dest='vocoder')
-    wr_parser = subparsers.add_parser('wavernn')
-    wr_parser.add_argument('--overlap', '-o', default=550,  type=int, help='[int] number of crossover samples')
-    wr_parser.add_argument('--target', '-t', default=11_000, type=int, help='[int] number of samples in each batch index')
-
     gl_parser = subparsers.add_parser('griffinlim')
     mg_parser = subparsers.add_parser('melgan')
     hg_parser = subparsers.add_parser('hifigan')

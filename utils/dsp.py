@@ -26,6 +26,7 @@ class DSP:
                  vad_window_length: float,
                  vad_moving_average_width: float,
                  vad_max_silence_length: int,
+                 **kwargs,  # for backward compatibility
                  ) -> None:
 
         self.n_mels = num_mels
