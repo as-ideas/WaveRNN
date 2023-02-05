@@ -2,7 +2,6 @@ import torch
 import numpy as np
 from typing import Callable
 
-from models.fatchord_version import WaveRNN
 from utils.checkpoints import init_tts_model
 from utils.dsp import DSP
 from utils.text.cleaners import Cleaner
