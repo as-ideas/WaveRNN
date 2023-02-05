@@ -67,7 +67,10 @@ class TacoDataset(Dataset):
         speaker_name = self.speaker_dict[item_id]
         x = self.tokenizer(text)
         mel = np.load(str(self.paths.mel/f'{item_id}.npy'))
+        mel_sil_mask = np.load(str(self.paths.mel_sil_mask/f'{item_id}.npy'))
         mel_len = mel.shape[-1]
+
+
         speaker_emb = np.load(str(self.paths.speaker_emb/f'{item_id}.npy'))
         return {'x': x, 'mel': mel, 'item_id': item_id,
                 'mel_len': mel_len, 'x_len': len(x),

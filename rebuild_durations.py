@@ -36,8 +36,7 @@ def zero_runs(a):
 if __name__ == '__main__':
     config = read_config('config.yaml')
     dsp = DSP.from_config(config)
-    paths = Paths(config['data_path'], config['voc_model_id'], config['tts_model_id'])
-
+    paths = Paths(config['data_path'], config['tts_model_id'])
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     print('Using device:', device)
@@ -71,16 +70,10 @@ if __name__ == '__main__':
 
             mel = torch.from_numpy(dsp.wav_to_mel(wav)).unsqueeze(0)
 
-            plot_mel(mel.squeeze().numpy())
-            plt.savefig(f'/tmp/att/{id}_mel.png')
-            plt.clf()
-
             mel_mask = dsp.get_mel_mask(wav, mel, max_sil_len=1)
 
             #print(id, mel_mask.shape, mel.shape)
             mel_trimmed = mel[:, :, mel_mask]
-            plot_mel(mel_trimmed.squeeze().numpy())
-            plt.savefig(f'/tmp/att/{id}_mel_trim.png')
 
             split_points = zero_runs(mel_mask)
 
@@ -114,11 +107,6 @@ if __name__ == '__main__':
 
             att_new = torch.cat(parts, dim=1)
 
-            #plt.clf()
-            #plot_attention(att_new.squeeze().detach().numpy())
-            #plt.savefig(f'/tmp/att/{id}_att_new.png')
-            #plt.close()
-
             mel[:, :, ~mel_mask] = -12
             align_score, _ = attention_score(att, torch.ones(1)*(mel_trimmed.shape[-1]), r=1)
             align_score = float(align_score[0])
@@ -126,8 +114,7 @@ if __name__ == '__main__':
             durs = np_now(durs).astype(np.int)
             att_score_dict[id] = (align_score, att_score)
             sum_att_score += att_score
-            #print(durs.tolist())
-            #print(sum(durs), mel_orig.shape)
+
             assert sum(durs) == mel.shape[-1]
             mean_att_score = sum_att_score / i
             np.save(paths.alg / f'{id}.npy', np.array(durs).astype(int))

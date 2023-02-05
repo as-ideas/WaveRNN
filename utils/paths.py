@@ -11,10 +11,10 @@ class Paths:
         self.data = Path(data_path).expanduser().resolve()
         self.quant = self.data/'quant'
         self.mel_sil_mask = self.data/'mel_sil_mask'
-        self.mel = self.data/'mel'
+        self.mel = self.data/'mel_reextracted'
         self.gta = self.data/'gta'
         self.att_pred = self.data/'att_pred'
-        self.alg = self.data/'alg'
+        self.alg = self.data/'alg_reextracted'
         self.speaker_emb = self.data/'speaker_emb'
         self.mean_speaker_emb = self.data/'mean_speaker_emb'
         self.raw_pitch = self.data/'raw_pitch'
