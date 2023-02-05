@@ -13,7 +13,6 @@ class Synthesizer:
 
     def __init__(self,
                  tts_path: str,
-                 voc_path: str,
                  device='cuda'):
         self.device = torch.device(device)
         tts_checkpoint = torch.load(tts_path, map_location=self.device)
@@ -21,7 +20,6 @@ class Synthesizer:
         tts_model = init_tts_model(tts_config)
         tts_model.load_state_dict(tts_checkpoint['model'])
         self.tts_model = tts_model
-        self.wavernn = WaveRNN.from_checkpoint(voc_path)
         self.melgan = torch.hub.load('seungwonpark/melgan', 'melgan')
         self.melgan.to(device).eval()
         self.cleaner = Cleaner.from_config(tts_config)
@@ -45,12 +43,6 @@ class Synthesizer:
         m = gen['mel_post'].cpu()
         if voc_model == 'griffinlim':
             wav = self.dsp.griffinlim(m.squeeze().numpy(), n_iter=32)
-        elif voc_model == 'wavernn':
-            wav = self.wavernn.generate(mels=m,
-                                        batched=True,
-                                        target=11_000,
-                                        overlap=550,
-                                        mu_law=self.dsp.mu_law)
         else:
             m = m.cuda()
             with torch.no_grad():
