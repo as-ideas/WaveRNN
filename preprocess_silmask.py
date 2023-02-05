@@ -79,7 +79,7 @@ class Preprocessor:
             y /= peak
             y = y * 0.95
         mel = self.dsp.wav_to_mel(y)
-        mel_orig = np.load(self.paths.mel / f'{item_id}.npy')
+        mel_orig = np.load(self.paths / f'{item_id}.npy')
         print(item_id, mel.shape, mel_orig.shape)
         mel_sil_mask = self.dsp.get_mel_mask(y, mel_orig, max_sil_len=1)
         return DataPoint(item_id=item_id,

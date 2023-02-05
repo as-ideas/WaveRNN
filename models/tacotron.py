@@ -218,7 +218,7 @@ class Tacotron(nn.Module):
 
     def forward(self, batch: Dict[str, torch.Tensor]) -> torch.tensor:
         x = batch['x']
-        mel = batch['mel']
+        mel = batch['mel_masked']
         speaker_emb = batch['speaker_emb']
         device = next(self.parameters()).device  # use same device as parameters
 

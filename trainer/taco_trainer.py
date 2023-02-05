@@ -73,8 +73,8 @@ class TacoTrainer:
                 model.train()
                 m1_hat, m2_hat, attention = model(batch)
 
-                m1_loss = F.l1_loss(m1_hat, batch['mel'])
-                m2_loss = F.l1_loss(m2_hat, batch['mel'])
+                m1_loss = F.l1_loss(m1_hat, batch['mel_masked'])
+                m2_loss = F.l1_loss(m2_hat, batch['mel_masked'])
                 loss = m1_loss + m2_loss
                 optimizer.zero_grad()
                 loss.backward()
@@ -126,10 +126,10 @@ class TacoTrainer:
             batch = to_device(batch, device=device)
             with torch.no_grad():
                 m1_hat, m2_hat, attention = model(batch)
-                m1_loss = F.l1_loss(m1_hat, batch['mel'])
-                m2_loss = F.l1_loss(m2_hat, batch['mel'])
+                m1_loss = F.l1_loss(m1_hat, batch['mel_masked'])
+                m2_loss = F.l1_loss(m2_hat, batch['mel_masked'])
                 val_loss += m1_loss.item() + m2_loss.item()
-            _, att_score = attention_score(attention, batch['mel_len'])
+            _, att_score = attention_score(attention, batch['mel_masked_len'])
             val_att_score += torch.mean(att_score).item()
 
         return val_loss / len(val_set), val_att_score / len(val_set)
@@ -144,7 +144,7 @@ class TacoTrainer:
         att = np_now(att)[0]
         m1_hat = np_now(m1_hat)[0, :, :]
         m2_hat = np_now(m2_hat)[0, :, :]
-        m_target = np_now(batch['mel'])[0, :, :]
+        m_target = np_now(batch['mel_masked'])[0, :, :]
         speaker = batch['speaker_name'][0]
 
         att_fig = plot_attention(att)
@@ -167,7 +167,7 @@ class TacoTrainer:
             tag=f'Ground_Truth_Aligned/postnet_wav/{speaker}', snd_tensor=m2_hat_wav,
             global_step=model.step, sample_rate=self.dsp.sample_rate)
 
-        m1_hat, m2_hat, att = model.generate(batch['x'][0:1], steps=batch['mel_len'][0] + 20)
+        m1_hat, m2_hat, att = model.generate(batch['x'][0:1], steps=batch['mel_masked_len'][0] + 20)
         att_fig = plot_attention(att)
         m1_hat_fig = plot_mel(m1_hat)
         m2_hat_fig = plot_mel(m2_hat)
