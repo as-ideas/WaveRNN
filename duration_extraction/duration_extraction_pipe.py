@@ -54,11 +54,11 @@ class DurationExtractionDataset(Dataset):
         x = self.tokenizer(x)
         mel = np.load(self.paths.mel / f'{item_id}.npy')
         mel_mask = np.load(self.paths.mel_mask / f'{item_id}.npy')
-        mel_masked = mel[:, mel_mask]
+        mel_masked = mel[:, mel_mask.astype(bool)]
         mel_masked = torch.from_numpy(mel_masked)
-        mel_mask = torch.from_numpy(mel_mask)
         mel = torch.from_numpy(mel)
         split_points = self._get_split_points(mel_mask)
+        mel_mask = torch.from_numpy(mel_mask)
 
         x = torch.tensor(x)
 
@@ -72,17 +72,17 @@ class DurationExtractionDataset(Dataset):
         for a, b in split_points:
             piece += a - last_b
             last_b = b
-            zeros = torch.zeros((1, b-a, attention.size(-1)))
-            parts.append(attention[:, last_piece:piece:, :])
+            zeros = torch.zeros((b-a, attention.size(-1)))
+            parts.append(attention[last_piece:piece:, :])
             parts.append(zeros)
             last_piece = piece
 
-        parts.append(attention[:, last_piece:, :])
-        attention = torch.cat(parts, dim=1)
-        mel[:, :, ~mel_mask] = -12
-        align_score, _ = attention_score(attention.unsqueeze(0), mel_masked.shape[-1], r=1)
+        parts.append(attention[last_piece:, :])
+        attention = torch.cat(parts, dim=0)
+        mel[:, ~mel_mask] = self.duration_extractor.silence_threshold - 1
+        align_score, _ = attention_score(attention.unsqueeze(0), torch.full((1, ), fill_value=mel_masked.shape[-1]), r=1)
         align_score = float(align_score[0])
-        attention = torch.cat(parts, dim=1)
+        attention = torch.cat(parts, dim=0)
         durations, att_score = self.duration_extractor(x=x, mel=mel, attention=attention)
         att_score = float(att_score)
         durations_npy = durations.cpu().numpy()
