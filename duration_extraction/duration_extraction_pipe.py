@@ -53,43 +53,54 @@ class DurationExtractionDataset(Dataset):
         x = self.text_dict[item_id]
         x = self.tokenizer(x)
         mel = np.load(self.paths.mel / f'{item_id}.npy')
-        mel_mask = np.load(self.paths.mel_mask / f'{item_id}.npy')
-        mel_masked = mel[:, mel_mask.astype(bool)]
-        mel_masked = torch.from_numpy(mel_masked)
-        mel = torch.from_numpy(mel)
-        split_points = self._get_split_points(mel_mask)
-        mel_mask = torch.from_numpy(mel_mask)
+        try:
+            mel_mask = np.load(self.paths.mel_mask / f'{item_id}.npy')
+            mel_masked = mel[:, mel_mask.astype(bool)]
+            mel_masked = torch.from_numpy(mel_masked)
+            mel = torch.from_numpy(mel)
+            split_points = self._get_split_points(mel_mask)
+            mel_mask = torch.from_numpy(mel_mask)
 
-        x = torch.tensor(x)
+            x = torch.tensor(x)
 
-        attention_npy = np.load(str(self.paths.att_pred / f'{item_id}.npy'))
-        attention = torch.from_numpy(attention_npy)
+            attention_npy = np.load(str(self.paths.att_pred / f'{item_id}.npy'))
+            attention = torch.from_numpy(attention_npy)
 
-        parts = []
-        last_b = 0
-        piece = 0
-        last_piece = 0
-        for a, b in split_points:
-            piece += a - last_b
-            last_b = b
-            zeros = torch.zeros((b-a, attention.size(-1)))
-            parts.append(attention[last_piece:piece:, :])
-            parts.append(zeros)
-            last_piece = piece
+            parts = []
+            last_b = 0
+            piece = 0
+            last_piece = 0
+            for a, b in split_points:
+                piece += a - last_b
+                last_b = b
+                zeros = torch.zeros((b-a, attention.size(-1)))
+                parts.append(attention[last_piece:piece:, :])
+                parts.append(zeros)
+                last_piece = piece
 
-        parts.append(attention[last_piece:, :])
-        attention = torch.cat(parts, dim=0)
-        mel[:, ~mel_mask] = self.duration_extractor.silence_threshold - 1
-        align_score, _ = attention_score(attention.unsqueeze(0), torch.full((1, ), fill_value=mel_masked.shape[-1]), r=1)
-        align_score = float(align_score[0])
-        attention = torch.cat(parts, dim=0)
-        durations, att_score = self.duration_extractor(x=x, mel=mel, attention=attention)
-        att_score = float(att_score)
-        durations_npy = durations.cpu().numpy()
-        if np.sum(durations_npy) != mel.shape[-1]:
-            print(f'WARNINNG: Sum of durations did not match mel length for item {item_id}!')
-        return DurationResult(item_id=item_id, att_score=att_score,
+            parts.append(attention[last_piece:, :])
+            attention = torch.cat(parts, dim=0)
+            mel[:, ~mel_mask] = self.duration_extractor.silence_threshold - 1
+            align_score, _ = attention_score(attention.unsqueeze(0), torch.full((1, ), fill_value=mel_masked.shape[-1]), r=1)
+            align_score = float(align_score[0])
+            attention = torch.cat(parts, dim=0)
+            durations, att_score = self.duration_extractor(x=x, mel=mel, attention=attention)
+            att_score = float(att_score)
+            durations_npy = durations.cpu().numpy()
+            #for t, d in zip(self.text_dict[item_id], durations_npy):
+            #    print(t, d)
+            #print(durations_npy)
+            if np.sum(durations_npy) != mel.shape[-1]:
+                print(f'WARNINNG: Sum of durations did not match mel length for item {item_id}!')
+
+            return DurationResult(item_id=item_id, att_score=att_score,
                               align_score=align_score, durations=durations_npy)
+        except Exception as e:
+            print(e)
+            fake_durs = np.zeros(x.shape)
+            fake_durs[-1] = mel.shape[-1]
+            return DurationResult(item_id=item_id, att_score=0,
+                                  align_score=0, durations=fake_durs)
 
     def _get_split_points(self, mel_mask: np.array) -> np.array:
         iszero = np.concatenate(([0], np.equal(mel_mask, 0).view(np.int8), [0]))

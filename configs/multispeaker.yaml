@@ -56,7 +56,7 @@ duration_extraction:
   silence_prob_shift: 0.25           # increase probability for silent characters in periods of silence
                                      # for better durations during non voiced periods
   max_batch_size: 32                 # max allowed for binned dataloader used for tacotron inference
-  num_workers: 1                    # number of processes for costly dijkstra duration extraction
+  num_workers: 6                    # number of processes for costly dijkstra duration extraction
 
 
 tacotron:
