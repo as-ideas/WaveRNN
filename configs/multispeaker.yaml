@@ -131,8 +131,8 @@ multi_forward_tacotron:
 
   training:
     schedule:
-      - 5e-5,  500,  32       # progressive training schedule
-      - 1e-5,  600,  32       # lr, step, batch_size
+      - 5e-5,  500_000,  32       # progressive training schedule
+      - 1e-5,  600_000,  32       # lr, step, batch_size
     dur_loss_factor: 0.1
     pitch_loss_factor: 0.1
     energy_loss_factor: 0.1
