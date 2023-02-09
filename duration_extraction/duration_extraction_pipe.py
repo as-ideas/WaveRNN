@@ -23,6 +23,7 @@ class DurationResult:
     item_id: str
     att_score: float
     align_score: float
+    num_consecutive_low: int
     durations: np.array
 
 
@@ -62,13 +63,14 @@ class DurationExtractionDataset(Dataset):
         mel_len = torch.tensor(mel_len).unsqueeze(0)
         align_score, _ = attention_score(attention.unsqueeze(0), mel_len, r=1)
         align_score = float(align_score)
-        durations, att_score = self.duration_extractor(x=x, mel=mel, attention=attention)
+        durations, att_score, num_consecutive_low = self.duration_extractor(x=x, mel=mel, attention=attention)
         att_score = float(att_score)
         durations_npy = durations.cpu().numpy()
         if np.sum(durations_npy) != mel_len:
             print(f'WARNINNG: Sum of durations did not match mel length for item {item_id}!')
         return DurationResult(item_id=item_id, att_score=att_score,
-                              align_score=align_score, durations=durations_npy)
+                              align_score=align_score, durations=durations_npy,
+                              num_consecutive_low=num_consecutive_low)
 
     def __len__(self):
         return len(self.metadata)
@@ -128,7 +130,7 @@ class DurationExtractionPipeline:
 
     def extract_durations(self,
                           num_workers: int = 0,
-                          sampler_bin_size: int = 1) -> Dict[str, Tuple[float, float]]:
+                          sampler_bin_size: int = 1) -> Dict[str, Tuple[float, float, int]]:
         """
         Extracts durations from saved attention matrices.
 
@@ -172,7 +174,7 @@ class DurationExtractionPipeline:
         for i, res in enumerate(pbar, 1):
             sum_att_score += res.att_score
             pbar.set_description(f'Avg duration attention score: {sum_att_score / i}', refresh=True)
-            att_score_dict[res.item_id] = (res.align_score, res.att_score)
+            att_score_dict[res.item_id] = (res.align_score, res.att_score, res.num_consecutive_low)
             np.save(self.paths.alg / f'{res.item_id}.npy', res.durations.astype(int), allow_pickle=False)
 
         return att_score_dict

@@ -1,6 +1,6 @@
 
 tts_model_id: 'multispeaker_tts'
-data_path: 'data_multispeaker'                                        # output data path
+data_path: 'data_bild_masked'                                        # output data path
 
 tts_model: 'multi_forward_tacotron'
 
@@ -146,6 +146,7 @@ multi_forward_tacotron:
     plot_speakers:                # speakers to generate plots for (additionally to plot_n_speakers)
       - default_speaker
 
-    filter_attention: False               # whether to filter data with bad attention scores
+    filter_attention: True               # whether to filter data with bad attention scores
     min_attention_sharpness: 0.5         # filter data with bad attention sharpness score, if 0 then no filter
     min_attention_alignment: 0.95        # filter data with bad attention alignment score, if 0 then no filter
+    max_consecutive_low: 5               # maximum allowed consecutive low prob durations (avg. duration prob < 0.1)

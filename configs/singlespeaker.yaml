@@ -195,3 +195,4 @@ fast_pitch:
     filter_attention: True               # whether to filter data with bad attention scores
     min_attention_sharpness: 0.5         # filter data with bad attention sharpness score, if 0 then no filter
     min_attention_alignment: 0.95        # filter data with bad attention alignment score, if 0 then no filter
+    max_consecutive_low: 5               # maximum allowed consecutive low prob durations (avg. duration prob < 0.1)

@@ -78,7 +78,7 @@ class TestDurationExtractionPipe(unittest.TestCase):
 
         att_score_dict = duration_extraction_pipe.extract_durations(num_workers=1, sampler_bin_size=1)
 
-        expected_att_score_dict = {f'{file_id}': (1., 1.) for file_id, _ in self.train_dataset + self.val_dataset}
+        expected_att_score_dict = {f'{file_id}': (1., 1., 0) for file_id, _ in self.train_dataset + self.val_dataset}
         self.assertEqual(expected_att_score_dict, att_score_dict)
 
         dur_files = list(self.paths.alg.glob('**/*.npy'))

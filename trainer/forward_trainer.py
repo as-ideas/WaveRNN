@@ -43,7 +43,9 @@ class ForwardTrainer:
                     max_mel_len=self.train_cfg['max_mel_len'],
                     filter_attention=self.train_cfg['filter_attention'],
                     filter_min_alignment=self.train_cfg['min_attention_alignment'],
-                    filter_min_sharpness=self.train_cfg['min_attention_sharpness'])
+                    filter_min_sharpness=self.train_cfg['min_attention_sharpness'],
+                    filter_max_consecutive_low=self.train_cfg['max_consecutive_low']
+                )
                 session = TTSSession(
                     index=i, r=1, lr=lr, max_step=max_step,
                     bs=bs, train_set=train_set, val_set=val_set)

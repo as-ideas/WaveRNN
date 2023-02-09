@@ -3,7 +3,6 @@ from random import Random
 from typing import List, Tuple, Iterator
 
 import torch
-import tqdm
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import Sampler
 
@@ -14,27 +13,6 @@ from utils.text.tokenizer import Tokenizer
 
 
 SHUFFLE_SEED = 42
-
-
-def count_consecutive_ones(arr):
-    # Convert the input array to a 1D numpy array
-    arr = np.ravel(arr)
-
-    # Initialize a counter for consecutive ones
-    count = 0
-    max_count = 0
-
-    # Loop through the array and count the number of consecutive ones
-    for i in range(arr.shape[0]):
-        if arr[i] == 1:
-            count += 1
-        else:
-            if count != 0:
-                max_count = max(count, max_count)
-                count = 0
-
-    # Return the maximum count of consecutive ones
-    return max(count, max_count)
 
 
 class BinnedLengthSampler(Sampler):
@@ -239,10 +217,11 @@ def get_taco_datasets(paths: Paths,
 
 def get_forward_datasets(paths: Paths,
                          batch_size: int,
-                         max_mel_len,
-                         filter_attention=True,
-                         filter_min_alignment=0.5,
-                         filter_min_sharpness=0.9,
+                         max_mel_len: int = None,
+                         filter_attention: bool = False,
+                         filter_min_alignment: float = 0.9,
+                         filter_min_sharpness: float = 0.5,
+                         filter_max_consecutive_low: int = 5,
                          num_workers=0) -> Tuple[DataLoader, DataLoader]:
 
     tokenizer = Tokenizer()
@@ -257,15 +236,18 @@ def get_forward_datasets(paths: Paths,
     if filter_attention:
         attention_score_dict = unpickle_binary(paths.att_score_dict)
         train_data = filter_bad_attentions(dataset=train_data,
-                                           paths=paths,
+                                           attention_score_dict=attention_score_dict,
                                            min_alignment=filter_min_alignment,
-                                           min_sharpness=filter_min_sharpness)
+                                           min_sharpness=filter_min_sharpness,
+                                           max_consecutive_low=filter_max_consecutive_low)
         val_data = filter_bad_attentions(dataset=val_data,
-                                         paths=paths,
+                                         attention_score_dict=attention_score_dict,
                                          min_alignment=filter_min_alignment,
-                                         min_sharpness=filter_min_sharpness)
-    print(f'Using {len(train_data)} train files. '
-          f'Filtered {train_len_original - len(train_data)} files due to bad attention!')
+                                         min_sharpness=filter_min_sharpness,
+                                         max_consecutive_low=filter_max_consecutive_low)
+        print(f'Using {len(train_data)} train files. '
+              f'Filtered {train_len_original - len(train_data)} files due to bad attention!')
+
     train_ids, train_lens = zip(*train_data)
     val_ids, val_lens = zip(*val_data)
 
@@ -366,15 +348,14 @@ def filter_max_len(dataset: List[tuple], max_mel_len: int) -> List[tuple]:
 
 
 def filter_bad_attentions(dataset: List[tuple],
-                          paths: Paths,
+                          attention_score_dict: Dict[str, tuple],
                           min_alignment: float,
-                          min_sharpness: float) -> List[tuple]:
+                          min_sharpness: float,
+                          max_consecutive_low: int) -> List[tuple]:
     dataset_filtered = []
-    for item_id, mel_len in tqdm.tqdm(dataset, total=(len(dataset))):
-        #align_score, sharp_score = attention_score_dict[item_id]
-        durs = np.load(paths.alg / f'{item_id}.npy')
-        c = count_consecutive_ones(durs)
-        if c < 5:
+    for item_id, mel_len in dataset:
+        align_score, sharp_score, consecutive_low = attention_score_dict[item_id]
+        if all([align_score > min_alignment, sharp_score > min_sharpness, consecutive_low <= max_consecutive_low]):
             dataset_filtered.append((item_id, mel_len))
     return dataset_filtered
 

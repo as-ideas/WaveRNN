@@ -8,6 +8,9 @@ from scipy.sparse.csgraph import dijkstra
 from utils.text.symbols import silent_phonemes_indices
 
 
+LOW_DURATION_PROB_THRESHOLD = 0.1
+
+
 class DurationExtractor:
 
     def __init__(self,
@@ -23,7 +26,7 @@ class DurationExtractor:
     def __call__(self,
                  x: torch.Tensor,
                  mel: torch.Tensor,
-                 attention: torch.Tensor) -> Tuple[torch.tensor, float]:
+                 attention: torch.Tensor) -> Tuple[torch.tensor, float, int]:
         """
         Extracts durations from the attention matrix by finding the shortest monotonic path from
         top left to bottom right.
@@ -31,7 +34,8 @@ class DurationExtractor:
         :param x: Tokenized sequence.
         :param mel: Mel spec.
         :param attention: Attention matrix with shape (mel_len, x_len).
-        :return: Tuple, where the first entry is the durations and the second entry is the average attention probability.
+        :return: Tuple, where the first entry is the durations, the second entry is the average attention probability
+                 and the third entry is the number of consecutive durations with low probability.
         """
         attention = attention[...]
         mel_len = mel.shape[-1]
@@ -66,22 +70,26 @@ class DurationExtractor:
         cols = path_probs.shape[1]
         mel_text = {}
         durations = torch.zeros(x.shape[0])
-
+        duration_probs = torch.zeros(x.shape[0])
         att_scores = []
 
         # collect indices (mel, text) along the path
         for node_index in path:
             i, j = self._from_node_index(node_index, cols)
             mel_text[i] = j
+            duration_probs[j] += float(attention[i, j])
             if not sil_mask[i]:
                 att_scores.append(float(attention[i, j]))
 
         for j in mel_text.values():
             durations[j] += 1
 
-        att_score = sum(att_scores) / len(att_scores)
+        att_score = 0 if len(att_scores) == 0 else sum(att_scores) / len(att_scores)
+        for i in range(len(duration_probs)):
+            duration_probs[i] /= max(durations[i], 1)
+        num_consecutive_low = DurationExtractor._consecutive_low_probs(duration_probs)
 
-        return durations, att_score
+        return durations, att_score, num_consecutive_low
 
     @staticmethod
     def _to_node_index(i: int, j: int, cols: int) -> int:
@@ -128,3 +136,15 @@ class DurationExtractor:
 
         adj_mat = coo_matrix((data, (row_ind, col_ind)), shape=(rows * cols, rows * cols))
         return adj_mat.tocsr()
+
+    @staticmethod
+    def _consecutive_low_probs(dur_probs: np.array) -> int:
+        max_low = 0
+        current_low = 0
+        for i in range(len(dur_probs)):
+            if dur_probs[i] < LOW_DURATION_PROB_THRESHOLD:
+                current_low += 1
+            else:
+                max_low = max(max_low, current_low)
+                current_low = 0
+        return max(max_low, current_low)
