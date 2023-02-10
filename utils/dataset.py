@@ -83,8 +83,8 @@ class ForwardDataset(Dataset):
                  paths: Paths,
                  dataset_ids: List[str],
                  text_dict: Dict[str, str],
-                 speaker_dict: Dict[str, str],
-                 tokenizer: Tokenizer):
+                 speaker_dict: Dict[str, str] = None,
+                 tokenizer: Tokenizer = None):
         self.paths = paths
         self.metadata = dataset_ids
         self.text_dict = text_dict
@@ -94,20 +94,16 @@ class ForwardDataset(Dataset):
     def __getitem__(self, index: int) -> Dict[str, torch.tensor]:
         item_id = self.metadata[index]
         text = self.text_dict[item_id]
-        speaker_name = self.speaker_dict[item_id]
         x = self.tokenizer(text)
         mel = np.load(str(self.paths.mel/f'{item_id}.npy'))
         mel_len = mel.shape[-1]
         dur = np.load(str(self.paths.alg/f'{item_id}.npy'))
         pitch = np.load(str(self.paths.phon_pitch/f'{item_id}.npy'))
         energy = np.load(str(self.paths.phon_energy/f'{item_id}.npy'))
-        speaker_emb = np.load(str(self.paths.speaker_emb/f'{item_id}.npy'))
-        pitch_cond = np.ones(pitch.shape)
-        pitch_cond[pitch != 0] = 2
+
 
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
-                'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy,
-                'speaker_emb': speaker_emb, 'pitch_cond': pitch_cond, 'speaker_name': speaker_name}
+                'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy}
 
     def __len__(self):
         return len(self.metadata)
@@ -300,15 +296,14 @@ class TacoCollator:
         mel = [pad2d(b['mel'], max_spec_len) for b in batch]
         mel = stack_to_tensor(mel)
         item_id = [b['item_id'] for b in batch]
-        speaker_name = [b['speaker_name'] for b in batch]
+
         mel_lens = [b['mel_len'] for b in batch]
         mel_lens = torch.tensor(mel_lens)
-        speaker_emb = [b['speaker_emb'] for b in batch]
-        speaker_emb = stack_to_tensor(speaker_emb)
+        #speaker_emb = [b['speaker_emb'] for b in batch]
+        #speaker_emb = stack_to_tensor(speaker_emb)
 
         return {'x': text, 'mel': mel, 'item_id': item_id,
-                'x_len': x_len, 'mel_len': mel_lens,
-                'speaker_emb': speaker_emb, 'speaker_name': speaker_name}
+                'x_len': x_len, 'mel_len': mel_lens}
 
 
 class ForwardCollator:
@@ -327,13 +322,10 @@ class ForwardCollator:
         pitch = stack_to_tensor(pitch).float()
         energy = [pad1d(b['energy'][:max_x_len], max_x_len) for b in batch]
         energy = stack_to_tensor(energy).float()
-        pitch_cond = [pad1d(b['pitch_cond'][:max_x_len], max_x_len) for b in batch]
-        pitch_cond = stack_to_tensor(pitch_cond).long()
         output.update({
             'pitch': pitch,
             'energy': energy,
             'dur': dur,
-            'pitch_cond': pitch_cond
         })
         return output
 

@@ -2,12 +2,14 @@ import time
 from typing import Dict, Any, Union
 
 import torch
+from torch.nn import CrossEntropyLoss
+from torch.optim import Adam
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from models.fast_pitch import FastPitch
-from models.forward_tacotron import ForwardTacotron
+from models.forward_tacotron import ForwardTacotron, PhonPredictor
 from trainer.common import Averager, TTSSession, MaskedL1, to_device, np_now
 from utils.checkpoints import  save_checkpoint
 from utils.dataset import get_forward_datasets
@@ -16,6 +18,7 @@ from utils.display import stream, simple_table, plot_mel, plot_pitch
 from utils.dsp import DSP
 from utils.files import parse_schedule
 from utils.paths import Paths
+from utils.text.tokenizer import Tokenizer
 
 
 class ForwardTrainer:
@@ -31,6 +34,10 @@ class ForwardTrainer:
         self.train_cfg = config[model_type]['training']
         self.writer = SummaryWriter(log_dir=paths.forward_log, comment='v1')
         self.l1_loss = MaskedL1()
+        self.ce_loss = CrossEntropyLoss()
+        self.phon_model = PhonPredictor()
+        self.phon_optim = Adam(self.phon_model.parameters(), lr=1e-4)
+        self.tokenizer = Tokenizer()
 
     def train(self, model: Union[ForwardTacotron, FastPitch], optimizer: Optimizer) -> None:
         forward_schedule = self.train_cfg['schedule']
@@ -67,6 +74,9 @@ class ForwardTrainer:
         duration_avg = Averager()
         pitch_loss_avg = Averager()
         device = next(model.parameters()).device  # use same device as model parameters
+        phon_model = self.phon_model.to(device)
+        ce_loss = self.ce_loss.to(device)
+
         for e in range(1, epochs + 1):
             for i, batch in enumerate(session.train_set, 1):
                 batch = to_device(batch, device=device)
@@ -81,7 +91,28 @@ class ForwardTrainer:
                 batch['pitch'] = batch['pitch'] * pitch_zoneout_mask.to(device).float()
                 batch['energy'] = batch['energy'] * energy_zoneout_mask.to(device).float()
 
+                phon_pred = phon_model(batch)
+                phon_loss = ce_loss(phon_pred.transpose(1, 2), batch['x'])
+
+                self.phon_optim.zero_grad()
+                phon_loss.backward()
+                self.phon_optim.step()
+                print(e, i, phon_loss.item())
+                if i % 10 == 0:
+                    x_pred = torch.argmax(phon_pred[0], dim=-1)
+                    text_pred = self.tokenizer.decode(x_pred.detach().cpu().tolist())
+                    text_true = self.tokenizer.decode(batch['x'][0].cpu().tolist())
+                    print(text_pred)
+                    print(text_true)
+
+                self.writer.add_scalar('phon_loss/train', phon_loss, e * len(session.train_set) + i)
+
+                if e < 10:
+                    continue
+
                 pred = model(batch)
+
+                
 
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
@@ -129,6 +160,7 @@ class ForwardTrainer:
                 self.writer.add_scalar('Params/learning_rate', session.lr, model.get_step())
 
                 stream(msg)
+
 
             val_out = self.evaluate(model, session.val_set)
             self.writer.add_scalar('Mel_Loss/val', val_out['mel_loss'], model.get_step())

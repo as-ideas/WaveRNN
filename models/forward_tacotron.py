@@ -11,6 +11,28 @@ from models.common_layers import CBHG, LengthRegulator, BatchNormConv
 from utils.text.symbols import phonemes
 
 
+class PhonPredictor(nn.Module):
+
+    def __init__(self):
+        super(PhonPredictor, self).__init__()
+        self.gru = nn.GRU(80, 128, bidirectional=True)
+        self.gru_2 = nn.GRU(256, 128, bidirectional=True)
+        self.lin = nn.Linear(256, len(phonemes))
+
+    def forward(self, batch):
+        mel = batch['mel']
+        dur = batch['dur']
+        x, _ = self.gru(mel.transpose(1, 2))
+        durcum = torch.cumsum(dur, dim=1)
+        output = torch.zeros((dur.size(0), dur.size(1), 256), dtype=torch.float).to(dur.device)
+        for b in range(mel.size(0)):
+            for indx, (i, j) in enumerate(zip(durcum[b, :-1], durcum[b, 1:])):
+                output[b, indx] = x[b, int(i):int(j), :].sum(0)
+        output, _ = self.gru_2(output)
+        output = self.lin(output)
+        return output
+
+
 class SeriesPredictor(nn.Module):
 
     def __init__(self, num_chars, emb_dim=64, conv_dims=256, rnn_dims=64, dropout=0.5):
