@@ -17,7 +17,7 @@ class PhonPredictor(nn.Module):
         super(PhonPredictor, self).__init__()
         self.conv = BatchNormConv(80, 512, 5)
         self.gru = nn.GRU(512, 256, bidirectional=True)
-        self.gru_2 = nn.GRU(256, 256, bidirectional=True)
+        self.gru_2 = nn.GRU(512, 256, bidirectional=True)
         self.lin = nn.Linear(512, len(phonemes))
 
     def forward(self, batch):
