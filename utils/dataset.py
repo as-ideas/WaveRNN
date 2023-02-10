@@ -132,7 +132,7 @@ class BinnedTacoDataLoader:
         tokenizer = Tokenizer()
         file_id_text_lens = []
         text_dict = unpickle_binary(paths.text_dict)
-        speaker_dict = unpickle_binary(paths.speaker_dict)
+        #speaker_dict = unpickle_binary(paths.speaker_dict)
         for item_id, _ in dataset:
             toks = tokenizer(text_dict[item_id])
             file_id_text_lens.append((item_id, len(toks)))
@@ -153,7 +153,7 @@ class BinnedTacoDataLoader:
         Random(SHUFFLE_SEED).shuffle(all_batches)
         self.all_batches = all_batches
         self.taco_dataset = TacoDataset(paths=paths, dataset_ids=dataset_ids,
-                                        text_dict=text_dict, speaker_dict=speaker_dict,
+                                        text_dict=text_dict, speaker_dict=None,
                                         tokenizer=tokenizer)
         self.collator = TacoCollator(r=1)
 
@@ -177,7 +177,7 @@ def get_taco_datasets(paths: Paths,
     train_data = unpickle_binary(paths.train_dataset)
     val_data = unpickle_binary(paths.val_dataset)
     text_dict = unpickle_binary(paths.text_dict)
-    speaker_dict = unpickle_binary(paths.speaker_dict)
+    #speaker_dict = unpickle_binary(paths.speaker_dict)
     train_data = filter_max_len(train_data, max_mel_len)
     val_data = filter_max_len(val_data, max_mel_len)
 
@@ -185,10 +185,11 @@ def get_taco_datasets(paths: Paths,
     val_ids, val_lens = zip(*val_data)
 
     train_dataset = TacoDataset(paths=paths, dataset_ids=train_ids,
-                                text_dict=text_dict, speaker_dict=speaker_dict,
+                                text_dict=text_dict, speaker_dict=None,
                                 tokenizer=tokenizer)
     val_dataset = TacoDataset(paths=paths, dataset_ids=val_ids,
-                              text_dict=text_dict, speaker_dict=speaker_dict,
+                              text_dict=text_dict, speaker_dict=None,
+                              text_dict=text_dict, speaker_dict=None,
                               tokenizer=tokenizer)
     train_sampler = BinnedLengthSampler(train_lens, batch_size, batch_size * 3)
     collator = TacoCollator(r=r)
@@ -223,7 +224,7 @@ def get_forward_datasets(paths: Paths,
     train_data = unpickle_binary(paths.train_dataset)
     val_data = unpickle_binary(paths.val_dataset)
     text_dict = unpickle_binary(paths.text_dict)
-    speaker_dict = unpickle_binary(paths.speaker_dict)
+    #speaker_dict = unpickle_binary(paths.speaker_dict)
     train_data = filter_max_len(train_data, max_mel_len)
     val_data = filter_max_len(val_data, max_mel_len)
     train_len_original = len(train_data)
@@ -245,10 +246,10 @@ def get_forward_datasets(paths: Paths,
     val_ids, val_lens = zip(*val_data)
 
     train_dataset = ForwardDataset(paths=paths, dataset_ids=train_ids,
-                                   text_dict=text_dict, speaker_dict=speaker_dict,
+                                   text_dict=text_dict, speaker_dict=None,
                                    tokenizer=tokenizer)
     val_dataset = ForwardDataset(paths=paths, dataset_ids=val_ids,
-                                 text_dict=text_dict, speaker_dict=speaker_dict,
+                                 text_dict=text_dict, speaker_dict=None,
                                  tokenizer=tokenizer)
     train_sampler = BinnedLengthSampler(train_lens, batch_size, batch_size * 3)
     collator = ForwardCollator(taco_collator=TacoCollator(r=1))
