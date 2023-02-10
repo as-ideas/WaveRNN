@@ -98,6 +98,7 @@ class ForwardTrainer:
                 phon_loss.backward()
                 self.phon_optim.step()
                 print(e, i, phon_loss.item())
+
                 if i % 10 == 0:
                     x_pred = torch.argmax(phon_pred[0], dim=-1)
                     text_pred = self.tokenizer.decode(x_pred.detach().cpu().tolist())
@@ -107,12 +108,15 @@ class ForwardTrainer:
 
                 self.writer.add_scalar('phon_loss/train', phon_loss, e * len(session.train_set) + i)
 
-                if e < 10:
+                if e < 20:
                     continue
 
-                pred = model(batch)
+                x_new = torch.zeros_like(batch['x'])
+                for b in range(phon_pred.size(0)):
+                    x_new[b] = torch.argmax(phon_pred[b], dim=-1).long()
+                batch['x'] = x_new
 
-                
+                pred = model(batch)
 
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
