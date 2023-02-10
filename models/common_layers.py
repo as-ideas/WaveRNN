@@ -60,7 +60,8 @@ class CBHG(nn.Module):
                  channels: int,
                  proj_channels: list,
                  num_highways: int,
-                 dropout: float = 0.5) -> None:
+                 dropout: float = 0.5,
+                 residual_strength: float = 0.) -> None:
         super().__init__()
 
         self.dropout = dropout
@@ -82,6 +83,8 @@ class CBHG(nn.Module):
             self.highways.append(hn)
 
         self.rnn = nn.GRU(channels, channels, batch_first=True, bidirectional=True)
+        self.res_lin = nn.Linear(channels, 2*channels)
+        self.residual_strength = residual_strength
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         residual = x
@@ -115,5 +118,8 @@ class CBHG(nn.Module):
             x = h(x)
 
         # And then the RNN
+        x_res = self.res_lin(x)
         x, _ = self.rnn(x)
+        x = x_res * self.residual_strength + x
+
         return x
