@@ -189,7 +189,6 @@ def get_taco_datasets(paths: Paths,
                                 tokenizer=tokenizer)
     val_dataset = TacoDataset(paths=paths, dataset_ids=val_ids,
                               text_dict=text_dict, speaker_dict=None,
-                              text_dict=text_dict, speaker_dict=None,
                               tokenizer=tokenizer)
     train_sampler = BinnedLengthSampler(train_lens, batch_size, batch_size * 3)
     collator = TacoCollator(r=r)
