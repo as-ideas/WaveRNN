@@ -11,11 +11,15 @@ from models.tacotron import Tacotron
 
 def save_checkpoint(model: torch.nn.Module,
                     optim: torch.optim.Optimizer,
+                    phon_model: torch.nn.Module,
+                    phon_optim: torch.optim.Optimizer,
                     config: Dict[str, Any],
                     path: Path,
                     meta: Dict[str, Any] = None) -> None:
     checkpoint = {'model': model.state_dict(),
                   'optim': optim.state_dict(),
+                  'phon_model': phon_model.state_dict(),
+                  'phon_optim': phon_optim.state_dict(),
                   'config': config}
     if meta is not None:
         checkpoint.update(meta)

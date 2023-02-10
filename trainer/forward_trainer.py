@@ -150,7 +150,7 @@ class ForwardTrainer:
                       f'| {speed:#.2} steps/s | Step: {k}k | '
 
                 if step % self.train_cfg['checkpoint_every'] == 0:
-                    save_checkpoint(model=model, optim=optimizer, config=self.config,
+                    save_checkpoint(model=model, optim=optimizer, phon_model=phon_model, phon_optim=self.phon_optim, config=self.config,
                                     path=self.paths.forward_checkpoints / f'forward_step{k}k.pt')
 
                 if step % self.train_cfg['plot_every'] == 0:
@@ -171,8 +171,8 @@ class ForwardTrainer:
             self.writer.add_scalar('Duration_Loss/val', val_out['dur_loss'], model.get_step())
             self.writer.add_scalar('Pitch_Loss/val', val_out['pitch_loss'], model.get_step())
             self.writer.add_scalar('Energy_Loss/val', val_out['energy_loss'], model.get_step())
-            save_checkpoint(model=model, optim=optimizer, config=self.config,
-                            path=self.paths.forward_checkpoints / 'latest_model.pt')
+            save_checkpoint(model=model, optim=optimizer, phon_model=phon_model, phon_optim=self.phon_optim, config=self.config,
+                            path=self.paths.forward_checkpoints / f'latest_model.pt')
 
             m_loss_avg.reset()
             duration_avg.reset()
