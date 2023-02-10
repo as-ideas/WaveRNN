@@ -24,7 +24,7 @@ class PhonPredictor(nn.Module):
         mel = batch['mel']
         dur = batch['dur']
         x = self.conv(mel).transpose(1, 2)
-        x, _ = self.gru(x.transpose(1, 2))
+        x, _ = self.gru(x)
         durcum = torch.cumsum(dur, dim=1)
         output = torch.zeros((dur.size(0), dur.size(1), 256), dtype=torch.float).to(dur.device)
         for b in range(mel.size(0)):
