@@ -15,19 +15,21 @@ class PhonPredictor(nn.Module):
 
     def __init__(self):
         super(PhonPredictor, self).__init__()
-        self.gru = nn.GRU(80, 128, bidirectional=True)
+        self.conv = BatchNormConv(80, 256, 5)
+        self.gru = nn.GRU(256, 128, bidirectional=True)
         self.gru_2 = nn.GRU(256, 128, bidirectional=True)
         self.lin = nn.Linear(256, len(phonemes))
 
     def forward(self, batch):
         mel = batch['mel']
         dur = batch['dur']
-        x, _ = self.gru(mel.transpose(1, 2))
+        x = self.conv(mel)
+        x, _ = self.gru(x.transpose(1, 2))
         durcum = torch.cumsum(dur, dim=1)
         output = torch.zeros((dur.size(0), dur.size(1), 256), dtype=torch.float).to(dur.device)
         for b in range(mel.size(0)):
             for indx, (i, j) in enumerate(zip(durcum[b, :-1], durcum[b, 1:])):
-                output[b, indx] = x[b, int(i):int(j), :].sum(0)
+                output[b, indx] = x[b, int(i):int(j), :].sum(0) / max(1, j-i)
         output, _ = self.gru_2(output)
         output = self.lin(output)
         return output
