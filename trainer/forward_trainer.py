@@ -199,6 +199,8 @@ class ForwardTrainer:
         for i, batch in enumerate(val_set, 1):
             batch = to_device(batch, device=device)
             with torch.no_grad():
+                phon_gen = self.phon_model.to(device).generate(batch)
+                batch['x_gen'] = phon_gen
                 pred = model(batch)
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
