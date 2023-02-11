@@ -41,7 +41,7 @@ class PhonPredictor(nn.Module):
             pred = self.forward(batch)
         mel = batch['mel']
         dur = batch['dur']
-        durcum = torch.cumsum(dur, dim=1)
+        durcum = torch.cumsum(torch.cat([torch.zeros(dur.size(0), 1).to(dur.device), dur]), dim=1)
         output = torch.zeros((dur.size(0), dur.size(1)), dtype=torch.float).to(dur.device)
         for b in range(mel.size(0)):
             x_pred = torch.argmax(pred['logits'][b], dim=-1)

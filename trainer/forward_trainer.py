@@ -102,7 +102,7 @@ class ForwardTrainer:
                 self.phon_optim.step()
                 print(e, i, phon_loss.item())
 
-                if i % 10 == 0:
+                if i % 1000 == 0:
                     x_pred = torch.argmax(phon_pred['logits'][0], dim=-1)
                     text_pred = self.tokenizer.decode(x_pred.detach().cpu().tolist())
                     text_true = self.tokenizer.decode(phon_pred['x'][0].cpu().tolist())
