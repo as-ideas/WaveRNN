@@ -224,6 +224,8 @@ class ForwardTrainer:
         device = next(model.parameters()).device
         batch = session.val_sample
         batch = to_device(batch, device=device)
+        phon_gen = self.phon_model.to(device).generate(batch)
+        batch['x_gen'] = phon_gen
 
         pred = model(batch)
         m1_hat = np_now(pred['mel'])[0, :, :]
