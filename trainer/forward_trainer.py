@@ -120,13 +120,11 @@ class ForwardTrainer:
 
                 self.writer.add_scalar('phon_loss/train', phon_loss, e * len(session.train_set) + i)
 
-                if e < 20:
-                    continue
+                #if e < 20:
+                #    continue
 
-                x_new = torch.zeros_like(batch['x'])
-                for b in range(phon_pred.size(0)):
-                    x_new[b] = torch.argmax(phon_pred[b], dim=-1).long()
-                batch['x'] = x_new
+                phon_gen = phon_model.generate(batch)
+                batch['x_gen'] = phon_gen
 
                 pred = model(batch)
 

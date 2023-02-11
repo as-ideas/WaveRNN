@@ -111,7 +111,8 @@ class ForwardTacotron(nn.Module):
         super().__init__()
         self.rnn_dims = rnn_dims
         self.padding_value = padding_value
-        self.embedding = nn.Embedding(num_chars, embed_dims)
+        self.embedding = nn.Embedding(num_chars, embed_dims//2)
+        self.gen_embedding = nn.Embedding(num_chars, embed_dims//2)
         self.lr = LengthRegulator()
         self.dur_pred = SeriesPredictor(num_chars=num_chars,
                                         emb_dim=series_embed_dims,
@@ -158,6 +159,7 @@ class ForwardTacotron(nn.Module):
 
     def forward(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         x = batch['x']
+        x_gen = batch['x_gen']
         mel = batch['mel']
         dur = batch['dur']
         mel_lens = batch['mel_len']
@@ -172,6 +174,9 @@ class ForwardTacotron(nn.Module):
         energy_hat = self.energy_pred(x).transpose(1, 2)
 
         x = self.embedding(x)
+        x_gen = self.gen_embedding(x_gen)
+        x = torch.cat([x, x_gen], dim=-1)
+
         x = x.transpose(1, 2)
         x = self.prenet(x)
 
@@ -249,6 +254,8 @@ class ForwardTacotron(nn.Module):
                       pitch_hat: torch.Tensor,
                       energy_hat: torch.Tensor) -> Dict[str, torch.Tensor]:
         x = self.embedding(x)
+        x_gen = self.gen_embedding(x)
+        x = torch.cat([x, x_gen], dim=-1)
         x = x.transpose(1, 2)
         x = self.prenet(x)
 

@@ -1,5 +1,5 @@
 
-tts_model_id: 'bild_phon_tts'
+tts_model_id: 'bild_phon_5_tts'
 data_path: 'data_bild'                                        # output data path
 
 tts_model: 'forward_tacotron'                             # choices: [forward_tacotron, fast_pitch]
