@@ -16,8 +16,9 @@ class PhonPredictor(nn.Module):
     def __init__(self):
         super(PhonPredictor, self).__init__()
         self.length_regulator = LengthRegulator()
-        self.conv = BatchNormConv(80, 256, 5)
-        self.gru = nn.GRU(256, 256, bidirectional=True)
+        self.conv1 = BatchNormConv(80, 256, 5)
+        self.conv2 = BatchNormConv(256, 256, 5)
+        self.gru = nn.LSTM(256, 256, bidirectional=True)
         self.lin = nn.Linear(512, len(phonemes))
 
     def forward(self, batch):
@@ -29,7 +30,8 @@ class PhonPredictor(nn.Module):
         x = self.length_regulator(x, dur)
         x = x.squeeze(-1)
 
-        output = self.conv(mel)
+        output = self.conv1(mel)
+        output = self.conv2(output)
         output, _ = self.gru(output.transpose(1, 2))
         output = self.lin(output)
         output = output[:, :x.size(1), :]
