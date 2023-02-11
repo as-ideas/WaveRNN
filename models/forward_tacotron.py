@@ -15,24 +15,41 @@ class PhonPredictor(nn.Module):
 
     def __init__(self):
         super(PhonPredictor, self).__init__()
-        self.conv = BatchNormConv(80, 512, 5)
-        self.gru = nn.GRU(512, 256, bidirectional=True)
-        self.gru_2 = nn.GRU(512, 256, bidirectional=True)
+        self.length_regulator = LengthRegulator()
+        self.conv = BatchNormConv(80, 256, 5)
+        self.gru = nn.GRU(256, 256, bidirectional=True)
         self.lin = nn.Linear(512, len(phonemes))
 
     def forward(self, batch):
         mel = batch['mel']
         dur = batch['dur']
-        x = self.conv(mel).transpose(1, 2)
-        x, _ = self.gru(x)
-        durcum = torch.cumsum(torch.cat([torch.zeros(dur.size(0), 1).to(dur.device), dur], dim=1), dim=1)
-        output = torch.zeros((dur.size(0), dur.size(1), 512), dtype=torch.float).to(dur.device)
-        for b in range(mel.size(0)):
-            for indx, (i, j) in enumerate(zip(durcum[b, :-1], durcum[b, 1:])):
-                output[b, indx] = x[b, int(i):int(j), :].sum(0) / max(1, j-i)
-        output, _ = self.gru_2(output)
+        x = batch['x']
+
+        x = x.unsqueeze(-1)
+        x = self.length_regulator(x, dur)
+        x = x.squeeze(-1)
+
+        output = self.conv(mel)
+        output, _ = self.gru(output.transpose(1, 2))
         output = self.lin(output)
-        return output
+        output = output[:, :x.size(1), :]
+
+        return {'x': x, 'logits': output}
+
+    def generate(self, batch):
+        with torch.no_grad():
+            pred = self.forward(batch)
+        mel = batch['mel']
+        dur = batch['dur']
+        durcum = torch.cumsum(dur, dim=1)
+        output = torch.zeros((dur.size(0), dur.size(1)), dtype=torch.float).to(dur.device)
+        for b in range(mel.size(0)):
+            x_pred = torch.argmax(pred['logits'][b], dim=-1)
+            for indx, (i, j) in enumerate(zip(durcum[b, :-1], durcum[b, 1:])):
+                unique, counts = torch.unique(x_pred[int(i):int(j)], return_counts=True)
+                label = unique[counts.argmax()] if j > i else 0
+                output[b, indx] = label
+        return output.long()
 
 
 class SeriesPredictor(nn.Module):

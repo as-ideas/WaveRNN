@@ -92,7 +92,10 @@ class ForwardTrainer:
                 batch['energy'] = batch['energy'] * energy_zoneout_mask.to(device).float()
 
                 phon_pred = phon_model(batch)
-                phon_loss = ce_loss(phon_pred.transpose(1, 2), batch['x'])
+
+                phon_loss = ce_loss(phon_pred['logits'].transpose(1, 2), phon_pred['x'])
+
+
 
                 self.phon_optim.zero_grad()
                 phon_loss.backward()
@@ -100,11 +103,20 @@ class ForwardTrainer:
                 print(e, i, phon_loss.item())
 
                 if i % 10 == 0:
-                    x_pred = torch.argmax(phon_pred[0], dim=-1)
+                    x_pred = torch.argmax(phon_pred['logits'][0], dim=-1)
                     text_pred = self.tokenizer.decode(x_pred.detach().cpu().tolist())
+                    text_true = self.tokenizer.decode(phon_pred['x'][0].cpu().tolist())
+
+                    print('---------------------')
+                    print(text_pred)
+                    print(text_true)
+
+                    phon_gen = phon_model.generate(batch)
+                    text_pred = self.tokenizer.decode(phon_gen[0].cpu().tolist())
                     text_true = self.tokenizer.decode(batch['x'][0].cpu().tolist())
                     print(text_pred)
                     print(text_true)
+
 
                 self.writer.add_scalar('phon_loss/train', phon_loss, e * len(session.train_set) + i)
 
