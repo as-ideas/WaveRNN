@@ -120,8 +120,8 @@ class ForwardTrainer:
 
                 self.writer.add_scalar('phon_loss/train', phon_loss, e * len(session.train_set) + i)
 
-                #if e < 20:
-                #    continue
+                if e < 50:
+                    continue
 
                 phon_gen = phon_model.generate(batch)
                 batch['x_gen'] = phon_gen
