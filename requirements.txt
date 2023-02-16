@@ -1,4 +1,4 @@
-numba==0.49.1
+numba==0.48
 librosa==0.7.2
 pyworld >= 0.2.10
 torch>=1.2.0
@@ -14,3 +14,4 @@ matplotlib
 unidecode
 inflect
 resemblyzer==0.1.1-dev
+pandas
