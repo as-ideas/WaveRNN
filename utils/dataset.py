@@ -68,10 +68,17 @@ class TacoDataset(Dataset):
         x = self.tokenizer(text)
         mel = np.load(str(self.paths.mel/f'{item_id}.npy'))
         mel_len = mel.shape[-1]
+
+        mel_mask = np.load(str(self.paths.mel_mask / f'{item_id}.npy'))
+        mel_masked = mel[:, mel_mask]
+        mel_masked_len = mel_masked.shape[-1]
+
         speaker_emb = np.load(str(self.paths.speaker_emb/f'{item_id}.npy'))
         return {'x': x, 'mel': mel, 'item_id': item_id,
                 'mel_len': mel_len, 'x_len': len(x),
-                'speaker_emb': speaker_emb, 'speaker_name': speaker_name}
+                'speaker_emb': speaker_emb, 'speaker_name': speaker_name,
+                'mel_masked_len': mel_masked_len, 'mel_masked': mel_masked,
+                'mel_mask': mel_mask}
 
     def __len__(self):
         return len(self.metadata)
@@ -105,9 +112,15 @@ class ForwardDataset(Dataset):
         pitch_cond = np.ones(pitch.shape)
         pitch_cond[pitch != 0] = 2
 
+        mel_mask = np.load(str(self.paths.mel_mask / f'{item_id}.npy'))
+        mel_masked = mel[:, mel_mask]
+        mel_masked_len = mel_masked.shape[-1]
+
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
                 'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy,
-                'speaker_emb': speaker_emb, 'pitch_cond': pitch_cond, 'speaker_name': speaker_name}
+                'speaker_emb': speaker_emb, 'pitch_cond': pitch_cond, 'speaker_name': speaker_name,
+               'mel_masked_len': mel_masked_len, 'mel_masked': mel_masked, 'mel_mask': mel_mask
+                }
 
     def __len__(self):
         return len(self.metadata)
@@ -293,23 +306,39 @@ class TacoCollator:
         max_x_len = max(x_len)
         text = [pad1d(b['x'], max_x_len) for b in batch]
         text = stack_to_tensor(text).long()
-        spec_lens = [b['mel_len'] for b in batch]
-        max_spec_len = max(spec_lens) + 1
-        if max_spec_len % self.r != 0:
-            max_spec_len += self.r - max_spec_len % self.r
-        mel = [pad2d(b['mel'], max_spec_len) for b in batch]
+
+        max_mel_len = self._get_max_spec_len('mel_len', batch)
+        mel = [pad2d(b['mel'], max_mel_len) for b in batch]
         mel = stack_to_tensor(mel)
+
+        max_mel_masked_len = self._get_max_spec_len('mel_masked_len', batch)
+        mel_masked = [pad2d(b['mel_masked'], max_mel_masked_len) for b in batch]
+        mel_masked = stack_to_tensor(mel_masked)
+
+        mel_mask = [pad1d(b['mel_mask'][:max_mel_len], max_mel_len) for b in batch]
+        mel_mask = stack_to_tensor(mel_mask)
+
         item_id = [b['item_id'] for b in batch]
         speaker_name = [b['speaker_name'] for b in batch]
         mel_lens = [b['mel_len'] for b in batch]
         mel_lens = torch.tensor(mel_lens)
+        mel_masked_lens = [b['mel_masked_len'] for b in batch]
+        mel_masked_lens = torch.tensor(mel_masked_lens)
         speaker_emb = [b['speaker_emb'] for b in batch]
         speaker_emb = stack_to_tensor(speaker_emb)
 
         return {'x': text, 'mel': mel, 'item_id': item_id,
                 'x_len': x_len, 'mel_len': mel_lens,
-                'speaker_emb': speaker_emb, 'speaker_name': speaker_name}
+                'speaker_emb': speaker_emb, 'speaker_name': speaker_name,
+                'mel_masked': mel_masked, 'mel_mask': mel_mask,
+                'mel_masked_len': mel_masked_lens}
 
+    def _get_max_spec_len(self, mel_len_key: str, batch: List[dict]) -> int:
+        spec_lens = [b[mel_len_key] for b in batch]
+        max_spec_len = max(spec_lens) + 1
+        if max_spec_len % self.r != 0:
+            max_spec_len += self.r - max_spec_len % self.r
+        return max_spec_len
 
 class ForwardCollator:
 
