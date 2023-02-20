@@ -26,6 +26,7 @@ class DSP:
                  vad_window_length: float,
                  vad_moving_average_width: float,
                  vad_max_silence_length: int,
+                 vad_mel_mask_max_silence_length: int,
                  **kwargs,  # for backward compatibility
                  ) -> None:
 
@@ -46,6 +47,7 @@ class DSP:
         self.vad_window_length = vad_window_length
         self.vad_moving_average_width = vad_moving_average_width
         self.vad_max_silence_length = vad_max_silence_length
+        self.vad_mel_mask_max_silence_length = vad_mel_mask_max_silence_length
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> 'DSP':
@@ -103,26 +105,43 @@ class DSP:
     def trim_silence(self, wav: np.array) -> np.array:
         return librosa.effects.trim(wav, top_db=self.trim_silence_top_db, frame_length=2048, hop_length=512)[0]
 
-    # borrowed from https://github.com/resemble-ai/Resemblyzer/blob/master/resemblyzer/audio.py
     def trim_long_silences(self, wav: np.array) -> np.array:
+        audio_mask = self.get_audio_mask(wav, self.vad_max_silence_length)
+        audio_mask = audio_mask[:len(wav)]
+        return wav[audio_mask]
+
+    def get_mel_mask(self, wav: np.array, mel: np.array) -> np.array:
+        audio_mask = self.get_audio_mask(wav, max_silence_len=self.vad_mel_mask_max_silence_length)
+        end = len(audio_mask) - (len(audio_mask) % 256)
+        audio_mask = audio_mask[:end]
+        mel_mask = audio_mask.reshape(-1, 256).max(axis=1)
+        mel_mask = mel_mask[:mel.shape[-1]]
+        return mel_mask
+
+    # borrowed from https://github.com/resemble-ai/Resemblyzer/blob/master/resemblyzer/audio.py
+    def get_audio_mask(self, wav: np.array, max_silence_len: int) -> np.array:
+        wav = np.concatenate([wav, np.zeros(256*10)])
         int16_max = (2 ** 15) - 1
         samples_per_window = (self.vad_window_length * self.vad_sample_rate) // 1000
         wav = wav[:len(wav) - (len(wav) % samples_per_window)]
         pcm_wave = struct.pack("%dh" % len(wav), *(np.round(wav * int16_max)).astype(np.int16))
         voice_flags = []
         vad = webrtcvad.Vad(mode=3)
+
         for window_start in range(0, len(wav), samples_per_window):
             window_end = window_start + samples_per_window
             voice_flags.append(vad.is_speech(pcm_wave[window_start * 2:window_end * 2],
                                              sample_rate=self.vad_sample_rate))
         voice_flags = np.array(voice_flags)
+
         def moving_average(array, width):
             array_padded = np.concatenate((np.zeros((width - 1) // 2), array, np.zeros(width // 2)))
             ret = np.cumsum(array_padded, dtype=float)
             ret[width:] = ret[width:] - ret[:-width]
             return ret[width - 1:] / width
+
         audio_mask = moving_average(voice_flags, self.vad_moving_average_width)
         audio_mask = np.round(audio_mask).astype(np.bool)
-        audio_mask[:] = binary_dilation(audio_mask[:], np.ones(self.vad_max_silence_length + 1))
+        audio_mask[:] = binary_dilation(audio_mask[:], np.ones(max_silence_len + 1))
         audio_mask = np.repeat(audio_mask, samples_per_window)
-        return wav[audio_mask]
+        return audio_mask

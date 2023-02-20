@@ -1,4 +1,5 @@
 import logging
+import traceback
 from dataclasses import dataclass
 from logging import INFO
 from typing import List, Dict, Any, Tuple
@@ -16,7 +17,6 @@ from utils.files import unpickle_binary
 from utils.metrics import attention_score
 from utils.paths import Paths
 from utils.text.tokenizer import Tokenizer
-
 
 @dataclass
 class DurationResult:
@@ -53,22 +53,59 @@ class DurationExtractionDataset(Dataset):
         item_id = self.metadata[index]
         x = self.text_dict[item_id]
         x = self.tokenizer(x)
+        x = torch.tensor(x)
         mel = np.load(self.paths.mel / f'{item_id}.npy')
         mel = torch.from_numpy(mel)
-        x = torch.tensor(x)
+
+        mel_mask = np.load(self.paths.mel_mask / f'{item_id}.npy')
+        mel_mask = torch.from_numpy(mel_mask).bool()
+        mel_masked = mel[:, mel_mask]
         attention_npy = np.load(str(self.paths.att_pred / f'{item_id}.npy'))
         attention = torch.from_numpy(attention_npy)
-        mel_len = mel.shape[-1]
-        mel_len = torch.tensor(mel_len).unsqueeze(0)
-        align_score, _ = attention_score(attention.unsqueeze(0), mel_len, r=1)
-        align_score = float(align_score)
+
+        attention = self.expand_attention_tensor(attention, mel_mask)
+        mel[:, ~mel_mask] = self.duration_extractor.silence_threshold - 1
+
+        align_score, _ = attention_score(attention.unsqueeze(0), torch.full((1, ), fill_value=mel_masked.shape[-1]), r=1)
+        align_score = float(align_score[0])
+
         durations, att_score = self.duration_extractor(x=x, mel=mel, attention=attention)
         att_score = float(att_score)
         durations_npy = durations.cpu().numpy()
-        if np.sum(durations_npy) != mel_len:
-            print(f'WARNINNG: Sum of durations did not match mel length for item {item_id}!')
+        assert np.sum(durations_npy) == mel.shape[-1], 'Sum of durations did not match mel length for item {item_id}!'
         return DurationResult(item_id=item_id, att_score=att_score,
                               align_score=align_score, durations=durations_npy)
+
+    @staticmethod
+    def get_unvoiced_split_points(mel_mask: torch.Tensor) -> np.array:
+        """ Returns indices of mel mask where silent parts begin and end, e.g. [0, 1, 1, 0, 1] --> [1, 2, 4]"""
+        iszero = torch.cat([torch.tensor([0], dtype=torch.int8, device=mel_mask.device), (mel_mask == 0).to(torch.int8), torch.tensor([0], dtype=torch.int8, device=mel_mask.device)])
+        absdiff = torch.abs(torch.diff(iszero))
+        ranges = torch.where(absdiff == 1)[0].reshape(-1, 2)
+        return ranges
+
+    @staticmethod
+    def get_voiced_split_points(mel_mask: torch.Tensor) -> Tuple[list, list]:
+        """ Returns indices of mel mask where non-silent parts begin and end, e.g. [0, 1, 1, 0, 1] --> [1, 2, 4]"""
+        ones = torch.where(mel_mask == 1)[0]
+        if len(ones) == 0:
+            return [0], [len(mel_mask)]
+        else:
+            diff = ones[1:] - ones[:-1]
+            gaps = torch.where(diff > 1)[0] + 1
+            starts = torch.cat([ones[0].unsqueeze(0), ones[gaps]]).tolist()
+            ends = torch.cat([ones[gaps-1], ones[-1].unsqueeze(0)]).tolist()
+            return starts, ends
+
+    @staticmethod
+    def expand_attention_tensor(attention: torch.Tensor, mel_mask: np.array) -> np.array:
+        expanded_attention = torch.zeros((mel_mask.size(0), attention.size(1)))
+        voiced_index = 0
+        for i, m in enumerate(mel_mask):
+            if bool(m):
+                expanded_attention[i, :] = attention[voiced_index, :]
+                voiced_index += 1
+        return expanded_attention
 
     def __len__(self):
         return len(self.metadata)

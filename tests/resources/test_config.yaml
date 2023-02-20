@@ -21,6 +21,7 @@ dsp:
   vad_window_length: 30      # In milliseconds
   vad_moving_average_width: 8
   vad_max_silence_length: 12
+  vad_mel_mask_max_silence_length: 1
   vad_sample_rate: 16000
 
 preprocessing:
