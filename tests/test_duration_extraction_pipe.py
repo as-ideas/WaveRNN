@@ -51,6 +51,7 @@ class TestDurationExtractionPipe(unittest.TestCase):
         pickle_binary(self.speaker_dict, self.paths.speaker_dict)
         for id, mel_len in self.train_dataset + self.val_dataset:
             np.save(self.paths.mel / f'{id}.npy', np.ones((5, mel_len)), allow_pickle=False)
+            np.save(self.paths.mel_mask / f'{id}.npy', np.ones((mel_len,)), allow_pickle=False)
             np.save(self.paths.speaker_emb / f'{id}.npy', np.ones(1), allow_pickle=False)
 
     def tearDown(self) -> None:
