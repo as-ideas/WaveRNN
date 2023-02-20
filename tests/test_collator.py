@@ -12,8 +12,11 @@ class TestDataset(unittest.TestCase):
             {
                 'item_id': 0,
                 'mel': np.full((2, 5), fill_value=1.),
+                'mel_masked': np.full((2, 4), fill_value=1.),
+                'mel_mask': np.full((5, ), fill_value=1.),
                 'x': np.full(2, fill_value=2.),
                 'mel_len': 5,
+                'mel_masked_len': 4,
                 'x_len': 2,
                 'dur': np.full(2, fill_value=3.),
                 'pitch': np.full(2, fill_value=4.),
@@ -25,8 +28,11 @@ class TestDataset(unittest.TestCase):
             {
                 'item_id': 1,
                 'mel': np.full((2, 6), fill_value=1.),
+                'mel_masked': np.full((2, 5), fill_value=1.),
+                'mel_mask': np.full((6, ), fill_value=1.),
                 'x': np.full(3, fill_value=2.),
                 'mel_len': 6,
+                'mel_masked_len': 5,
                 'x_len': 3,
                 'dur': np.full(3, fill_value=3.),
                 'pitch': np.full(3, fill_value=4.),
@@ -43,12 +49,18 @@ class TestDataset(unittest.TestCase):
         self.assertEqual(1, batch['item_id'][1])
         self.assertEqual((2, 7), batch['mel'][0].size())
         self.assertEqual((2, 7), batch['mel'][1].size())
+        self.assertEqual((2, 6), batch['mel_masked'][0].size())
+        self.assertEqual((2, 6), batch['mel_masked'][1].size())
         self.assertEqual([2., 2., 2., 2., 2., -11.5129*2, -11.5129*2], torch.sum(batch['mel'][0], dim=0).tolist())
         self.assertEqual([2., 2., 2., 2., 2., 2., -11.5129*2], torch.sum(batch['mel'][1], dim=0).tolist())
         self.assertEqual(2, batch['x_len'][0])
         self.assertEqual(3, batch['x_len'][1])
         self.assertEqual(5, batch['mel_len'][0])
         self.assertEqual(6, batch['mel_len'][1])
+        self.assertEqual(4, batch['mel_masked_len'][0])
+        self.assertEqual(5, batch['mel_masked_len'][1])
+        self.assertEqual([1., 1., 1., 1., 1., 0., 0.], batch['mel_mask'][0].tolist())
+        self.assertEqual([1., 1., 1., 1., 1., 1., 0.], batch['mel_mask'][1].tolist())
         self.assertEqual([2., 2., 0], batch['x'][0].tolist())
         self.assertEqual([2., 2., 2.], batch['x'][1].tolist())
         self.assertEqual([3., 3., 0], batch['dur'][0].tolist())

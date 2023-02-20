@@ -116,10 +116,11 @@ class ForwardDataset(Dataset):
         mel_masked = mel[:, mel_mask.astype(bool)]
         mel_masked_len = mel_masked.shape[-1]
 
-        return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
+        return {
+                'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
                 'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy,
                 'speaker_emb': speaker_emb, 'pitch_cond': pitch_cond, 'speaker_name': speaker_name,
-               'mel_masked_len': mel_masked_len, 'mel_masked': mel_masked, 'mel_mask': mel_mask
+                'mel_masked_len': mel_masked_len, 'mel_masked': mel_masked, 'mel_mask': mel_mask
                 }
 
     def __len__(self):
