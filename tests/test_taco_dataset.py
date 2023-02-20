@@ -25,11 +25,13 @@ class TestForwardDataset(unittest.TestCase):
         paths.data = data_dir
 
         mels = [np.full((2, 2), fill_value=1), np.full((2, 3), fill_value=2)]
+        mel_mask = [np.array([1, 0]), np.array([1, 0, 1])]
         speaker_embs = [np.full(1, fill_value=6), np.full(1, fill_value=7)]
 
         for i in range(2):
             np.save(str(paths.mel / f'{i}.npy'), mels[i])
             np.save(str(paths.speaker_emb / f'{i}.npy'), speaker_embs[i])
+            np.save(str(paths.mel_mask / f'{i}.npy'), mel_mask[i])
 
         dataset = TacoDataset(paths=paths,
                               dataset_ids=['0', '1'],
@@ -41,6 +43,8 @@ class TestForwardDataset(unittest.TestCase):
 
         np.testing.assert_allclose(data[0]['mel'], mels[0], rtol=1e-10)
         np.testing.assert_allclose(data[1]['mel'], mels[1], rtol=1e-10)
+        np.testing.assert_allclose(data[0]['mel_mask'], mel_mask[0], rtol=1e-10)
+        np.testing.assert_allclose(data[1]['mel_mask'], mel_mask[1], rtol=1e-10)
         np.testing.assert_allclose(data[0]['speaker_emb'], speaker_embs[0], rtol=1e-10)
         np.testing.assert_allclose(data[1]['speaker_emb'], speaker_embs[1], rtol=1e-10)
 
@@ -50,5 +54,7 @@ class TestForwardDataset(unittest.TestCase):
         self.assertEqual('1', data[1]['item_id'])
         self.assertEqual(2, data[0]['mel_len'])
         self.assertEqual(3, data[1]['mel_len'])
+        self.assertEqual(1, data[0]['mel_masked_len'])  # mel mask is removing one mel frame
+        self.assertEqual(2, data[1]['mel_masked_len'])  # mel mask is removing one mel frame
         self.assertEqual('speaker_0', data[0]['speaker_name'])
         self.assertEqual('speaker_1', data[1]['speaker_name'])

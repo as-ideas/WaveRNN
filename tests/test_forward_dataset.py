@@ -25,6 +25,7 @@ class TestForwardDataset(unittest.TestCase):
         paths.data = data_dir
 
         mels = [np.full((2, 2), fill_value=1), np.full((2, 3), fill_value=2)]
+        mel_mask = [np.array([1, 0]), np.array([1, 0, 1])]
         durs = [np.full(1, fill_value=2), np.full(2, fill_value=3)]
         pitches = [np.full(1, fill_value=5), np.full(2, fill_value=6)]
         energies = [np.full(1, fill_value=6), np.full(2, fill_value=7)]
@@ -32,6 +33,7 @@ class TestForwardDataset(unittest.TestCase):
 
         for i in range(2):
             np.save(str(paths.mel / f'{i}.npy'), mels[i])
+            np.save(str(paths.mel_mask / f'{i}.npy'), mel_mask[i])
             np.save(str(paths.alg / f'{i}.npy'), durs[i])
             np.save(str(paths.phon_pitch / f'{i}.npy'), pitches[i])
             np.save(str(paths.phon_energy / f'{i}.npy'), energies[i])
@@ -62,5 +64,7 @@ class TestForwardDataset(unittest.TestCase):
         self.assertEqual('1', data[1]['item_id'])
         self.assertEqual(2, data[0]['mel_len'])
         self.assertEqual(3, data[1]['mel_len'])
+        self.assertEqual(1, data[0]['mel_masked_len'])  # mel mask is removing one mel frame
+        self.assertEqual(2, data[1]['mel_masked_len'])  # mel mask is removing one mel frame
         self.assertEqual('speaker_0', data[0]['speaker_name'])
         self.assertEqual('speaker_1', data[1]['speaker_name'])

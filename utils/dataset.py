@@ -70,7 +70,7 @@ class TacoDataset(Dataset):
         mel_len = mel.shape[-1]
 
         mel_mask = np.load(str(self.paths.mel_mask / f'{item_id}.npy'))
-        mel_masked = mel[:, mel_mask]
+        mel_masked = mel[:, mel_mask.astype(bool)]
         mel_masked_len = mel_masked.shape[-1]
 
         speaker_emb = np.load(str(self.paths.speaker_emb/f'{item_id}.npy'))
@@ -113,7 +113,7 @@ class ForwardDataset(Dataset):
         pitch_cond[pitch != 0] = 2
 
         mel_mask = np.load(str(self.paths.mel_mask / f'{item_id}.npy'))
-        mel_masked = mel[:, mel_mask]
+        mel_masked = mel[:, mel_mask.astype(bool)]
         mel_masked_len = mel_masked.shape[-1]
 
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
