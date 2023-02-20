@@ -79,7 +79,7 @@ class DurationExtractor:
         for j in mel_text.values():
             durations[j] += 1
 
-        att_score = sum(att_scores) / len(att_scores)
+        att_score = sum(att_scores) / max(len(att_scores), 1)
 
         return durations, att_score
 
