@@ -72,30 +72,11 @@ class DurationExtractionDataset(Dataset):
         durations, att_score = self.duration_extractor(x=x, mel=mel, attention=attention)
         att_score = float(att_score)
         durations_npy = durations.cpu().numpy()
+
         assert np.sum(durations_npy) == mel.shape[-1], 'Sum of durations did not match mel length for item {item_id}!'
+
         return DurationResult(item_id=item_id, att_score=att_score,
                               align_score=align_score, durations=durations_npy)
-
-    @staticmethod
-    def get_unvoiced_split_points(mel_mask: torch.Tensor) -> np.array:
-        """ Returns indices of mel mask where silent parts begin and end, e.g. [0, 1, 1, 0, 1] --> [1, 2, 4]"""
-        iszero = torch.cat([torch.tensor([0], dtype=torch.int8, device=mel_mask.device), (mel_mask == 0).to(torch.int8), torch.tensor([0], dtype=torch.int8, device=mel_mask.device)])
-        absdiff = torch.abs(torch.diff(iszero))
-        ranges = torch.where(absdiff == 1)[0].reshape(-1, 2)
-        return ranges
-
-    @staticmethod
-    def get_voiced_split_points(mel_mask: torch.Tensor) -> Tuple[list, list]:
-        """ Returns indices of mel mask where non-silent parts begin and end, e.g. [0, 1, 1, 0, 1] --> [1, 2, 4]"""
-        ones = torch.where(mel_mask == 1)[0]
-        if len(ones) == 0:
-            return [0], [len(mel_mask)]
-        else:
-            diff = ones[1:] - ones[:-1]
-            gaps = torch.where(diff > 1)[0] + 1
-            starts = torch.cat([ones[0].unsqueeze(0), ones[gaps]]).tolist()
-            ends = torch.cat([ones[gaps-1], ones[-1].unsqueeze(0)]).tolist()
-            return starts, ends
 
     @staticmethod
     def expand_attention_tensor(attention: torch.Tensor, mel_mask: np.array) -> np.array:

@@ -76,6 +76,7 @@ class DurationExtractor:
             if not sil_mask[i]:
                 att_scores.append(float(attention[i, j]))
 
+
         for j in mel_text.values():
             durations[j] += 1
 
