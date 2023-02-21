@@ -45,13 +45,15 @@ class TestDurationExtractionPipe(unittest.TestCase):
         self.val_dataset = [('id_4', 6), ('id_5', 12)]
         pickle_binary(self.train_dataset, self.paths.train_dataset)
         pickle_binary(self.val_dataset, self.paths.val_dataset)
-        self.text_dict = {file_id: 'a' * length for file_id, length in self.train_dataset + self.val_dataset}
+        self.text_dict = {file_id: 'a' * (length-1) for file_id, length in self.train_dataset + self.val_dataset}
         self.speaker_dict = {file_id: 'default_speaker' for file_id, _ in self.train_dataset + self.val_dataset}
         pickle_binary(self.text_dict, self.paths.text_dict)
         pickle_binary(self.speaker_dict, self.paths.speaker_dict)
         for id, mel_len in self.train_dataset + self.val_dataset:
             np.save(self.paths.mel / f'{id}.npy', np.ones((5, mel_len)), allow_pickle=False)
-            np.save(self.paths.mel_mask / f'{id}.npy', np.ones((mel_len,)), allow_pickle=False)
+            mel_mask = np.ones((mel_len,))
+            mel_mask[2] = 0
+            np.save(self.paths.mel_mask / f'{id}.npy', mel_mask, allow_pickle=False)
             np.save(self.paths.speaker_emb / f'{id}.npy', np.ones(1), allow_pickle=False)
 
     def tearDown(self) -> None:
@@ -78,15 +80,17 @@ class TestDurationExtractionPipe(unittest.TestCase):
             self.assertEqual(expected_att_size, att.shape)
 
         att_score_dict = duration_extraction_pipe.extract_durations(num_workers=1, sampler_bin_size=1)
-
-        expected_att_score_dict = {f'{file_id}': (1., 1.) for file_id, _ in self.train_dataset + self.val_dataset}
-        self.assertEqual(expected_att_score_dict, att_score_dict)
+        for id, (sharp_score, att_score) in att_score_dict.items():
+            self.assertEqual(1., att_score)
+            self.assertGreater(sharp_score, 0.6)
 
         dur_files = list(self.paths.alg.glob('**/*.npy'))
         self.assertEqual(5, len(dur_files))
 
         for dur_file in dur_files:
             dur = np.load(dur_file)
-            # We expect durations of one due to the diagonal attention.
+            # We expect durations of one due to the diagonal attention except for index two,
+            # because of masking of the third mel frame
             expected = np.ones(len(dur))
+            expected[1] = 2
             np.testing.assert_allclose(expected, dur, rtol=1e-8)
