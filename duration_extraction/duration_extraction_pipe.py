@@ -130,13 +130,13 @@ class DurationExtractionPipeline:
             batch = to_device(batch, device=device)
             with torch.no_grad():
                 _, _, attention_batch = model(batch)
-            _, att_score = attention_score(attention_batch, batch['mel_len'], r=1)
+            _, att_score = attention_score(attention_batch, batch['mel_masked_len'], r=1)
             sum_att_score += att_score.sum()
             B = batch['x_len'].size(0)
             sum_items += B
             for b in range(B):
                 x_len = batch['x_len'][b].cpu()
-                mel_len = batch['mel_len'][b].cpu()
+                mel_len = batch['mel_masked_len'][b].cpu()
                 item_id = batch['item_id'][b]
                 attention = attention_batch[b, :mel_len, :x_len].cpu()
                 np.save(self.paths.att_pred / f'{item_id}.npy', attention.numpy(), allow_pickle=False)
