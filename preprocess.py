@@ -131,7 +131,9 @@ if __name__ == '__main__':
     text_dict = {item_id: text for item_id, text in text_dict.items()
                  if item_id in audio_ids and len(text) > config['preprocessing']['min_text_len']}
     file_id_to_audio = {k: v for k, v in file_id_to_audio.items() if k in text_dict}
+    audio_ids = {k for k in audio_ids if k in text_dict}
     speaker_dict = {item_id: speaker for item_id, speaker in speaker_dict_raw.items() if item_id in audio_ids}
+
     speaker_counts = Counter(speaker_dict.values())
 
     assert len(file_id_to_audio) > 0, f'No audio file is indexed in metadata, exiting. ' \
