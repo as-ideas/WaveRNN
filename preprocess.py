@@ -87,7 +87,7 @@ class Preprocessor:
             y /= peak
             y = y * 0.95
         mel = self.dsp.wav_to_mel(y)
-        mel_mask = self.dsp.get_mel_mask(y, mel, max_silence_len=1)
+        mel_mask = self.dsp.get_mel_mask(y, mel)
         pitch = self.pitch_extractor(y)
         text = self.text_dict[item_id]
         text = self.cleaner(text)
