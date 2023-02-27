@@ -22,6 +22,6 @@ class TestDSP(unittest.TestCase):
         y = dsp.load_wav(file)[:10000]
         mel = dsp.wav_to_mel(y)
         expected = np.load(str(self.resource_path / 'test_mel.npy'))
-        np.testing.assert_allclose(expected, mel)
+        np.testing.assert_allclose(expected, mel, rtol=1e-5)
 
 

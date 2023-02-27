@@ -37,16 +37,16 @@ class TestDurationExtractor(unittest.TestCase):
         mel = torch.full((80, 10), fill_value=-10).float()
         mel[:, 4:6] = -11.51
 
-        # Mock up simple diagonal attention which is fuzzy at mel indices 4:6, exactly where the model
+        # Mock up simple diagonal attention which is fuzzy at mel indices 3:5, exactly where the model
         # should look at x[2], which is a silent token (token_index=10, which is a whitespace)
         attention = new_diagonal_attention((10, 5))
-        attention[4:6, :] = 1./len(x)
+        attention[3:5, :] = 1./len(x)
 
         # duration extractor with no probability shift delivers larger durations after the pause (at index=3)
         duration_extractor = DurationExtractor(silence_threshold=-11.,
                                                silence_prob_shift=0.)
         durs, att_score = duration_extractor(x=x, mel=mel, attention=attention)
-        expected = [2., 2., 1., 3., 2]
+        expected = [2., 3., 1., 2., 2]
         self.assertEqual(expected, durs.tolist())
 
         # duration extractor with some probability shift delivers larger durations during the pause (at index=2)
