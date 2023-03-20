@@ -40,8 +40,7 @@ class ForwardTrainer:
             if model.get_step() < max_step:
                 train_set, val_set = get_forward_datasets(
                     paths=self.paths, batch_size=bs,
-                    max_mel_len=self.train_cfg['max_mel_len'],
-                    filter_attention=self.train_cfg['filter_attention'],
+                    filter_max_mel_len=self.train_cfg['max_mel_len'],
                     filter_min_alignment=self.train_cfg['min_attention_alignment'],
                     filter_min_sharpness=self.train_cfg['min_attention_sharpness'])
                 session = TTSSession(

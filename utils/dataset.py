@@ -3,6 +3,7 @@ from random import Random
 from typing import List, Tuple, Iterator
 
 import torch
+import tqdm
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import Sampler
 
@@ -11,8 +12,50 @@ from utils.files import unpickle_binary
 from utils.paths import Paths
 from utils.text.tokenizer import Tokenizer
 
-
 SHUFFLE_SEED = 42
+
+
+class DataFilter:
+
+    def __init__(self,
+                 paths: Paths,
+                 att_score_dict: Dict[str, Tuple[float, float]],
+                 att_min_alignment: float,
+                 att_min_sharpness: float,
+                 max_consecutive_duration_ones: int,
+                 max_duration: int):
+        self.paths = paths
+        self.att_score_dict = att_score_dict
+        self.att_min_alignment = att_min_alignment
+        self.att_min_sharpness = att_min_sharpness
+        self.max_consecutive_duration_ones = max_consecutive_duration_ones
+        self.max_duration = max_duration
+
+    def __call__(self, dataset: List[Tuple[str, int]]) -> List[Tuple[str, int]]:
+        dataset_filtered = []
+        for item_id, mel_len in tqdm.tqdm(dataset, total=len(dataset)):
+            align_score, sharp_score = self.att_score_dict[item_id]
+            durations = np.load(self.paths.alg / f'{item_id}.npy')
+            consecutive_ones = self._get_max_consecutive_ones(durations)
+            largest_dur = np.max(durations)
+            if all([align_score >= self.att_min_alignment,
+                    sharp_score >= self.att_min_sharpness,
+                    consecutive_ones <= self.max_consecutive_duration_ones,
+                    largest_dur <= self.max_duration]):
+                dataset_filtered.append((item_id, mel_len))
+
+        return dataset_filtered
+
+    def _get_max_consecutive_ones(self, durations: np.array) -> int:
+        max_count = 0
+        count = 0
+        for d in durations:
+            if d == 1:
+                count += 1
+            else:
+                max_count = max(max_count, count)
+                count = 0
+        return max(max_count, count)
 
 
 class BinnedLengthSampler(Sampler):
@@ -171,117 +214,6 @@ class BinnedTacoDataLoader:
         return len(self.all_batches)
 
 
-def get_taco_datasets(paths: Paths,
-                      batch_size: int,
-                      r: int,
-                      max_mel_len,
-                      num_workers=0) -> Tuple[DataLoader, DataLoader]:
-
-    tokenizer = Tokenizer()
-    train_data = unpickle_binary(paths.train_dataset)
-    val_data = unpickle_binary(paths.val_dataset)
-    text_dict = unpickle_binary(paths.text_dict)
-    speaker_dict = unpickle_binary(paths.speaker_dict)
-    train_data = filter_max_len(train_data, max_mel_len)
-    val_data = filter_max_len(val_data, max_mel_len)
-
-    train_ids, train_lens = zip(*train_data)
-    val_ids, val_lens = zip(*val_data)
-
-    train_dataset = TacoDataset(paths=paths, dataset_ids=train_ids,
-                                text_dict=text_dict, speaker_dict=speaker_dict,
-                                tokenizer=tokenizer)
-    val_dataset = TacoDataset(paths=paths, dataset_ids=val_ids,
-                              text_dict=text_dict, speaker_dict=speaker_dict,
-                              tokenizer=tokenizer)
-    train_sampler = BinnedLengthSampler(train_lens, batch_size, batch_size * 3)
-    collator = TacoCollator(r=r)
-
-    train_set = DataLoader(train_dataset,
-                           collate_fn=collator,
-                           batch_size=batch_size,
-                           sampler=train_sampler,
-                           num_workers=num_workers,
-                           pin_memory=True)
-
-    val_set = DataLoader(val_dataset,
-                         collate_fn=collator,
-                         batch_size=batch_size,
-                         sampler=None,
-                         num_workers=0,
-                         shuffle=False,
-                         pin_memory=True)
-
-    return train_set, val_set
-
-
-def get_forward_datasets(paths: Paths,
-                         batch_size: int,
-                         max_mel_len,
-                         filter_attention=True,
-                         filter_min_alignment=0.5,
-                         filter_min_sharpness=0.9,
-                         num_workers=0) -> Tuple[DataLoader, DataLoader]:
-
-    tokenizer = Tokenizer()
-    train_data = unpickle_binary(paths.train_dataset)
-    val_data = unpickle_binary(paths.val_dataset)
-    text_dict = unpickle_binary(paths.text_dict)
-    speaker_dict = unpickle_binary(paths.speaker_dict)
-    train_data = filter_max_len(train_data, max_mel_len)
-    val_data = filter_max_len(val_data, max_mel_len)
-    train_len_original = len(train_data)
-
-    if filter_attention:
-        attention_score_dict = unpickle_binary(paths.att_score_dict)
-        train_data = filter_bad_attentions(dataset=train_data,
-                                           attention_score_dict=attention_score_dict,
-                                           min_alignment=filter_min_alignment,
-                                           min_sharpness=filter_min_sharpness)
-        val_data = filter_bad_attentions(dataset=val_data,
-                                         attention_score_dict=attention_score_dict,
-                                         min_alignment=filter_min_alignment,
-                                         min_sharpness=filter_min_sharpness)
-        print(f'Using {len(train_data)} train files. '
-              f'Filtered {train_len_original - len(train_data)} files due to bad attention!')
-
-    train_ids, train_lens = zip(*train_data)
-    val_ids, val_lens = zip(*val_data)
-
-    train_dataset = ForwardDataset(paths=paths, dataset_ids=train_ids,
-                                   text_dict=text_dict, speaker_dict=speaker_dict,
-                                   tokenizer=tokenizer)
-    val_dataset = ForwardDataset(paths=paths, dataset_ids=val_ids,
-                                 text_dict=text_dict, speaker_dict=speaker_dict,
-                                 tokenizer=tokenizer)
-    train_sampler = BinnedLengthSampler(train_lens, batch_size, batch_size * 3)
-    collator = ForwardCollator(taco_collator=TacoCollator(r=1))
-
-    train_set = DataLoader(train_dataset,
-                           collate_fn=collator,
-                           batch_size=batch_size,
-                           sampler=train_sampler,
-                           num_workers=num_workers,
-                           pin_memory=True)
-
-    val_set = DataLoader(val_dataset,
-                         collate_fn=collator,
-                         batch_size=batch_size,
-                         sampler=None,
-                         num_workers=0,
-                         shuffle=False,
-                         pin_memory=True)
-
-    return train_set, val_set
-
-
-def get_binned_taco_dataloader(paths: Paths, max_batch_size: int = 8) -> BinnedTacoDataLoader:
-    train_data = unpickle_binary(paths.train_dataset)
-    val_data = unpickle_binary(paths.val_dataset)
-    dataset = train_data + val_data
-    return BinnedTacoDataLoader(paths=paths, dataset=dataset, max_batch_size=max_batch_size)
-
-
 class TacoCollator:
 
     def __init__(self, r: int) -> None:
@@ -338,23 +270,123 @@ class ForwardCollator:
         return output
 
 
+def get_taco_datasets(paths: Paths,
+                      batch_size: int,
+                      r: int,
+                      max_mel_len,
+                      num_workers=0) -> Tuple[DataLoader, DataLoader]:
+
+    tokenizer = Tokenizer()
+    train_data = unpickle_binary(paths.train_dataset)
+    val_data = unpickle_binary(paths.val_dataset)
+    text_dict = unpickle_binary(paths.text_dict)
+    speaker_dict = unpickle_binary(paths.speaker_dict)
+    train_data = filter_max_len(train_data, max_mel_len)
+    val_data = filter_max_len(val_data, max_mel_len)
+
+    train_ids, train_lens = zip(*train_data)
+    val_ids, val_lens = zip(*val_data)
+
+    train_dataset = TacoDataset(paths=paths, dataset_ids=train_ids,
+                                text_dict=text_dict, speaker_dict=speaker_dict,
+                                tokenizer=tokenizer)
+    val_dataset = TacoDataset(paths=paths, dataset_ids=val_ids,
+                              text_dict=text_dict, speaker_dict=speaker_dict,
+                              tokenizer=tokenizer)
+    train_sampler = BinnedLengthSampler(train_lens, batch_size, batch_size * 3)
+    collator = TacoCollator(r=r)
+
+    train_set = DataLoader(train_dataset,
+                           collate_fn=collator,
+                           batch_size=batch_size,
+                           sampler=train_sampler,
+                           num_workers=num_workers,
+                           pin_memory=True)
+
+    val_set = DataLoader(val_dataset,
+                         collate_fn=collator,
+                         batch_size=batch_size,
+                         sampler=None,
+                         num_workers=0,
+                         shuffle=False,
+                         pin_memory=True)
+
+    return train_set, val_set
+
+
+def get_forward_datasets(paths: Paths,
+                         batch_size: int,
+                         filter_max_mel_len,
+                         filter_min_alignment: float = 0.5,
+                         filter_min_sharpness: float = 0.9,
+                         filter_max_consecutive_ones: int = 5,
+                         filter_max_duration: int = 40,
+                         num_workers=0) -> Tuple[DataLoader, DataLoader]:
+
+    tokenizer = Tokenizer()
+    train_data = unpickle_binary(paths.train_dataset)
+    val_data = unpickle_binary(paths.val_dataset)
+    text_dict = unpickle_binary(paths.text_dict)
+    attention_score_dict = unpickle_binary(paths.att_score_dict)
+    speaker_dict = unpickle_binary(paths.speaker_dict)
+    train_data = filter_max_len(train_data, filter_max_mel_len)
+    val_data = filter_max_len(val_data, filter_max_mel_len)
+    train_len_original = len(train_data)
+
+    data_filter = DataFilter(paths=paths,
+                             att_score_dict=attention_score_dict,
+                             att_min_alignment=filter_min_alignment,
+                             att_min_sharpness=filter_min_sharpness,
+                             max_consecutive_duration_ones=filter_max_consecutive_ones,
+                             max_duration=filter_max_duration)
+
+    train_data = data_filter(train_data)
+    val_data = data_filter(val_data)
+
+    print(f'Using {len(train_data)} train files. '
+    f'Filtered {train_len_original - len(train_data)} files due to bad attention!')
+
+    train_ids, train_lens = zip(*train_data)
+    val_ids, val_lens = zip(*val_data)
+
+    train_dataset = ForwardDataset(paths=paths, dataset_ids=train_ids,
+                                   text_dict=text_dict, speaker_dict=speaker_dict,
+                                   tokenizer=tokenizer)
+    val_dataset = ForwardDataset(paths=paths, dataset_ids=val_ids,
+                                 text_dict=text_dict, speaker_dict=speaker_dict,
+                                 tokenizer=tokenizer)
+    train_sampler = BinnedLengthSampler(train_lens, batch_size, batch_size * 3)
+    collator = ForwardCollator(taco_collator=TacoCollator(r=1))
+
+    train_set = DataLoader(train_dataset,
+                           collate_fn=collator,
+                           batch_size=batch_size,
+                           sampler=train_sampler,
+                           num_workers=num_workers,
+                           pin_memory=True)
+
+    val_set = DataLoader(val_dataset,
+                         collate_fn=collator,
+                         batch_size=batch_size,
+                         sampler=None,
+                         num_workers=0,
+                         shuffle=False,
+                         pin_memory=True)
+
+    return train_set, val_set
+
+
+def get_binned_taco_dataloader(paths: Paths, max_batch_size: int = 8) -> BinnedTacoDataLoader:
+    train_data = unpickle_binary(paths.train_dataset)
+    val_data = unpickle_binary(paths.val_dataset)
+    dataset = train_data + val_data
+    return BinnedTacoDataLoader(paths=paths, dataset=dataset, max_batch_size=max_batch_size)
+
+
 def filter_max_len(dataset: List[tuple], max_mel_len: int) -> List[tuple]:
     if max_mel_len is None:
         return dataset
     return [(id, len) for id, len in dataset if len <= max_mel_len]
-
-
-def filter_bad_attentions(dataset: List[tuple],
-                          attention_score_dict: Dict[str, tuple],
-                          min_alignment: float,
-                          min_sharpness: float) -> List[tuple]:
-    dataset_filtered = []
-    for item_id, mel_len in dataset:
-        align_score, sharp_score = attention_score_dict[item_id]
-        if align_score > min_alignment \
-                and sharp_score > min_sharpness:
-            dataset_filtered.append((item_id, mel_len))
-    return dataset_filtered
 
 
 def stack_to_tensor(x: List[np.array]) -> torch.Tensor:
