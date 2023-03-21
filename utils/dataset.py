@@ -1,4 +1,5 @@
 import random
+from collections import Counter
 from dataclasses import dataclass
 from random import Random
 from typing import List, Tuple, Iterator
@@ -42,14 +43,13 @@ class DataFilter:
 
     def __call__(self, dataset: List[Tuple[str, int]]) -> List[Tuple[str, int]]:
         dataset_filtered = []
-        for item_id, mel_len in tqdm.tqdm(dataset, total=len(dataset)):
+        for item_id, mel_len in dataset:
             dur_stat: DurationStats = self.att_score_dict[item_id]
             if all([dur_stat.att_align_score >= self.att_min_alignment,
                     dur_stat.att_sharpness_score >= self.att_min_sharpness,
                     dur_stat.max_consecutive_ones <= self.max_consecutive_duration_ones,
                     dur_stat.max_duration <= self.max_duration]):
                 dataset_filtered.append((item_id, mel_len))
-
         return dataset_filtered
 
 
@@ -311,12 +311,27 @@ def get_taco_datasets(paths: Paths,
 
 def get_forward_datasets(paths: Paths,
                          batch_size: int,
-                         filter_max_mel_len: int = 1250,
-                         filter_min_alignment: float = 0.5,
-                         filter_min_sharpness: float = 0.9,
-                         filter_max_consecutive_ones: int = 5,
-                         filter_max_duration: int = 40,
+                         max_mel_len: int = 1250,
+                         min_attention_alignment: float = 0.5,
+                         min_attention_sharpness: float = 0.9,
+                         max_consecutive_ones: int = 5,
+                         max_duration: int = 40,
                          num_workers=0) -> Tuple[DataLoader, DataLoader]:
+    """Returns training and validation dataloaders.
+
+    Args:
+        paths (Paths): An instance of the Paths class containing file paths.
+        batch_size (int): The batch size for the dataloaders.
+        max_mel_len (int, optional): The maximum length of the mel spectrograms. Defaults to 1250.
+        min_attention_alignment (float, optional): The minimum attention alignment value. Defaults to 0.5.
+        min_attention_sharpness (float, optional): The minimum attention sharpness value. Defaults to 0.9.
+        max_consecutive_ones (int, optional): The maximum number of consecutive ones in the alignment. Defaults to 5.
+        max_duration (int, optional): The maximum duration of the audio in seconds. Defaults to 40.
+        num_workers (int, optional): The number of worker processes for loading data. Defaults to 0.
+
+    Returns:
+        Tuple[DataLoader, DataLoader]: A tuple of two PyTorch DataLoaders for training and validation.
+    """
 
     tokenizer = Tokenizer()
     train_data = unpickle_binary(paths.train_dataset)
@@ -324,22 +339,30 @@ def get_forward_datasets(paths: Paths,
     text_dict = unpickle_binary(paths.text_dict)
     attention_score_dict = unpickle_binary(paths.duration_stats)
     speaker_dict = unpickle_binary(paths.speaker_dict)
-    train_data = filter_max_len(train_data, filter_max_mel_len)
-    val_data = filter_max_len(val_data, filter_max_mel_len)
-    train_len_original = len(train_data)
+    train_data = filter_max_len(train_data, max_mel_len)
+    val_data = filter_max_len(val_data, max_mel_len)
 
     data_filter = DataFilter(paths=paths,
                              att_score_dict=attention_score_dict,
-                             att_min_alignment=filter_min_alignment,
-                             att_min_sharpness=filter_min_sharpness,
-                             max_consecutive_duration_ones=filter_max_consecutive_ones,
-                             max_duration=filter_max_duration)
+                             att_min_alignment=min_attention_alignment,
+                             att_min_sharpness=min_attention_sharpness,
+                             max_consecutive_duration_ones=max_consecutive_ones,
+                             max_duration=max_duration)
 
+    speaker_counts_orig = Counter([speaker_dict[item_id] for item_id, _ in train_data + val_data if item_id in speaker_dict])
     train_data = data_filter(train_data)
     val_data = data_filter(val_data)
+    speaker_counts_filtered = Counter([speaker_dict[item_id] for item_id, _ in train_data + val_data if item_id in speaker_dict])
 
-    print(f'Using {len(train_data)} train files. '
-    f'Filtered {train_len_original - len(train_data)} files due to bad attention!')
+    print(f'{"Speaker":32} {"Count":9} {"Filtered":9}')
+    print(f'------------------------------|---------|----------')
+    for speaker, count in speaker_counts_filtered.most_common():
+        print(f'{speaker:28} {count:9} {speaker_counts_orig[speaker]-speaker_counts_filtered[speaker]:9}')
+    num_files = sum(speaker_counts_filtered.values())
+    num_filtered = num_files - sum(speaker_counts_filtered.values())
+    print(f'\nUsing {num_files} files, filtered {num_filtered}')
+
+    speaker_dict = {item_id: speaker for item_id, speaker in speaker_dict.items() if item_id in speaker_dict}
 
     train_ids, train_lens = zip(*train_data)
     val_ids, val_lens = zip(*val_data)
@@ -347,9 +370,11 @@ def get_forward_datasets(paths: Paths,
     train_dataset = ForwardDataset(paths=paths, dataset_ids=train_ids,
                                    text_dict=text_dict, speaker_dict=speaker_dict,
                                    tokenizer=tokenizer)
+
     val_dataset = ForwardDataset(paths=paths, dataset_ids=val_ids,
                                  text_dict=text_dict, speaker_dict=speaker_dict,
                                  tokenizer=tokenizer)
+
     train_sampler = BinnedLengthSampler(train_lens, batch_size, batch_size * 3)
     collator = ForwardCollator(taco_collator=TacoCollator(r=1))
 

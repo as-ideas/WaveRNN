@@ -193,6 +193,9 @@ fast_pitch:
     checkpoint_every: 10_000      # checkpoints the model every x steps
     plot_every: 1000
 
-    filter_attention: True               # whether to filter data with bad attention scores
-    min_attention_sharpness: 0.5         # filter data with bad attention sharpness score, if 0 then no filter
-    min_attention_alignment: 0.95        # filter data with bad attention alignment score, if 0 then no filter
+    filter:
+      max_mel_len: 1250                    # filter file with mel len larger than given
+      min_attention_sharpness: 0.5         # filter file with bad attention sharpness score, if 0 then no filter
+      min_attention_alignment: 0.95        # filter file with bad attention alignment score, if 0 then no filter
+      max_duration: 40                     # filter file with containing a duration larger than given
+      max_consecutive_ones: 5              # filter file where durations contain more consecutive ones than given
