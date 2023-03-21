@@ -11,7 +11,7 @@ from tqdm import tqdm
 from duration_extraction.duration_extractor import DurationExtractor
 from models.tacotron import Tacotron
 from trainer.common import to_device
-from utils.dataset import BinnedLengthSampler, get_binned_taco_dataloader
+from utils.dataset import BinnedLengthSampler, get_binned_taco_dataloader, DurationStats
 from utils.files import unpickle_binary
 from utils.metrics import attention_score
 from utils.paths import Paths
@@ -74,6 +74,7 @@ class DurationExtractionDataset(Dataset):
         return len(self.metadata)
 
 
+
 class DurationExtractionPipeline:
 
     def __init__(self,
@@ -128,7 +129,7 @@ class DurationExtractionPipeline:
 
     def extract_durations(self,
                           num_workers: int = 0,
-                          sampler_bin_size: int = 1) -> Dict[str, Tuple[float, float]]:
+                          sampler_bin_size: int = 1) -> Dict[str, DurationStats]:
         """
         Extracts durations from saved attention matrices.
 
@@ -151,7 +152,8 @@ class DurationExtractionPipeline:
         data_ids, mel_lens = list(zip(*dataset))
         self.logger.info(f'Found {len(data_ids)} / {len_orig} '
                          f'alignment files in {self.paths.att_pred}')
-        att_score_dict = {}
+
+        duration_stats = {}
         sum_att_score = 0
 
         dataset = DurationExtractionDataset(
@@ -172,7 +174,24 @@ class DurationExtractionPipeline:
         for i, res in enumerate(pbar, 1):
             sum_att_score += res.att_score
             pbar.set_description(f'Avg duration attention score: {sum_att_score / i}', refresh=True)
-            att_score_dict[res.item_id] = (res.align_score, res.att_score)
+            max_consecutive_ones = self._get_max_consecutive_ones(res.durations)
+            max_duration = np.max(res.durations)
+            duration_stats[res.item_id] = DurationStats(att_align_score=res.align_score,
+                                                        att_sharpness_score=res.att_score,
+                                                        max_consecutive_ones=max_consecutive_ones,
+                                                        max_duration=max_duration)
             np.save(self.paths.alg / f'{res.item_id}.npy', res.durations.astype(int), allow_pickle=False)
 
-        return att_score_dict
+        return duration_stats
+
+    @staticmethod
+    def _get_max_consecutive_ones(durations: np.array) -> int:
+        max_count = 0
+        count = 0
+        for d in durations:
+            if d == 1:
+                count += 1
+            else:
+                max_count = max(max_count, count)
+                count = 0
+        return max(max_count, count)

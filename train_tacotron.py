@@ -128,13 +128,13 @@ def create_align_features(model: Tacotron,
                                                           duration_extractor=duration_extractor)
 
     print('Extracting attention matrices from tacotron...')
-    duration_extraction_pipe.extract_attentions(model, max_batch_size=dur_extr_conf['max_batch_size'])
+    #duration_extraction_pipe.extract_attentions(model, max_batch_size=dur_extr_conf['max_batch_size'])
 
     num_workers = dur_extr_conf['num_workers']
     print(f'Extracting durations from attention matrices (num workers={num_workers})...')
-    att_score_dict = duration_extraction_pipe.extract_durations(num_workers=num_workers,
+    duration_stats = duration_extraction_pipe.extract_durations(num_workers=num_workers,
                                                                 sampler_bin_size=num_workers*4)
-    pickle_binary(att_score_dict, paths.att_score_dict)
+    pickle_binary(duration_stats, paths.duration_stats)
 
     print('Extracting Pitch Values...')
     extract_pitch_energy(save_path_pitch=paths.phon_pitch,

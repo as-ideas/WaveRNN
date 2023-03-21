@@ -1,4 +1,5 @@
 import random
+from dataclasses import dataclass
 from random import Random
 from typing import List, Tuple, Iterator
 
@@ -15,11 +16,19 @@ from utils.text.tokenizer import Tokenizer
 SHUFFLE_SEED = 42
 
 
+@dataclass
+class DurationStats:
+    att_sharpness_score: float
+    att_align_score: float
+    max_consecutive_ones: int
+    max_duration: int
+
+
 class DataFilter:
 
     def __init__(self,
                  paths: Paths,
-                 att_score_dict: Dict[str, Tuple[float, float]],
+                 att_score_dict: Dict[str, DurationStats],
                  att_min_alignment: float,
                  att_min_sharpness: float,
                  max_consecutive_duration_ones: int,
@@ -34,28 +43,14 @@ class DataFilter:
     def __call__(self, dataset: List[Tuple[str, int]]) -> List[Tuple[str, int]]:
         dataset_filtered = []
         for item_id, mel_len in tqdm.tqdm(dataset, total=len(dataset)):
-            align_score, sharp_score = self.att_score_dict[item_id]
-            durations = np.load(self.paths.alg / f'{item_id}.npy')
-            consecutive_ones = self._get_max_consecutive_ones(durations)
-            largest_dur = np.max(durations)
-            if all([align_score >= self.att_min_alignment,
-                    sharp_score >= self.att_min_sharpness,
-                    consecutive_ones <= self.max_consecutive_duration_ones,
-                    largest_dur <= self.max_duration]):
+            dur_stat: DurationStats = self.att_score_dict[item_id]
+            if all([dur_stat.att_align_score >= self.att_min_alignment,
+                    dur_stat.att_sharpness_score >= self.att_min_sharpness,
+                    dur_stat.max_consecutive_ones <= self.max_consecutive_duration_ones,
+                    dur_stat.max_duration <= self.max_duration]):
                 dataset_filtered.append((item_id, mel_len))
 
         return dataset_filtered
-
-    def _get_max_consecutive_ones(self, durations: np.array) -> int:
-        max_count = 0
-        count = 0
-        for d in durations:
-            if d == 1:
-                count += 1
-            else:
-                max_count = max(max_count, count)
-                count = 0
-        return max(max_count, count)
 
 
 class BinnedLengthSampler(Sampler):
@@ -316,7 +311,7 @@ def get_taco_datasets(paths: Paths,
 
 def get_forward_datasets(paths: Paths,
                          batch_size: int,
-                         filter_max_mel_len,
+                         filter_max_mel_len: int = 1250,
                          filter_min_alignment: float = 0.5,
                          filter_min_sharpness: float = 0.9,
                          filter_max_consecutive_ones: int = 5,
@@ -327,7 +322,7 @@ def get_forward_datasets(paths: Paths,
     train_data = unpickle_binary(paths.train_dataset)
     val_data = unpickle_binary(paths.val_dataset)
     text_dict = unpickle_binary(paths.text_dict)
-    attention_score_dict = unpickle_binary(paths.att_score_dict)
+    attention_score_dict = unpickle_binary(paths.duration_stats)
     speaker_dict = unpickle_binary(paths.speaker_dict)
     train_data = filter_max_len(train_data, filter_max_mel_len)
     val_data = filter_max_len(val_data, filter_max_mel_len)

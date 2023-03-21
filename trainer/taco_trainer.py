@@ -3,7 +3,7 @@ import time
 import torch
 import torch.nn.functional as F
 from torch.optim.optimizer import Optimizer
-from torch.utils.data import Dataset
+from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from typing import Tuple, Dict, Any
 
@@ -117,7 +117,7 @@ class TacoTrainer:
             duration_avg.reset()
             print(' ')
 
-    def evaluate(self, model: Tacotron, val_set: Dataset) -> Tuple[float, float]:
+    def evaluate(self, model: Tacotron, val_set: DataLoader) -> Tuple[float, float]:
         model.eval()
         val_loss = 0
         val_att_score = 0

@@ -30,7 +30,7 @@ class Paths:
         self.val_dataset = self.data / 'val_dataset.pkl'
         self.text_dict = self.data / 'text_dict.pkl'
         self.speaker_dict = self.data / 'speaker_dict.pkl'
-        self.att_score_dict = self.data / 'att_score_dict.pkl'
+        self.duration_stats = self.data / 'duration_stats.pkl'
 
         self.create_paths()
 
