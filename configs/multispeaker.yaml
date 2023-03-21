@@ -147,8 +147,8 @@ multi_forward_tacotron:
       - default_speaker
 
     filter:
-      max_mel_len: 1250                    # filter file with mel len larger than given
-      min_attention_sharpness: 0.5         # filter file with bad attention sharpness score, if 0 then no filter
-      min_attention_alignment: 0.95        # filter file with bad attention alignment score, if 0 then no filter
-      max_duration: 40                     # filter file with containing a duration larger than given
-      max_consecutive_ones: 5              # filter file where durations contain more consecutive ones than given
+      max_mel_len: 1250                    # filter files with mel len larger than given
+      min_attention_sharpness: 0.5         # filter files with bad attention sharpness score, if 0 then no filter
+      min_attention_alignment: 0.95        # filter files with bad attention alignment score, if 0 then no filter
+      max_duration: 40                     # filter files with durations larger than given
+      max_consecutive_ones: 5              # filter files where durations contain more consecutive ones than given
