@@ -349,10 +349,10 @@ def get_forward_datasets(paths: Paths,
                              max_consecutive_duration_ones=max_consecutive_ones,
                              max_duration=max_duration)
 
-    speaker_counts_orig = Counter([speaker_dict[item_id] for item_id, _ in train_data + val_data if item_id in speaker_dict])
+    speaker_counts_orig = Counter([speaker_dict[item_id] for item_id, _ in train_data + val_data])
     train_data = data_filter(train_data)
     val_data = data_filter(val_data)
-    speaker_counts_filtered = Counter([speaker_dict[item_id] for item_id, _ in train_data + val_data if item_id in speaker_dict])
+    speaker_counts_filtered = Counter([speaker_dict[item_id] for item_id, _ in train_data + val_data])
 
     print(f'{"Speaker":32} {"Count":9} {"Filtered":9}')
     print(f'------------------------------|---------|----------')
