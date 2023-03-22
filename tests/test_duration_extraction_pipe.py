@@ -11,6 +11,7 @@ import torch
 from duration_extraction.duration_extraction_pipe import DurationExtractionPipeline
 from duration_extraction.duration_extractor import DurationExtractor
 from models.tacotron import Tacotron
+from utils.dataset import DurationStats
 from utils.files import read_config, pickle_binary
 from utils.paths import Paths
 
@@ -76,10 +77,13 @@ class TestDurationExtractionPipe(unittest.TestCase):
             expected_att_size = (mel_len, len(x))
             self.assertEqual(expected_att_size, att.shape)
 
-        att_score_dict = duration_extraction_pipe.extract_durations(num_workers=1, sampler_bin_size=1)
+        dur_stats = duration_extraction_pipe.extract_durations(num_workers=1, sampler_bin_size=1)
 
-        expected_att_score_dict = {f'{file_id}': (1., 1.) for file_id, _ in self.train_dataset + self.val_dataset}
-        self.assertEqual(expected_att_score_dict, att_score_dict)
+        for file_id, dur_stat in dur_stats.items():
+            self.assertEqual(dur_stat.att_align_score, 1.)
+            self.assertEqual(dur_stat.att_sharpness_score, 1.)
+            self.assertTrue(3 <= dur_stat.max_consecutive_ones <= 15)
+            self.assertEqual(dur_stat.max_duration, 1)
 
         dur_files = list(self.paths.alg.glob('**/*.npy'))
         self.assertEqual(5, len(dur_files))

@@ -5,7 +5,6 @@ from random import Random
 from typing import List, Tuple, Iterator
 
 import torch
-import tqdm
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import Sampler
 
@@ -28,27 +27,25 @@ class DurationStats:
 class DataFilter:
 
     def __init__(self,
-                 paths: Paths,
-                 att_score_dict: Dict[str, DurationStats],
+                 duration_stats: Dict[str, DurationStats],
                  att_min_alignment: float,
                  att_min_sharpness: float,
                  max_consecutive_duration_ones: int,
                  max_duration: int):
-        self.paths = paths
-        self.att_score_dict = att_score_dict
-        self.att_min_alignment = att_min_alignment
-        self.att_min_sharpness = att_min_sharpness
-        self.max_consecutive_duration_ones = max_consecutive_duration_ones
-        self.max_duration = max_duration
+        self._duration_stats = duration_stats
+        self._att_min_alignment = att_min_alignment
+        self._att_min_sharpness = att_min_sharpness
+        self._max_consecutive_duration_ones = max_consecutive_duration_ones
+        self._max_duration = max_duration
 
     def __call__(self, dataset: List[Tuple[str, int]]) -> List[Tuple[str, int]]:
         dataset_filtered = []
         for item_id, mel_len in dataset:
-            dur_stat: DurationStats = self.att_score_dict[item_id]
-            if all([dur_stat.att_align_score >= self.att_min_alignment,
-                    dur_stat.att_sharpness_score >= self.att_min_sharpness,
-                    dur_stat.max_consecutive_ones <= self.max_consecutive_duration_ones,
-                    dur_stat.max_duration <= self.max_duration]):
+            dur_stat: DurationStats = self._duration_stats[item_id]
+            if all([dur_stat.att_align_score >= self._att_min_alignment,
+                    dur_stat.att_sharpness_score >= self._att_min_sharpness,
+                    dur_stat.max_consecutive_ones <= self._max_consecutive_duration_ones,
+                    dur_stat.max_duration <= self._max_duration]):
                 dataset_filtered.append((item_id, mel_len))
         return dataset_filtered
 
@@ -337,13 +334,12 @@ def get_forward_datasets(paths: Paths,
     train_data = unpickle_binary(paths.train_dataset)
     val_data = unpickle_binary(paths.val_dataset)
     text_dict = unpickle_binary(paths.text_dict)
-    attention_score_dict = unpickle_binary(paths.duration_stats)
+    duration_stats = unpickle_binary(paths.duration_stats)
     speaker_dict = unpickle_binary(paths.speaker_dict)
     train_data = filter_max_len(train_data, max_mel_len)
     val_data = filter_max_len(val_data, max_mel_len)
 
-    data_filter = DataFilter(paths=paths,
-                             att_score_dict=attention_score_dict,
+    data_filter = DataFilter(duration_stats=duration_stats,
                              att_min_alignment=min_attention_alignment,
                              att_min_sharpness=min_attention_sharpness,
                              max_consecutive_duration_ones=max_consecutive_ones,
