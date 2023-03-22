@@ -84,7 +84,6 @@ if __name__ == '__main__':
         train_set, val_set = get_forward_datasets(
             paths=paths, batch_size=8, **config['training']['filter'])
         create_gta_features(model, train_set, val_set, paths.gta)
-        print('\n\nYou can now train WaveRNN on GTA features - use python train_wavernn.py --gta\n')
     elif config['tts_model'] == 'multi_forward_tacotron':
         assert isinstance(model, MultiForwardTacotron)
         trainer = MultiForwardTrainer(paths=paths, dsp=dsp, config=config)
