@@ -82,7 +82,7 @@ if __name__ == '__main__':
     if force_gta:
         print('Creating Ground Truth Aligned Dataset...\n')
         train_set, val_set = get_forward_datasets(
-            paths.data, 8, filter_max_mel_len=None)
+            paths=paths, batch_size=8, **config['training']['filter'])
         create_gta_features(model, train_set, val_set, paths.gta)
         print('\n\nYou can now train WaveRNN on GTA features - use python train_wavernn.py --gta\n')
     elif config['tts_model'] == 'multi_forward_tacotron':
