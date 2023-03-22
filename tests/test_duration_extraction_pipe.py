@@ -11,7 +11,6 @@ import torch
 from duration_extraction.duration_extraction_pipe import DurationExtractionPipeline
 from duration_extraction.duration_extractor import DurationExtractor
 from models.tacotron import Tacotron
-from utils.dataset import DurationStats
 from utils.files import read_config, pickle_binary
 from utils.paths import Paths
 

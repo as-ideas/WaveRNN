@@ -74,7 +74,6 @@ class DurationExtractionDataset(Dataset):
         return len(self.metadata)
 
 
-
 class DurationExtractionPipeline:
 
     def __init__(self,
