@@ -3,6 +3,8 @@ import warnings
 from collections import Counter
 from typing import Tuple
 
+from tabulate import tabulate
+
 from utils.text.recipes import read_ljspeech_format, read_metadata
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -134,12 +136,10 @@ if __name__ == '__main__':
                                       f'Pease make sure the audio ids match the ids in the metadata. ' \
                                       f'\nAudio ids: {sorted(list(audio_ids))[:5]}... ' \
                                       f'\nText ids: {sorted(list(speaker_dict_raw.keys()))[:5]}...'
+
     print(f'Will use {len(file_id_to_audio)} {audio_format} files that are indexed in metafile.\n')
-    print(f'\n{"Speaker":30} {"Count":5}')
-    print(f'------------------------------|-------')
-    for speaker, count in speaker_counts.most_common():
-        print(f'{speaker:30} {count:5}')
-    print()
+    table = [(speaker, count) for speaker, count in speaker_counts.most_common()]
+    print(tabulate(table, headers=('speaker', 'count')))
 
     dsp = DSP.from_config(config)
     nval = config['preprocessing']['n_val']

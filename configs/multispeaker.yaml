@@ -82,11 +82,19 @@ tacotron:
       - 2,   1e-4,  50_000,  8
       - 1,   1e-4,  65_000,  8
 
-    max_mel_len: 1250                # if you have a couple of extremely long spectrograms you might want to use this
+
     clip_grad_norm: 1.0              # clips the gradient norm to prevent explosion - set to None if not needed
     checkpoint_every: 10000          # checkpoints the model every x steps
     plot_every: 1000                 # generates samples and plots every x steps
     num_workers: 2                   # number of workers for dataloader
+
+    filter:
+      max_mel_len: 1250                    # filter files with mel len larger than given
+      filter_duration_stats: False          # whether to filter according to the duration stats below
+      min_attention_sharpness: 0.5         # filter files with bad attention sharpness score, if 0 then no filter
+      min_attention_alignment: 0.95        # filter files with bad attention alignment score, if 0 then no filter
+      max_duration: 40                     # filter files with durations larger than given
+      max_consecutive_ones: 6              # filter files where durations contain more consecutive ones than given
 
 
 multi_forward_tacotron:
@@ -147,7 +155,8 @@ multi_forward_tacotron:
 
     filter:
       max_mel_len: 1250                    # filter files with mel len larger than given
+      filter_duration_stats: True          # whether to filter according to the duration stats below
       min_attention_sharpness: 0.5         # filter files with bad attention sharpness score, if 0 then no filter
       min_attention_alignment: 0.95        # filter files with bad attention alignment score, if 0 then no filter
       max_duration: 40                     # filter files with durations larger than given
-      max_consecutive_ones: 5              # filter files where durations contain more consecutive ones than given
+      max_consecutive_ones: 6              # filter files where durations contain more consecutive ones than given

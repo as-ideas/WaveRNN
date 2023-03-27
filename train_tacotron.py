@@ -14,7 +14,7 @@ from models.tacotron import Tacotron
 from trainer.common import to_device
 from trainer.taco_trainer import TacoTrainer
 from utils.checkpoints import restore_checkpoint
-from utils.dataset import get_taco_datasets
+from utils.dataset import get_taco_dataloaders
 from utils.display import *
 from utils.dsp import DSP
 from utils.files import pickle_binary, unpickle_binary, read_config
@@ -179,19 +179,19 @@ if __name__ == '__main__':
     train_cfg = config['tacotron']['training']
     if args.force_gta:
         print('Creating Ground Truth Aligned Dataset...\n')
-        train_set, val_set = get_taco_datasets(paths.data, 1, model.r, max_mel_len=None)
+        train_set, val_set = get_taco_dataloaders(paths.data, 1, model.r, max_mel_len=None)
         create_gta_features(model, train_set, val_set, paths.gta)
         print('\n\nYou can now train WaveRNN on GTA features - use python train_wavernn.py --gta\n')
     elif args.force_align:
         print('Creating Attention Alignments and Pitch Values...')
-        train_set, val_set = get_taco_datasets(paths, 1, model.r, max_mel_len=None)
+        train_set, val_set = get_taco_dataloaders(paths, 1, model.r, max_mel_len=None)
         create_align_features(model=model, config=config,  paths=paths)
         print('\n\nYou can now train ForwardTacotron - use python train_forward.py\n')
     else:
         trainer = TacoTrainer(paths, config=config, dsp=dsp)
         trainer.train(model, optimizer)
         print('Training finished, now creating Attention Alignments and Pitch Values...')
-        train_set, val_set = get_taco_datasets(paths, 1, model.r, max_mel_len=None)
+        train_set, val_set = get_taco_dataloaders(paths, 1, model.r, max_mel_len=None)
         create_align_features(model=model,  config=config, paths=paths)
         print('\n\nYou can now train ForwardTacotron - use python train_forward.py\n')
 

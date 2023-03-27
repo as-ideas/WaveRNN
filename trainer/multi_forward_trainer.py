@@ -10,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 from models.multi_forward_tacotron import MultiForwardTacotron
 from trainer.common import Averager, TTSSession, MaskedL1, to_device, np_now
 from utils.checkpoints import save_checkpoint
-from utils.dataset import get_forward_datasets
+from utils.dataset import get_forward_dataloaders
 from utils.decorators import ignore_exception
 from utils.display import stream, simple_table, plot_mel, plot_pitch
 from utils.dsp import DSP
@@ -45,7 +45,7 @@ class MultiForwardTrainer:
             lr, max_step, bs = session_params
             if model.get_step() < max_step:
                 filter_params = self.train_cfg['filter']
-                train_set, val_set = get_forward_datasets(
+                train_set, val_set = get_forward_dataloaders(
                     paths=self.paths, batch_size=bs, **filter_params)
                 session = TTSSession(
                     index=i, r=1, lr=lr, max_step=max_step,

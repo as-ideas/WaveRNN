@@ -24,8 +24,8 @@ class TestDatasetFilter(unittest.TestCase):
         ]
 
         data_filter = DataFilter(duration_stats=dur_stats,
-                                 att_min_alignment=1.,
-                                 att_min_sharpness=1.,
+                                 min_attention_alignment=1.,
+                                 min_attention_sharpness=1.,
                                  max_consecutive_duration_ones=1,
                                  max_duration=2)
 
@@ -34,8 +34,8 @@ class TestDatasetFilter(unittest.TestCase):
         self.assertEqual(['id_1'], [r for r, _ in result])
 
         data_filter = DataFilter(duration_stats=dur_stats,
-                                 att_min_alignment=0.,
-                                 att_min_sharpness=0.,
+                                 min_attention_alignment=0.,
+                                 min_attention_sharpness=0.,
                                  max_consecutive_duration_ones=5,
                                  max_duration=10)
 

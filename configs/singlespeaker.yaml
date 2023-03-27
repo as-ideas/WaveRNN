@@ -1,6 +1,6 @@
 
 tts_model_id: 'ljspeech_tts'
-data_path: 'data/'                                        # output data path
+data_path: 'data_bild/'                                        # output data path
 
 tts_model: 'forward_tacotron'                             # choices: [forward_tacotron, fast_pitch]
 
@@ -85,6 +85,14 @@ tacotron:
     plot_every: 1000                 # generates samples and plots every x steps
     num_workers: 2                   # number of workers for dataloader
 
+    filter:
+      max_mel_len: 1250                    # filter files with mel len larger than given
+      filter_duration_stats: False        # whether to filter according to the duration stats below
+      min_attention_sharpness: 0.5         # filter files with bad attention sharpness score, if 0 then no filter
+      min_attention_alignment: 0.95        # filter files with bad attention alignment score, if 0 then no filter
+      max_duration: 40                     # filter files with durations larger than given
+      max_consecutive_ones: 6              # filter files where durations contain more consecutive ones than given
+
 
 forward_tacotron:
 
@@ -134,10 +142,11 @@ forward_tacotron:
 
     filter:
       max_mel_len: 1250                    # filter files with mel len larger than given
+      filter_duration_stats: True          # whether to filter according to the duration stats below
       min_attention_sharpness: 0.5         # filter files with bad attention sharpness score, if 0 then no filter
       min_attention_alignment: 0.95        # filter files with bad attention alignment score, if 0 then no filter
       max_duration: 40                     # filter files with durations larger than given
-      max_consecutive_ones: 5              # filter files where durations contain more consecutive ones than given
+      max_consecutive_ones: 6              # filter files where durations contain more consecutive ones than given
 
 fast_pitch:
 
@@ -195,7 +204,8 @@ fast_pitch:
 
     filter:
       max_mel_len: 1250                    # filter files with mel len larger than given
+      filter_duration_stats: True          # whether to filter according to the duration stats below
       min_attention_sharpness: 0.5         # filter files with bad attention sharpness score, if 0 then no filter
       min_attention_alignment: 0.95        # filter files with bad attention alignment score, if 0 then no filter
       max_duration: 40                     # filter files with durations larger than given
-      max_consecutive_ones: 5              # filter files where durations contain more consecutive ones than given
+      max_consecutive_ones: 6              # filter files where durations contain more consecutive ones than given
