@@ -143,7 +143,7 @@ class ForwardDataset(Dataset):
         pitch_cond[pitch != 0] = 2
         dur_cond = np.ones(dur.shape)
         dur_cond[dur > 2] = 2
-        dur_cond[dur > 9] = 3
+        dur_cond[dur > 8] = 3
 
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
                 'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy, 'dur_cond': dur_cond,
