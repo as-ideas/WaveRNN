@@ -41,7 +41,7 @@ class TacoTrainer:
             if model.get_step() < max_step:
                 train_set, val_set = get_taco_dataloaders(
                     paths=self.paths, batch_size=bs, r=r,
-                    max_mel_len=self.train_cfg['max_mel_len']
+                    **self.train_cfg['filter']
                 )
                 session = TTSSession(
                     index=i, r=r, lr=lr, max_step=max_step,

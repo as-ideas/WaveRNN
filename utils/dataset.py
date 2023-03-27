@@ -442,7 +442,7 @@ def _get_filtered_datasets(paths: Paths,
 
         table = [(speaker, count, speaker_counts_orig[speaker]-speaker_counts_filtered[speaker])
                  for speaker, count in speaker_counts_filtered.most_common()]
-        print(tabulate(table, headers=('speaker', 'count used', 'removed')))
+        print(tabulate(table, headers=('speaker', 'files used', 'files removed')))
         num_files = sum(speaker_counts_filtered.values())
         num_filtered = sum(speaker_counts_orig.values()) - num_files
         print(f'\nUsing {num_files} files, removed {num_filtered}')
