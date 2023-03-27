@@ -1,6 +1,6 @@
 
 tts_model_id: 'multispeaker_tts'
-data_path: 'data_multispeaker'                                        # output data path
+data_path: 'data_bild_masked'                                        # output data path
 
 tts_model: 'multi_forward_tacotron'
 

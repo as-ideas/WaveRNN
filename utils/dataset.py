@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from random import Random
 from typing import List, Tuple, Iterator
 
+import numpy as np
 import torch
 from tabulate import tabulate
 from torch.utils.data import Dataset, DataLoader
@@ -140,9 +141,12 @@ class ForwardDataset(Dataset):
         speaker_emb = np.load(str(self.paths.speaker_emb/f'{item_id}.npy'))
         pitch_cond = np.ones(pitch.shape)
         pitch_cond[pitch != 0] = 2
+        dur_cond = np.ones(dur.shape)
+        dur_cond[dur >= 3] = 2
+        dur_cond[dur >= 9] = 3
 
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
-                'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy,
+                'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy, 'dur_cond': dur_cond,
                 'speaker_emb': speaker_emb, 'pitch_cond': pitch_cond, 'speaker_name': speaker_name}
 
     def __len__(self):
@@ -254,11 +258,14 @@ class ForwardCollator:
         energy = _stack_to_tensor(energy).float()
         pitch_cond = [_pad1d(b['pitch_cond'][:max_x_len], max_x_len) for b in batch]
         pitch_cond = _stack_to_tensor(pitch_cond).long()
+        dur_cond = [_pad1d(b['dur_cond'][:max_x_len], max_x_len) for b in batch]
+        dur_cond = _stack_to_tensor(dur_cond).long()
         output.update({
             'pitch': pitch,
             'energy': energy,
             'dur': dur,
-            'pitch_cond': pitch_cond
+            'pitch_cond': pitch_cond,
+            'dur_cond': dur_cond
         })
         return output
 
