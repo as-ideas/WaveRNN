@@ -279,12 +279,12 @@ def get_taco_dataloaders(paths: Paths,
     Args:
         paths (Paths): An instance of the Paths class containing file paths.
         batch_size (int): The batch size for the dataloaders.
-        max_mel_len (int, optional): The maximum length of the mel spectrograms. Defaults to 1250.
+        max_mel_len (int, optional): The maximum length of the mel spectrograms.
         filter_duration_stats (bool): Whether to filter accordint to below duration stats.
-        min_attention_alignment (float): The minimum attention alignment value. Defaults to 0.5.
-        min_attention_sharpness (float): The minimum attention sharpness value. Defaults to 0.9.
-        max_consecutive_ones (int): The maximum number of consecutive ones in the alignment. Defaults to 5.
-        max_duration (int): The maximum duration of the audio in seconds. Defaults to 40.
+        min_attention_alignment (float): The minimum attention alignment value.
+        min_attention_sharpness (float): The minimum attention sharpness value.
+        max_consecutive_ones (int): The maximum number of consecutive ones in the alignment.
+        max_duration (int): The maximum duration of the audio in seconds.
         num_workers (int): The number of worker processes for loading data. Defaults to 0.
 
     Returns:
@@ -347,12 +347,12 @@ def get_forward_dataloaders(paths: Paths,
     Args:
         paths (Paths): An instance of the Paths class containing file paths.
         batch_size (int): The batch size for the dataloaders.
-        max_mel_len (int, optional): The maximum length of the mel spectrograms. Defaults to 1250.
+        max_mel_len (int, optional): The maximum length of the mel spectrograms.
         filter_duration_stats (bool): Whether to filter accordint to below duration stats.
-        min_attention_alignment (float): The minimum attention alignment value. Defaults to 0.5.
-        min_attention_sharpness (float): The minimum attention sharpness value. Defaults to 0.9.
-        max_consecutive_ones (int): The maximum number of consecutive ones in the alignment. Defaults to 5.
-        max_duration (int): The maximum duration of the audio in seconds. Defaults to 40.
+        min_attention_alignment (float): The minimum attention alignment value.
+        min_attention_sharpness (float): The minimum attention sharpness value.
+        max_consecutive_ones (int): The maximum number of consecutive ones in the alignment.
+        max_duration (int): The maximum duration of the audio in seconds.
         num_workers (int): The number of worker processes for loading data. Defaults to 0.
 
     Returns:
@@ -440,9 +440,12 @@ def _get_filtered_datasets(paths: Paths,
         val_data = data_filter(val_data)
         speaker_counts_filtered = Counter([speaker_dict[item_id] for item_id, _ in train_data + val_data if item_id in speaker_dict])
 
-        table = [(speaker, count, speaker_counts_orig[speaker]-speaker_counts_filtered[speaker])
+        table = [(speaker,
+                  count,
+                  speaker_counts_orig[speaker],
+                  speaker_counts_orig[speaker]-count)
                  for speaker, count in speaker_counts_filtered.most_common()]
-        print(tabulate(table, headers=('speaker', 'files used', 'files removed')))
+        print(tabulate(table, headers=('speaker', 'files used', 'files total', 'files removed')))
         num_files = sum(speaker_counts_filtered.values())
         num_filtered = sum(speaker_counts_orig.values()) - num_files
         print(f'\nUsing {num_files} files, removed {num_filtered}')
