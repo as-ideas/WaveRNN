@@ -5,7 +5,7 @@ from typing import Tuple
 
 from tabulate import tabulate
 
-from utils.text.recipes import read_ljspeech_format, read_metadata
+from utils.text.recipes import read_metadata
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
