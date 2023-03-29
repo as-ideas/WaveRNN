@@ -1,10 +1,11 @@
 from pathlib import Path
-from typing import Tuple, Dict, Any, Union
+from typing import Dict, Any, Union
 
 import torch
 import torch.optim.optimizer
 from models.fast_pitch import FastPitch
 from models.forward_tacotron import ForwardTacotron
+from models.multi_fast_pitch import MultiFastPitch
 from models.multi_forward_tacotron import MultiForwardTacotron
 from models.tacotron import Tacotron
 
@@ -22,7 +23,7 @@ def save_checkpoint(model: torch.nn.Module,
     torch.save(checkpoint, str(path))
 
 
-def restore_checkpoint(model: Union[FastPitch, ForwardTacotron, Tacotron],
+def restore_checkpoint(model: Union[FastPitch, ForwardTacotron, Tacotron, MultiForwardTacotron, MultiFastPitch],
                        optim: torch.optim.Optimizer,
                        path: Path,
                        device: torch.device) -> None:
@@ -33,7 +34,7 @@ def restore_checkpoint(model: Union[FastPitch, ForwardTacotron, Tacotron],
         print(f'Restored model with step {model.get_step()}\n')
 
 
-def init_tts_model(config: Dict[str, Any]) -> Union[ForwardTacotron, FastPitch]:
+def init_tts_model(config: Dict[str, Any]) -> Union[ForwardTacotron, FastPitch, MultiForwardTacotron, MultiFastPitch]:
     model_type = config.get('tts_model', 'forward_tacotron')
     if model_type == 'forward_tacotron':
         model = ForwardTacotron.from_config(config)
@@ -41,6 +42,8 @@ def init_tts_model(config: Dict[str, Any]) -> Union[ForwardTacotron, FastPitch]:
         model = FastPitch.from_config(config)
     elif model_type == 'multi_forward_tacotron':
         model = MultiForwardTacotron.from_config(config)
+    elif model_type == 'multi_fast_pitch':
+        model = MultiFastPitch.from_config(config)
     else:
         raise ValueError(f'Model type not supported: {model_type}')
     return model

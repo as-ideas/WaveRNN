@@ -2,7 +2,7 @@
 tts_model_id: 'multispeaker_tts'
 data_path: 'data_multispeaker'                                        # output data path
 
-tts_model: 'multi_forward_tacotron'
+tts_model: 'multi_forward_tacotron'   # choices: [multi_forward_tacotron, multi_fast_pitch]
 
 
 dsp:
@@ -116,7 +116,7 @@ multi_forward_tacotron:
     energy_conv_dims: 256
     energy_rnn_dims: 64
     energy_dropout: 0.5
-    energy_strength: 0.             # set to 0 if you want no energy conditioning
+    energy_strength: 1.             # set to 0 if you want no energy conditioning
 
     pitch_cond_conv_dims: 256       # predictor for pitch prior (predicts unvoiced phonemes with zero pitch)
     pitch_cond_rnn_dims: 128
@@ -149,6 +149,83 @@ multi_forward_tacotron:
     clip_grad_norm: 1.0           # clips the gradient norm to prevent explosion - set to None if not needed
     checkpoint_every: 50_000      # checkpoints the model every x steps
     plot_every: 5000              # generates samples and plots every x steps
+    plot_n_speakers: 3            # max number of speakers to generate plots for
+    plot_speakers:                # speakers to generate plots for (additionally to plot_n_speakers)
+      - default_speaker
+
+    filter:
+      max_mel_len: 1250                    # filter files with mel len larger than given
+      filter_duration_stats: True          # whether to filter according to the duration stats below
+      min_attention_sharpness: 0.5         # filter files with bad attention sharpness score, if 0 then no filter
+      min_attention_alignment: 0.95        # filter files with bad attention alignment score, if 0 then no filter
+      max_duration: 40                     # filter files with durations larger than given
+      max_consecutive_ones: 6              # filter files where durations contain more consecutive ones than given
+
+
+multi_fast_pitch:
+
+  model:
+    speaker_emb_dims: 256
+
+    durpred_d_model: 128
+    durpred_n_heads: 2
+    durpred_layers: 4
+    durpred_d_fft: 128
+    durpred_dropout: 0.5
+
+    pitch_d_model: 128
+    pitch_n_heads: 2
+    pitch_layers: 4
+    pitch_d_fft: 128
+    pitch_dropout: 0.5
+    pitch_strength: 1.0
+
+    energy_d_model: 128
+    energy_n_heads: 2
+    energy_layers: 4
+    energy_d_fft: 128
+    energy_dropout: 0.5
+    energy_strength: 1.0
+
+    pitch_cond_d_model: 128
+    pitch_cond_n_heads: 2
+    pitch_cond_layers: 4
+    pitch_cond_d_fft: 128
+    pitch_cond_dropout: 0.5
+    pitch_cond_output_dims: 3  # dimension of categorical output of pitch conditioning, should be set to 3
+                                    # (zero=padding, one=zero pitch, two=nonzero pitch)
+
+    d_model: 256
+    conv1_kernel: 9
+    conv2_kernel: 1
+
+    prenet_layers: 4
+    prenet_heads: 2
+    prenet_fft: 1024
+    prenet_dropout: 0.1
+
+    postnet_layers: 4
+    postnet_heads: 2
+    postnet_fft: 1024
+    postnet_dropout: 0.1
+
+
+  training:
+    schedule:
+      - 1e-5,  5_000,  32         # progressive training schedule
+      - 5e-5,  300_000,  32       # lr, step, batch_size
+      - 2e-5,  300_000,  32
+    dur_loss_factor: 0.1
+    pitch_loss_factor: 0.1
+    energy_loss_factor: 0.1
+    pitch_cond_loss_factor: 0.1
+    pitch_zoneout: 0.             # zoneout may regularize conditioning on pitch
+    energy_zoneout: 0.            # zoneout may regularize conditioning on energy
+
+    max_mel_len: 1250
+    clip_grad_norm: 1.0           # clips the gradient norm to prevent explosion - set to None if not needed
+    checkpoint_every: 10_000      # checkpoints the model every x steps
+    plot_every: 1000
     plot_n_speakers: 3            # max number of speakers to generate plots for
     plot_speakers:                # speakers to generate plots for (additionally to plot_n_speakers)
       - default_speaker

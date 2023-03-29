@@ -1,5 +1,5 @@
 import time
-from typing import Dict, Any
+from typing import Dict, Any, Union
 
 import numpy as np
 import torch
@@ -7,6 +7,7 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
+from models.multi_fast_pitch import MultiFastPitch
 from models.multi_forward_tacotron import MultiForwardTacotron
 from trainer.common import Averager, TTSSession, MaskedL1, to_device, np_now
 from utils.checkpoints import save_checkpoint
@@ -27,7 +28,7 @@ class MultiForwardTrainer:
         self.paths = paths
         self.dsp = dsp
         self.config = config
-        self.train_cfg = config['multi_forward_tacotron']['training']
+        self.train_cfg = config[config['tts_model']]['training']
         self.writer = SummaryWriter(log_dir=paths.forward_log, comment='v1')
         self.l1_loss = MaskedL1()
         self.ce_loss = torch.nn.CrossEntropyLoss(ignore_index=0)
@@ -38,7 +39,7 @@ class MultiForwardTrainer:
             speaker_emb = torch.from_numpy(speaker_emb).float().unsqueeze(0)
             self.speaker_embs[speaker] = speaker_emb
 
-    def train(self, model: MultiForwardTacotron, optimizer: Optimizer) -> None:
+    def train(self, model: Union[MultiForwardTacotron, MultiFastPitch], optimizer: Optimizer) -> None:
         forward_schedule = self.train_cfg['schedule']
         forward_schedule = parse_schedule(forward_schedule)
         for i, session_params in enumerate(forward_schedule, 1):
@@ -52,7 +53,7 @@ class MultiForwardTrainer:
                     bs=bs, train_set=train_set, val_set=val_set)
                 self.train_session(model, optimizer, session)
 
-    def train_session(self,  model: MultiForwardTacotron,
+    def train_session(self,  model: Union[MultiForwardTacotron, MultiFastPitch],
                       optimizer: Optimizer, session: TTSSession) -> None:
         current_step = model.get_step()
         training_steps = session.max_step - current_step
@@ -146,7 +147,7 @@ class MultiForwardTrainer:
                 avg.reset()
             print(' ')
 
-    def evaluate(self, model: MultiForwardTacotron, val_set: DataLoader) -> Dict[str, float]:
+    def evaluate(self, model: Union[MultiForwardTacotron, MultiFastPitch], val_set: DataLoader) -> Dict[str, float]:
         model.eval()
         val_losses = {
             'mel_loss': 0, 'dur_loss': 0, 'pitch_loss': 0,
@@ -175,7 +176,7 @@ class MultiForwardTrainer:
         return val_losses
 
     @ignore_exception
-    def generate_plots(self, model: MultiForwardTacotron, session: TTSSession) -> None:
+    def generate_plots(self, model: Union[MultiForwardTacotron, MultiFastPitch], session: TTSSession) -> None:
         model.eval()
         device = next(model.parameters()).device
         batch = session.val_sample

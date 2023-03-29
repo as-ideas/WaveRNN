@@ -16,7 +16,7 @@ from trainer.common import to_device
 from trainer.forward_trainer import ForwardTrainer
 from trainer.multi_forward_trainer import MultiForwardTrainer
 from utils.checkpoints import restore_checkpoint, init_tts_model
-from utils.dataset import get_forward_dataloaders
+from utils.dataset import get_forward_datasets
 from utils.display import *
 from utils.dsp import DSP
 from utils.files import read_config
@@ -84,8 +84,7 @@ if __name__ == '__main__':
         train_set, val_set = get_forward_dataloaders(
             paths=paths, batch_size=8, **config['training']['filter'])
         create_gta_features(model, train_set, val_set, paths.gta)
-    elif config['tts_model'] == 'multi_forward_tacotron':
-        assert isinstance(model, MultiForwardTacotron)
+    elif config['tts_model'] in ['multi_forward_tacotron', 'multi_fast_pitch']:
         trainer = MultiForwardTrainer(paths=paths, dsp=dsp, config=config)
         trainer.train(model, optimizer)
     else:
