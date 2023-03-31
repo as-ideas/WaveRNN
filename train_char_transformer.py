@@ -1,5 +1,6 @@
 import math
 import random
+from random import Random
 
 import pandas as pd
 # Define the dataset
@@ -101,19 +102,24 @@ if __name__ == '__main__':
     df.dropna(inplace=True)
     strings = df['phonemes']
     strings = [s for s in strings if len(s) > 10]
+    random = Random(42)
+    random.shuffle(strings)
+
     print(strings[:10])
 
-    dataset = StringDataset(strings)
+    dataset = StringDataset(strings[100:])
+    val_dataset = StringDataset(strings[:100])
     dataloader = DataLoader(dataset, batch_size=2, collate_fn=collate_fn)
+    val_dataloader = DataLoader(val_dataset, batch_size=2, collate_fn=collate_fn)
 
-    device = torch.device('mps')#torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    device = torch.device('cpu')#torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     ntokens = len(phonemes) + 1  # size of vocabulary
     mask_index = len(phonemes)
     emsize = 512  # embedding dimension
     d_hid = 512  # dimension of the feedforward network model in nn.TransformerEncoder
     nlayers = 2  # number of nn.TransformerEncoderLayer in nn.TransformerEncoder
     nhead = 4  # number of heads in nn.MultiheadAttention
-    dropout = 0.2  # dropout probability
+    dropout = 0.1  # dropout probability
     model = TransformerModel(ntokens, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
     criterion = nn.CrossEntropyLoss(ignore_index=0).to(device)
@@ -127,7 +133,7 @@ if __name__ == '__main__':
     eval_sent = 'diː t͡seː-deː-ʔuː-t͡sɛntʁaːlə lɛst iːɐ ʃpɪt͡sn̩pɛʁzonaːl dʊʁçt͡ʃɛkn̩: ɪm jʏŋstn̩ mɪtɡliːdɐbʁiːf fɔn bʊndəsɡəʃɛft͡sfyːʁɐ ʃtɛfan hɛnəvɪç (axtʔʊntfɪʁt͡sɪç) vɪʁt diː t͡seː-deː-ʔuː-baːzɪs aʊfɡəfɔʁdɐt, an aɪnɐ bəfʁaːɡʊŋ dɛs tʁiːʁɐ paʁtaɪən-fɔʁʃɐs uːvə jan (nɔɪnʔʊntfʏnft͡sɪç) taɪlt͡suneːmən'
     eval_input = Tokenizer()(eval_sent)
     eval_tens = torch.tensor(eval_input).unsqueeze(0).to(device)
-    eval_mask = (torch.rand(eval_tens.size()) < 0.3).to(device)
+    eval_mask = (torch.rand(eval_tens.size()) < 0.2).to(device)
     eval_tens[eval_mask] = mask_index
 
     sw = SummaryWriter(log_dir='checkpoints/lm_summary')
@@ -135,13 +141,10 @@ if __name__ == '__main__':
     for epoch in range(100):
         for batch in tqdm.tqdm(dataloader, total=len(dataloader)):
             batch = batch.to(device)
-            batch_target = torch.clone(batch)
-            rand_mask = (torch.rand(batch.size()) < 0.3).to(device)
-
+            batch_target = torch.clone(batch.detach())
+            rand_mask = (torch.rand(batch.size()) < 0.2).to(device)
             batch[rand_mask] = mask_index
-
             output = model(batch)
-
             loss = criterion(output.transpose(1, 2), batch_target)
 
             optimizer.zero_grad()
@@ -151,18 +154,34 @@ if __name__ == '__main__':
             step += 1
             sw.add_scalar('masked_loss', loss, global_step=step)
             if step % 100 == 0:
-                out = model(eval_tens)
-                out = torch.argmax(out[0], dim=-1)
-                out_text = Tokenizer().decode(out.tolist())
-                sw.add_text('eval/target', '"""' + eval_sent + '"""', global_step=step)
-                sw.add_text('eval/pred', '"""' + out_text + '"""', global_step=step)
-                eval_score = 0
-                for a, b in zip(out_text, eval_sent):
-                    if a == b:
-                        eval_score += 1
-                sw.add_scalar('eval/score', eval_score / len(eval_sent), global_step=step)
-                print(step, loss, eval_score / len(eval_sent))
-                print(eval_sent)
-                print(out_text)
+                val_loss = 0
+                val_norm = 0
+                for batch in tqdm.tqdm(val_dataloader, total=len(dataloader)):
+                    batch = batch.to(device)
+                    batch_target = torch.clone(batch.detach())
+                    rand_mask = (torch.rand(batch.size()) < 0.2).to(device)
+                    batch[rand_mask] = mask_index
+                    with torch.no_grad():
+                        output = model(batch)
+                        loss = criterion(output.transpose(1, 2), batch_target)
+                        val_loss += loss
+                        val_norm += 1
 
-                torch.save(model.state_dict(), 'checkpoints/latest_language_model.pt')
+                with torch.no_grad():
+                    out = model(eval_tens)
+                    out = torch.argmax(out[0], dim=-1)
+                    print(out)
+                    out_text = Tokenizer().decode(out.tolist())
+                    sw.add_text('eval/target', '   ' + eval_sent + '   ', global_step=step)
+                    sw.add_text('eval/pred', '   ' + out_text + '   ', global_step=step)
+                    eval_score = 0
+                    for a, b in zip(out_text, eval_sent):
+                        if a == b:
+                            eval_score += 1
+                    sw.add_scalar('eval/score', eval_score / len(eval_sent), global_step=step)
+                    sw.add_scalar('eval/loss', val_loss / val_norm / len(eval_sent), global_step=step)
+                    print(step, loss, eval_score / len(eval_sent))
+                    print(eval_sent)
+                    print(out_text)
+
+                    torch.save(model.state_dict(), 'checkpoints/latest_language_model.pt')
