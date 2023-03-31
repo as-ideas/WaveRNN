@@ -4,6 +4,7 @@ import random
 import pandas as pd
 # Define the dataset
 import torch
+import tqdm
 from torch import nn, Tensor
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from torch.utils.data import Dataset, DataLoader
@@ -105,7 +106,7 @@ if __name__ == '__main__':
     dataset = StringDataset(strings)
     dataloader = DataLoader(dataset, batch_size=2, collate_fn=collate_fn)
 
-    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    device = torch.device('mps')#torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     ntokens = len(phonemes) + 1  # size of vocabulary
     mask_index = len(phonemes)
     emsize = 512  # embedding dimension
@@ -115,7 +116,7 @@ if __name__ == '__main__':
     dropout = 0.2  # dropout probability
     model = TransformerModel(ntokens, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
-    criterion = nn.CrossEntropyLoss(ignore_index=0)
+    criterion = nn.CrossEntropyLoss(ignore_index=0).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
     model.train()  # turn on train mode
@@ -132,15 +133,16 @@ if __name__ == '__main__':
     sw = SummaryWriter(log_dir='checkpoints/lm_summary')
 
     for epoch in range(100):
-        for batch in dataloader:
+        for batch in tqdm.tqdm(dataloader, total=len(dataloader)):
+            batch = batch.to(device)
             batch_target = torch.clone(batch)
             rand_mask = (torch.rand(batch.size()) < 0.3).to(device)
+
             batch[rand_mask] = mask_index
-            batch_target[~rand_mask] = 0
 
             output = model(batch)
 
-            loss = criterion(output.transpose(1, 2), batch)
+            loss = criterion(output.transpose(1, 2), batch_target)
 
             optimizer.zero_grad()
             loss.backward()
@@ -159,6 +161,8 @@ if __name__ == '__main__':
                     if a == b:
                         eval_score += 1
                 sw.add_scalar('eval/score', eval_score / len(eval_sent), global_step=step)
-                print(step, eval_score)
+                print(step, loss, eval_score / len(eval_sent))
                 print(eval_sent)
                 print(out_text)
+
+                torch.save(model.state_dict(), 'checkpoints/latest_language_model.pt')
