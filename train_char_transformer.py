@@ -125,9 +125,12 @@ def make_token_len_mask(x: torch.Tensor) -> torch.Tensor:
 def mask_tensor(x: torch.Tensor, probs: Tuple[float, float, float]) -> tuple:
     a, b, c = probs
     rand_mask = torch.rand(x.size()).to(x.device)
+    zero_inds = x == 0
     rand_inds = torch.randint(low=1, high=len(phonemes), size=x.size()).to(x.device)
     x[rand_mask < a - c] = mask_index
     x[rand_mask < b] = rand_inds[rand_mask < b]
+    x[zero_inds] = 0
+    rand_mask[zero_inds] = 0
     return x, rand_mask < a
 
 
@@ -180,21 +183,15 @@ if __name__ == '__main__':
     eval_input = Tokenizer()(eval_sent)
     eval_tens = torch.tensor(eval_input).unsqueeze(0).to(device)
     eval_tens, eval_mask = mask_tensor(eval_tens, mask_probs)
-    #eval_mask = (torch.rand(eval_tens.size()) < 0.3).to(device)
-    #eval_tens[eval_mask] = mask_index
 
     sw = SummaryWriter(log_dir='checkpoints/lm_summary')
     eval_sent_x = Tokenizer().decode(eval_tens[0].tolist())
-
-
 
     for epoch in range(100):
         for batch in tqdm.tqdm(dataloader, total=len(dataloader)):
             batch = batch.to(device)
             batch_target = torch.clone(batch.detach())
             batch, rand_mask = mask_tensor(batch, mask_probs)
-            #rand_mask = (torch.rand(batch.size()) < 0.3).to(device)
-            #batch[rand_mask] = mask_index
             batch_target[~rand_mask] = 0
             output = model(batch)
             loss = criterion(output.transpose(1, 2), batch_target)
@@ -202,18 +199,17 @@ if __name__ == '__main__':
 
             optimizer.zero_grad()
             loss.backward()
-            #torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
             optimizer.step()
             step += 1
             sw.add_scalar('masked_loss', loss, global_step=step)
             if step % 100 == 0:
                 val_loss = 0
                 val_norm = 0
-                for batch in tqdm.tqdm(val_dataloader, total=len(dataloader)):
+                for batch in tqdm.tqdm(val_dataloader, total=len(val_dataloader)):
                     batch = batch.to(device)
                     batch_target = torch.clone(batch.detach())
-                    rand_mask = (torch.rand(batch.size()) < 0.3).to(device)
-                    batch[rand_mask] = mask_index
+                    batch, rand_mask = mask_tensor(batch, mask_probs)
                     batch_target[~rand_mask] = 0
                     with torch.no_grad():
                         output = model(batch)
@@ -231,7 +227,7 @@ if __name__ == '__main__':
                     sw.add_text('eval/target_x', '   ' + eval_sent_x + '   ', global_step=step)
                     sw.add_text('eval/pred', '   ' + out_text + '   ', global_step=step)
                     eval_score = 0
-                    for a, b in zip(out_text, eval_sent):
+                    for a, b in zip(out, eval_input):
                         if a == b:
                             eval_score += 1
                     sw.add_scalar('eval/score', eval_score / len(eval_sent), global_step=step)
