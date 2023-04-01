@@ -1,5 +1,6 @@
 import math
 import random
+import numpy as np
 from random import Random
 from typing import Tuple
 
@@ -9,11 +10,43 @@ import torch
 import tqdm
 from torch import nn, Tensor
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, Sampler
 from torch.utils.tensorboard import SummaryWriter
 
 from utils.text.symbols import phonemes
 from utils.text.tokenizer import Tokenizer
+
+
+class BinnedLengthSampler(Sampler):
+    def __init__(self, lengths, batch_size, bin_size):
+        _, self.idx = torch.sort(torch.tensor(lengths).long())
+        self.batch_size = batch_size
+        self.bin_size = bin_size
+        assert self.bin_size % self.batch_size == 0
+
+    def __iter__(self):
+        # Need to change to numpy since there's a bug in random.shuffle(tensor)
+        # TODO: Post an issue on pytorch repo
+        idx = self.idx.numpy()
+        bins = []
+
+        for i in range(len(idx) // self.bin_size):
+            this_bin = idx[i * self.bin_size:(i + 1) * self.bin_size]
+            random.shuffle(this_bin)
+            bins += [this_bin]
+
+        random.shuffle(bins)
+        binned_idx = np.stack(bins).reshape(-1)
+
+        if len(binned_idx) < len(idx):
+            last_bin = idx[len(binned_idx):]
+            random.shuffle(last_bin)
+            binned_idx = np.concatenate([binned_idx, last_bin])
+
+        return iter(torch.tensor(binned_idx).long())
+
+    def __len__(self):
+        return len(self.idx)
 
 
 class StringDataset(Dataset):
@@ -57,8 +90,13 @@ class PositionalEncoding(nn.Module):
 
 class TransformerModel(nn.Module):
 
-    def __init__(self, ntoken: int, d_model: int, nhead: int, d_hid: int,
-                 nlayers: int, dropout: float = 0.5):
+    def __init__(self,
+                 ntoken: int,
+                 d_model: int,
+                 nhead: int,
+                 d_hid: int,
+                 nlayers: int,
+                 dropout: float = 0.):
         super().__init__()
         self.model_type = 'Transformer'
         self.pos_encoder = PositionalEncoding(d_model, dropout)
@@ -68,27 +106,10 @@ class TransformerModel(nn.Module):
         self.d_model = d_model
         self.decoder = nn.Linear(d_model, ntoken)
 
-        self.init_weights()
-
-    def init_weights(self) -> None:
-        initrange = 0.1
-        self.encoder.weight.data.uniform_(-initrange, initrange)
-        self.decoder.bias.data.zero_()
-        self.decoder.weight.data.uniform_(-initrange, initrange)
-
     def forward(self, src: Tensor) -> Tensor:
-        """
-        Args:
-            src: Tensor, shape [seq_len, batch_size]
-            src_mask: Tensor, shape [seq_len, seq_len]
-
-        Returns:
-            output Tensor of shape [seq_len, batch_size, ntoken]
-        """
         src_pad = make_token_len_mask(src)
         src = self.encoder(src) * math.sqrt(self.d_model)
         src = self.pos_encoder(src)
-
         output = self.transformer_encoder(src, src_key_padding_mask=src_pad)
         output = self.decoder(output)
         return output
@@ -126,7 +147,13 @@ if __name__ == '__main__':
 
     dataset = StringDataset(strings[512:])
     val_dataset = StringDataset(strings[:512])
-    dataloader = DataLoader(dataset, batch_size=32, collate_fn=collate_fn)
+
+    lengths = [len(s) for s in strings[512:]]
+
+    batch_size = 32
+
+    dataloader = DataLoader(dataset, batch_size=batch_size, collate_fn=collate_fn,
+                            sampler=BinnedLengthSampler(lengths, batch_size, batch_size*3))
     val_dataloader = DataLoader(val_dataset, batch_size=32, collate_fn=collate_fn)
 
     device = torch.device('mps')#torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -157,6 +184,7 @@ if __name__ == '__main__':
     #eval_tens[eval_mask] = mask_index
 
     sw = SummaryWriter(log_dir='checkpoints/lm_summary')
+    eval_sent_x = Tokenizer().decode(eval_tens[0].tolist())
 
 
 
@@ -200,6 +228,7 @@ if __name__ == '__main__':
                     print(out)
                     out_text = Tokenizer().decode(out.tolist())
                     sw.add_text('eval/target', '   ' + eval_sent + '   ', global_step=step)
+                    sw.add_text('eval/target_x', '   ' + eval_sent_x + '   ', global_step=step)
                     sw.add_text('eval/pred', '   ' + out_text + '   ', global_step=step)
                     eval_score = 0
                     for a, b in zip(out_text, eval_sent):
