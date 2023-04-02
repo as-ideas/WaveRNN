@@ -2,7 +2,7 @@ import math
 import random
 import numpy as np
 from random import Random
-from typing import Tuple
+from typing import Tuple, List
 
 import pandas as pd
 # Define the dataset
@@ -14,7 +14,20 @@ from torch.utils.data import Dataset, DataLoader, Sampler
 from torch.utils.tensorboard import SummaryWriter
 
 from utils.text.symbols import phonemes
-from utils.text.tokenizer import Tokenizer
+
+
+class Tokenizer:
+
+    def __init__(self) -> None:
+        self.symbol_to_id = {s: i for i, s in enumerate(phonemes + ['|'])}
+        self.id_to_symbol = {i: s for i, s in enumerate(phonemes + ['|'])}
+
+    def __call__(self, text: str) -> List[int]:
+        return [self.symbol_to_id[t] for t in text if t in self.symbol_to_id]
+
+    def decode(self, sequence: List[int]) -> str:
+        text = [self.id_to_symbol[s] for s in sequence if s in self.id_to_symbol]
+        return ''.join(text)
 
 
 class BinnedLengthSampler(Sampler):
@@ -84,7 +97,7 @@ class PositionalEncoding(nn.Module):
         Args:
             x: Tensor, shape [seq_len, batch_size, embedding_dim]
         """
-        x = x + self.pe[:x.size(0)]
+        x = x + self.pe.transpose(0, 1)[:, :x.size(1), :]
         return self.dropout(x)
 
 
@@ -100,7 +113,7 @@ class TransformerModel(nn.Module):
         super().__init__()
         self.model_type = 'Transformer'
         self.pos_encoder = PositionalEncoding(d_model, dropout)
-        encoder_layers = TransformerEncoderLayer(d_model, nhead, d_hid, dropout)
+        encoder_layers = TransformerEncoderLayer(d_model, nhead, d_hid, dropout, batch_first=True)
         self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
         self.encoder = nn.Embedding(ntoken, d_model)
         self.d_model = d_model
@@ -120,24 +133,25 @@ def generate_square_subsequent_mask(sz: int) -> Tensor:
     return torch.triu(torch.ones(sz, sz) * float('-inf'), diagonal=1)
 
 def make_token_len_mask(x: torch.Tensor) -> torch.Tensor:
-    return (x == 0).transpose(0, 1)
+    return (x == 0)
 
 def mask_tensor(x: torch.Tensor, probs: Tuple[float, float, float]) -> tuple:
     a, b, c = probs
     rand_mask = torch.rand(x.size()).to(x.device)
-    zero_inds = x == 0
+    zero_inds = torch.clone(x.detach()) == 0
     rand_inds = torch.randint(low=1, high=len(phonemes), size=x.size()).to(x.device)
     x[rand_mask < a - c] = mask_index
     x[rand_mask < b] = rand_inds[rand_mask < b]
     x[zero_inds] = 0
+    rand_mask = rand_mask < a
     rand_mask[zero_inds] = 0
-    return x, rand_mask < a
-
+    return x, rand_mask
 
 
 
 
 if __name__ == '__main__':
+    torch.random.manual_seed(42)
 
     df = pd.read_csv('/Users/cschaefe/datasets/nlp/welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
     df.dropna(inplace=True)
@@ -148,18 +162,18 @@ if __name__ == '__main__':
 
     print(strings[:10])
 
-    dataset = StringDataset(strings[512:])
-    val_dataset = StringDataset(strings[:512])
+    dataset = StringDataset(strings[1024:])
+    val_dataset = StringDataset(strings[:1024])
 
-    lengths = [len(s) for s in strings[512:]]
+    lengths = [len(s) for s in strings[1024:]]
 
     batch_size = 32
 
     dataloader = DataLoader(dataset, batch_size=batch_size, collate_fn=collate_fn,
                             sampler=BinnedLengthSampler(lengths, batch_size, batch_size*3))
-    val_dataloader = DataLoader(val_dataset, batch_size=32, collate_fn=collate_fn)
+    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, collate_fn=collate_fn)
 
-    device = torch.device('mps')#torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    device = torch.device('cpu')#torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     ntokens = len(phonemes) + 1  # size of vocabulary
     mask_index = len(phonemes)
     emsize = 512  # embedding dimension
@@ -170,7 +184,7 @@ if __name__ == '__main__':
     model = TransformerModel(ntokens, emsize, nhead, d_hid, nlayers, dropout).to(device)
 
     criterion = nn.CrossEntropyLoss(ignore_index=0, reduction='none').to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+    optimizer = torch.optim.Adam(model.parameters(), lr=2e-5)
 
     model.train()  # turn on train mode
     total_loss = 0.
@@ -179,12 +193,13 @@ if __name__ == '__main__':
 
     mask_probs = 0.3, 0.03, 0.03
 
+
     eval_sent = 'diː t͡seː-deː-ʔuː-t͡sɛntʁaːlə lɛst iːɐ ʃpɪt͡sn̩pɛʁzonaːl dʊʁçt͡ʃɛkn̩: ɪm jʏŋstn̩ mɪtɡliːdɐbʁiːf fɔn bʊndəsɡəʃɛft͡sfyːʁɐ ʃtɛfan hɛnəvɪç (axtʔʊntfɪʁt͡sɪç) vɪʁt diː t͡seː-deː-ʔuː-baːzɪs aʊfɡəfɔʁdɐt, an aɪnɐ bəfʁaːɡʊŋ dɛs tʁiːʁɐ paʁtaɪən-fɔʁʃɐs uːvə jan (nɔɪnʔʊntfʏnft͡sɪç) taɪlt͡suneːmən'
     eval_input = Tokenizer()(eval_sent)
     eval_tens = torch.tensor(eval_input).unsqueeze(0).to(device)
     eval_tens, eval_mask = mask_tensor(eval_tens, mask_probs)
 
-    sw = SummaryWriter(log_dir='checkpoints/lm_summary')
+    sw = SummaryWriter(log_dir=f'checkpoints/language_model/lm_fixed_summary_layers{nlayers}_heads{nhead}')
     eval_sent_x = Tokenizer().decode(eval_tens[0].tolist())
 
     for epoch in range(100):
@@ -194,7 +209,7 @@ if __name__ == '__main__':
             batch, rand_mask = mask_tensor(batch, mask_probs)
             batch_target[~rand_mask] = 0
             output = model(batch)
-            loss = criterion(output.transpose(1, 2), batch_target)
+            loss = x(output.transpose(1, 2), batch_target)
             loss = loss.sum() / (rand_mask.sum() + 1e-10)
 
             optimizer.zero_grad()
@@ -203,9 +218,10 @@ if __name__ == '__main__':
             optimizer.step()
             step += 1
             sw.add_scalar('masked_loss', loss, global_step=step)
-            if step % 100 == 0:
+            if step % 1000 == 0:
                 val_loss = 0
                 val_norm = 0
+
                 for batch in tqdm.tqdm(val_dataloader, total=len(val_dataloader)):
                     batch = batch.to(device)
                     batch_target = torch.clone(batch.detach())
@@ -234,6 +250,7 @@ if __name__ == '__main__':
                     sw.add_scalar('eval/loss', val_loss / val_norm, global_step=step)
                     print(step, loss, eval_score / len(eval_sent))
                     print(eval_sent)
+                    print(eval_sent_x)
                     print(out_text)
 
                     torch.save(model.state_dict(), 'checkpoints/latest_language_model.pt')
