@@ -209,7 +209,7 @@ if __name__ == '__main__':
             batch, rand_mask = mask_tensor(batch, mask_probs)
             batch_target[~rand_mask] = 0
             output = model(batch)
-            loss = x(output.transpose(1, 2), batch_target)
+            loss = criterion(output.transpose(1, 2), batch_target)
             loss = loss.sum() / (rand_mask.sum() + 1e-10)
 
             optimizer.zero_grad()
