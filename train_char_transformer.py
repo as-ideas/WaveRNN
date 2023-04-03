@@ -128,18 +128,17 @@ class TransformerModel(nn.Module):
         return output
 
     def generate(self, src: Tensor) -> Tensor:
-        with torch.no_grad():
-            src_pad = make_token_len_mask(src)
-            src = self.encoder(src) * math.sqrt(self.d_model)
-            src = self.pos_encoder(src)
-            output = self.transformer_encoder(src, src_key_padding_mask=src_pad)
+        src_pad = make_token_len_mask(src)
+        src = self.encoder(src) * math.sqrt(self.d_model)
+        src = self.pos_encoder(src)
+        output = self.transformer_encoder(src, src_key_padding_mask=src_pad)
         return output
 
     @classmethod
     def from_checkpoint(cls, path):
         emsize = 512  # embedding dimension
         d_hid = 512  # dimension of the feedforward network model in nn.TransformerEncoder
-        nlayers = 4  # number of nn.TransformerEncoderLayer in nn.TransformerEncoder
+        nlayers = 6  # number of nn.TransformerEncoderLayer in nn.TransformerEncoder
         nhead = 8  # number of heads in nn.MultiheadAttention
         dropout = 0.  # dropout probability
         model = TransformerModel(len(phonemes)+1, emsize, nhead, d_hid, nlayers, dropout)

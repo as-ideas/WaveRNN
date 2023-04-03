@@ -26,13 +26,13 @@ class SeriesPredictor(nn.Module):
                  speaker_emb_dims: int = 256,
                  out_dim: int = 1):
         super().__init__()
-        self.convs = torch.nn.ModuleList([
-            BatchNormConv(emb_dim + speaker_emb_dims, conv_dims, 5, relu=True),
-            BatchNormConv(conv_dims, conv_dims, 5, relu=True),
-            BatchNormConv(conv_dims, conv_dims, 5, relu=True),
-        ])
-        self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
-        self.lin = nn.Linear(2 * rnn_dims, out_dim)
+        #self.convs = torch.nn.ModuleList([
+        #    BatchNormConv(emb_dim + speaker_emb_dims, conv_dims, 5, relu=True),
+        #    BatchNormConv(conv_dims, conv_dims, 5, relu=True),
+        #    BatchNormConv(conv_dims, conv_dims, 5, relu=True),
+        #])
+        #self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
+        self.lin = nn.Linear(emb_dim + speaker_emb_dims, out_dim)
         self.dropout = dropout
 
     def forward(self,
@@ -42,12 +42,12 @@ class SeriesPredictor(nn.Module):
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
         x = torch.cat([x, speaker_emb], dim=2)
-        x = x.transpose(1, 2)
-        for conv in self.convs:
-            x = conv(x)
-            x = F.dropout(x, p=self.dropout, training=self.training)
-        x = x.transpose(1, 2)
-        x, _ = self.rnn(x)
+        #x = x.transpose(1, 2)
+        #for conv in self.convs:
+        #    x = conv(x)
+        #    x = F.dropout(x, p=self.dropout, training=self.training)
+        #x = x.transpose(1, 2)
+        #x, _ = self.rnn(x)
         x = self.lin(x)
         return x / alpha
 
@@ -65,13 +65,13 @@ class ConditionalSeriesPredictor(nn.Module):
                  speaker_emb_dims: int = 256):
         super().__init__()
         self.pitch_cond_embedding = Embedding(cond_emb_size, cond_emb_dims)
-        self.convs = torch.nn.ModuleList([
-            BatchNormConv(emb_dim + cond_emb_dims + speaker_emb_dims, conv_dims, 5, relu=True),
-            BatchNormConv(conv_dims, conv_dims, 5, relu=True),
-            BatchNormConv(conv_dims, conv_dims, 5, relu=True),
-        ])
-        self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
-        self.lin = nn.Linear(2 * rnn_dims, 1)
+        #self.convs = torch.nn.ModuleList([
+        #    BatchNormConv(emb_dim + cond_emb_dims + speaker_emb_dims, conv_dims, 5, relu=True),
+        #    BatchNormConv(conv_dims, conv_dims, 5, relu=True),
+        #    BatchNormConv(conv_dims, conv_dims, 5, relu=True),
+        #])
+        #self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
+        self.lin = nn.Linear(emb_dim + cond_emb_dims + speaker_emb_dims, 1)
         self.dropout = dropout
 
     def forward(self,
@@ -83,12 +83,12 @@ class ConditionalSeriesPredictor(nn.Module):
         speaker_emb = speaker_emb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
         x = torch.cat([x, x_cond, speaker_emb], dim=2)
-        x = x.transpose(1, 2)
-        for conv in self.convs:
-            x = conv(x)
-            x = F.dropout(x, p=self.dropout, training=self.training)
-        x = x.transpose(1, 2)
-        x, _ = self.rnn(x)
+        #x = x.transpose(1, 2)
+        #for conv in self.convs:
+        #    x = conv(x)
+        #    x = F.dropout(x, p=self.dropout, training=self.training)
+        #x = x.transpose(1, 2)
+        #x, _ = self.rnn(x)
         x = self.lin(x)
         return x / alpha
 
