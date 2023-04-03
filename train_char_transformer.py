@@ -127,6 +127,32 @@ class TransformerModel(nn.Module):
         output = self.decoder(output)
         return output
 
+    def generate(self, src: Tensor) -> Tensor:
+        with torch.no_grad():
+            src_pad = make_token_len_mask(src)
+            src = self.encoder(src) * math.sqrt(self.d_model)
+            src = self.pos_encoder(src)
+            output = self.transformer_encoder(src, src_key_padding_mask=src_pad)
+        return output
+
+    @classmethod
+    def from_checkpoint(cls, path):
+        emsize = 512  # embedding dimension
+        d_hid = 512  # dimension of the feedforward network model in nn.TransformerEncoder
+        nlayers = 4  # number of nn.TransformerEncoderLayer in nn.TransformerEncoder
+        nhead = 8  # number of heads in nn.MultiheadAttention
+        dropout = 0.  # dropout probability
+        model = TransformerModel(len(phonemes)+1, emsize, nhead, d_hid, nlayers, dropout)
+
+        checkpoint = torch.load(path, map_location=torch.device('cpu'))
+        model.load_state_dict(checkpoint)
+        model.requires_grad_(False)
+
+        return model
+
+
+
+
 
 def generate_square_subsequent_mask(sz: int) -> Tensor:
     """Generates an upper-triangular matrix of -inf, with zeros on diag."""
@@ -182,6 +208,7 @@ if __name__ == '__main__':
     nhead = 8  # number of heads in nn.MultiheadAttention
     dropout = 0.  # dropout probability
     model = TransformerModel(ntokens, emsize, nhead, d_hid, nlayers, dropout).to(device)
+
 
     criterion = nn.CrossEntropyLoss(ignore_index=0, reduction='none').to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=2e-5)
