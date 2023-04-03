@@ -83,9 +83,7 @@ def pad_mask(lens, max_len):
     batch_size = lens.size(0)
     seq_range = torch.arange(0, max_len).long()
     seq_range = seq_range.unsqueeze(0)
-    seq_range = seq_range.expand(batch_size, max_len)
-    if lens.is_cuda:
-        seq_range = seq_range.cuda()
+    seq_range = seq_range.expand(batch_size, max_len).to(lens.device)
     lens = lens.unsqueeze(1)
     lens = lens.expand_as(seq_range)
     mask = seq_range < lens
