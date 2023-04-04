@@ -129,7 +129,7 @@ class TacoTrainer:
                                                    self.train_cfg['clip_grad_norm'])
                     aligner_optim.step()
 
-                if aligner.get_step() > 200:
+                if aligner.get_step() > 2000:
 
                     start = time.time()
                     model.train()
@@ -217,23 +217,4 @@ class TacoTrainer:
             global_step=model.step, sample_rate=self.dsp.sample_rate)
         self.writer.add_audio(
             tag='Ground_Truth_Aligned/postnet_wav', snd_tensor=m2_hat_wav,
-            global_step=model.step, sample_rate=self.dsp.sample_rate)
-
-        m1_hat, m2_hat, att = model.generate(batch['x'][0:1], steps=batch['mel_len'][0] + 20)
-        att_fig = plot_attention(att)
-        m1_hat_fig = plot_mel(m1_hat)
-        m2_hat_fig = plot_mel(m2_hat)
-
-        self.writer.add_figure('Generated/attention', att_fig, model.step)
-        self.writer.add_figure('Generated/target', m_target_fig, model.step)
-        self.writer.add_figure('Generated/linear', m1_hat_fig, model.step)
-        self.writer.add_figure('Generated/postnet', m2_hat_fig, model.step)
-
-        m2_hat_wav = self.dsp.griffinlim(m2_hat)
-
-        self.writer.add_audio(
-            tag='Generated/target_wav', snd_tensor=target_wav,
-            global_step=model.step, sample_rate=self.dsp.sample_rate)
-        self.writer.add_audio(
-            tag='Generated/postnet_wav', snd_tensor=m2_hat_wav,
             global_step=model.step, sample_rate=self.dsp.sample_rate)
