@@ -133,7 +133,7 @@ class TacoTrainer:
 
                     start = time.time()
                     model.train()
-                    m1_hat, m2_hat, attention, att_u = model(batch['x'], batch['mel'], att_aligner.detach())
+                    m1_hat, m2_hat, attention, att_u = model(batch['x'], batch['mel'], att_aligner.detach().softmax(-1))
                     #att_diff_loss = F.l1_loss(attention, att_aligner.detach())
 
 
@@ -195,7 +195,7 @@ class TacoTrainer:
 
         with torch.no_grad():
             att_aligner = aligner(batch['x'], batch['mel'])
-            m1_hat, m2_hat, att, att_u = model(batch['x'], batch['mel'], att_aligner)
+            m1_hat, m2_hat, att, att_u = model(batch['x'], batch['mel'], att_aligner.softmax(-1))
             att_aligner = att_aligner.softmax(-1)
 
         att_aligner = np_now(att_aligner)[0]

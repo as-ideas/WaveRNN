@@ -107,18 +107,21 @@ class Attention(nn.Module):
 class LSA(nn.Module):
     def __init__(self, attn_dim, kernel_size=31, filters=32):
         super().__init__()
-        self.conv = nn.Conv1d(2, filters, padding=(kernel_size - 1) // 2, kernel_size=kernel_size, bias=False)
+        self.conv = nn.Conv1d(4, filters, padding=(kernel_size - 1) // 2, kernel_size=kernel_size, bias=False)
         self.L = nn.Linear(filters, attn_dim, bias=True)
         self.W = nn.Linear(attn_dim, attn_dim, bias=True)
         self.v = nn.Linear(attn_dim, 1, bias=False)
         self.cumulative = None
+        self.cumulative_2 = None
         self.attention = None
 
     def init_attention(self, encoder_seq_proj):
         device = next(self.parameters()).device  # use same device as parameters
         b, t, c = encoder_seq_proj.size()
         self.cumulative = torch.zeros(b, t, device=device)
+        self.cumulative_2 = torch.zeros(b, t, device=device)
         self.attention = torch.zeros(b, t, device=device)
+        self.attention_2 = torch.zeros(b, t, device=device)
 
     def forward(self, encoder_seq_proj, query, t, att_t):
 
@@ -126,7 +129,8 @@ class LSA(nn.Module):
 
         processed_query = self.W(query).unsqueeze(1)
 
-        location = torch.cat([self.cumulative.unsqueeze(1), self.attention.unsqueeze(1)], dim=1)
+        location = torch.cat([self.cumulative.unsqueeze(1), self.attention.unsqueeze(1),
+                              self.attention_2.unsqueeze(1), self.cumulative_2.unsqueeze(1)], dim=1)
         processed_loc = self.L(self.conv(location).transpose(1, 2))
 
         u = self.v(torch.tanh(processed_query + encoder_seq_proj + processed_loc))
@@ -134,9 +138,12 @@ class LSA(nn.Module):
 
         # Smooth Attention
         #scores = torch.sigmoid(u) / torch.sigmoid(u).sum(dim=1, keepdim=True)
-        scores = F.softmax(u + att_t, dim=1)
+        scores = F.softmax(u, dim=1)
         self.attention = scores
+        self.attention_2 = att_t
         self.cumulative += self.attention
+        self.cumulative_2 += self.attention_2
+
 
         return scores.unsqueeze(-1).transpose(1, 2), u.unsqueeze(-1).transpose(1, 2)
 
