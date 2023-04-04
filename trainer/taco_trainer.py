@@ -129,7 +129,7 @@ class TacoTrainer:
                                                    self.train_cfg['clip_grad_norm'])
                     aligner_optim.step()
 
-                if aligner.get_step() > 2000:
+                if aligner.get_step() > 200:
 
                     start = time.time()
                     model.train()
@@ -173,9 +173,6 @@ class TacoTrainer:
                 self.writer.add_scalar('Params/learning_rate', session.lr, aligner.get_step())
 
 
-            val_loss, val_att_score = self.evaluate(model, session.val_set)
-            self.writer.add_scalar('Loss/val', val_loss, model.get_step())
-            self.writer.add_scalar('Attention_Score/val', val_att_score, model.get_step())
             save_checkpoint(model=model, optim=optimizer, config=self.config,
                             path=self.paths.taco_checkpoints / 'latest_model.pt')
 
@@ -186,22 +183,6 @@ class TacoTrainer:
             duration_avg.reset()
             print(' ')
 
-    def evaluate(self, model: Tacotron, val_set: Dataset) -> Tuple[float, float]:
-        model.eval()
-        val_loss = 0
-        val_att_score = 0
-        device = next(model.parameters()).device
-        for i, batch in enumerate(val_set, 1):
-            batch = to_device(batch, device=device)
-            with torch.no_grad():
-                m1_hat, m2_hat, attention, att_u = model(batch['x'], batch['mel'])
-                m1_loss = F.l1_loss(m1_hat, batch['mel'])
-                m2_loss = F.l1_loss(m2_hat, batch['mel'])
-                val_loss += m1_loss.item() + m2_loss.item()
-            _, att_score = attention_score(attention, batch['mel_len'])
-            val_att_score += torch.mean(att_score).item()
-
-        return val_loss / len(val_set), val_att_score / len(val_set)
 
     @ignore_exception
     def generate_plots(self, model: Tacotron, aligner, session: TTSSession) -> None:
