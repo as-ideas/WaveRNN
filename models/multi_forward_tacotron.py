@@ -28,12 +28,12 @@ class SeriesPredictor(nn.Module):
         super().__init__()
         self.embedding = Embedding(num_chars, emb_dim)
         self.convs = torch.nn.ModuleList([
-            BatchNormConv(emb_dim + speaker_emb_dims + 512, conv_dims, 5, relu=True),
+            BatchNormConv(emb_dim + speaker_emb_dims, conv_dims, 5, relu=True),
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
         ])
         self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
-        self.lin = nn.Linear(2 * rnn_dims, out_dim)
+        self.lin = nn.Linear(2 * rnn_dims + 512, out_dim)
         self.dropout = dropout
 
     def forward(self,
@@ -44,13 +44,14 @@ class SeriesPredictor(nn.Module):
         x = self.embedding(x)
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
-        x = torch.cat([x, speaker_emb, x_emb], dim=2)
+        x = torch.cat([x, speaker_emb], dim=2)
         x = x.transpose(1, 2)
         for conv in self.convs:
             x = conv(x)
             x = F.dropout(x, p=self.dropout, training=self.training)
         x = x.transpose(1, 2)
         x, _ = self.rnn(x)
+        x = torch.cat([x, x_emb], dim=-1)
         x = self.lin(x)
         return x / alpha
 
@@ -70,12 +71,12 @@ class ConditionalSeriesPredictor(nn.Module):
         self.embedding = Embedding(num_chars, emb_dim)
         self.pitch_cond_embedding = Embedding(cond_emb_size, cond_emb_dims)
         self.convs = torch.nn.ModuleList([
-            BatchNormConv(emb_dim + cond_emb_dims + speaker_emb_dims + 512, conv_dims, 5, relu=True),
+            BatchNormConv(emb_dim + cond_emb_dims + speaker_emb_dims, conv_dims, 5, relu=True),
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
         ])
         self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
-        self.lin = nn.Linear(2 * rnn_dims, 1)
+        self.lin = nn.Linear(2 * rnn_dims + 512, 1)
         self.dropout = dropout
 
     def forward(self,
@@ -88,13 +89,14 @@ class ConditionalSeriesPredictor(nn.Module):
         x_cond = self.pitch_cond_embedding(x_cond)
         speaker_emb = speaker_emb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
-        x = torch.cat([x, x_cond, speaker_emb, x_emb], dim=2)
+        x = torch.cat([x, x_cond, speaker_emb], dim=2)
         x = x.transpose(1, 2)
         for conv in self.convs:
             x = conv(x)
             x = F.dropout(x, p=self.dropout, training=self.training)
         x = x.transpose(1, 2)
         x, _ = self.rnn(x)
+        x = torch.cat([x, x_emb], dim=-1)
         x = self.lin(x)
         return x / alpha
 
@@ -164,12 +166,12 @@ class MultiForwardTacotron(nn.Module):
                                            rnn_dims=energy_rnn_dims,
                                            dropout=energy_dropout)
         self.prenet = CBHG(K=prenet_k,
-                           in_channels=embed_dims + 512,
+                           in_channels=embed_dims,
                            channels=prenet_dims,
-                           proj_channels=[prenet_dims, embed_dims+512],
+                           proj_channels=[prenet_dims, embed_dims],
                            num_highways=prenet_num_highways,
                            dropout=prenet_dropout)
-        self.lstm = nn.LSTM(2 * prenet_dims + speaker_emb_dims,
+        self.lstm = nn.LSTM(2 * prenet_dims + speaker_emb_dims + 512,
                             rnn_dims,
                             batch_first=True,
                             bidirectional=True)
@@ -184,8 +186,8 @@ class MultiForwardTacotron(nn.Module):
         self.post_proj = nn.Linear(2 * postnet_dims, n_mels, bias=False)
         self.pitch_strength = pitch_strength
         self.energy_strength = energy_strength
-        self.pitch_proj = nn.Conv1d(1, 2 * prenet_dims + speaker_emb_dims, kernel_size=3, padding=1)
-        self.energy_proj = nn.Conv1d(1, 2 * prenet_dims + speaker_emb_dims, kernel_size=3, padding=1)
+        self.pitch_proj = nn.Conv1d(1, 2 * prenet_dims + speaker_emb_dims + 512, kernel_size=3, padding=1)
+        self.energy_proj = nn.Conv1d(1, 2 * prenet_dims + speaker_emb_dims + 512, kernel_size=3, padding=1)
 
         self.trans_embedding = TransformerModel.from_checkpoint(trans_path)
 
@@ -217,14 +219,13 @@ class MultiForwardTacotron(nn.Module):
 
         x = self.embedding(x)
 
-        x = torch.cat([x, x_emb], dim=-1)
-
         x = x.transpose(1, 2)
 
         x = self.prenet(x)
+
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
-        x = torch.cat([x, speaker_emb], dim=2)
+        x = torch.cat([x, speaker_emb, x_emb], dim=2)
 
         pitch_proj = self.pitch_proj(pitch)
         pitch_proj = pitch_proj.transpose(1, 2)
@@ -278,9 +279,8 @@ class MultiForwardTacotron(nn.Module):
 
             x = self.embedding(x)
 
-            x = torch.cat([x, x_emb], dim=-1)
-
             return self._generate_mel(x=x,
+                                      x_emb = x_emb,
                                       dur_hat=dur_hat,
                                       pitch_hat=pitch_hat,
                                       energy_hat=energy_hat,
@@ -292,6 +292,7 @@ class MultiForwardTacotron(nn.Module):
 
     def _generate_mel(self,
                       x: torch.Tensor,
+                      x_emb: torch.Tensor,
                       semb: torch.Tensor,
                       dur_hat: torch.Tensor,
                       pitch_hat: torch.Tensor,
@@ -302,7 +303,7 @@ class MultiForwardTacotron(nn.Module):
         x = self.prenet(x)
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
-        x = torch.cat([x, speaker_emb], dim=2)
+        x = torch.cat([x, speaker_emb, x_emb], dim=2)
 
         pitch_proj = self.pitch_proj(pitch_hat)
         pitch_proj = pitch_proj.transpose(1, 2)
