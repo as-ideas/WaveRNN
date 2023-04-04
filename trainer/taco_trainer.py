@@ -133,7 +133,7 @@ class TacoTrainer:
 
                     start = time.time()
                     model.train()
-                    m1_hat, m2_hat, attention, att_u = model(batch['x'], batch['mel'], att_aligner.softmax(-1))
+                    m1_hat, m2_hat, attention, att_u = model(batch['x'], batch['mel'], att_aligner)
                     #att_diff_loss = F.l1_loss(attention, att_aligner.detach())
 
 

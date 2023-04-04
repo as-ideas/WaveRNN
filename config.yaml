@@ -62,7 +62,7 @@ tacotron:
 
   training:
     schedule:
-      - 1,  1e-4,  5000,  8      # progressive training schedule
+      - 1,  1e-4,  15000,  8      # progressive training schedule
 
     max_mel_len: 1250                # if you have a couple of extremely long spectrograms you might want to use this
     clip_grad_norm: 1.0              # clips the gradient norm to prevent explosion - set to None if not needed
