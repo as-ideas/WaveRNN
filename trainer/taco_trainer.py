@@ -160,12 +160,12 @@ class TacoTrainer:
                         save_checkpoint(model=model, optim=optimizer, config=self.config,
                                         path=self.paths.taco_checkpoints / f'taco_step{k}k.pt')
 
-                if aligner.get_step() % self.train_cfg['plot_every'] == 0:
-                    self.generate_plots(model, aligner, session)
-
                     self.writer.add_scalar('Attention_Score/train', att_score, model.get_step())
                     self.writer.add_scalar('Loss/train', loss, model.get_step())
                     self.writer.add_scalar('Att_Diff_Loss/train', att_diff_loss, model.get_step())
+                    if aligner.get_step() % self.train_cfg['plot_every'] == 0:
+                        self.generate_plots(model, aligner, session)
+
                 self.writer.add_scalar('CTCLoss/train', ctc_loss, model.get_step())
                 self.writer.add_scalar('Params/reduction_factor', session.r, model.get_step())
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
