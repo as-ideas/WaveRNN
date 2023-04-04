@@ -118,10 +118,6 @@ class TacoTrainer:
         self.forward_loss = self.forward_loss.to(device)
         for e in range(1, epochs + 1):
             for i, batch in enumerate(session.train_set, 1):
-                batch = to_device(batch, device=device)
-                start = time.time()
-                model.train()
-                m1_hat, m2_hat, attention, att_u = model(batch['x'], batch['mel'])
                 att_aligner = aligner(batch['x'], batch['mel'])
                 ctc_loss = self.forward_loss(att_aligner, text_lens=batch['x_len'], mel_lens=batch['mel_len'])
                 aligner_optim.zero_grad()
@@ -131,33 +127,40 @@ class TacoTrainer:
                                                    self.train_cfg['clip_grad_norm'])
                     aligner_optim.step()
 
-                att_diff_loss = F.l1_loss(attention, att_aligner.detach())
+                if aligner.get_step() > 2000:
 
-                m1_loss = F.l1_loss(m1_hat, batch['mel'])
-                m2_loss = F.l1_loss(m2_hat, batch['mel'])
-                loss = m1_loss + m2_loss + att_diff_loss
-                optimizer.zero_grad()
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(model.parameters(),
-                                               self.train_cfg['clip_grad_norm'])
-                optimizer.step()
-                loss_avg.add(loss.item())
-                step = model.get_step()
-                k = step // 1000
-                _, att_score = attention_score(attention, batch['mel_len'])
-                att_score = torch.mean(att_score)
+                    batch = to_device(batch, device=device)
+                    start = time.time()
+                    model.train()
+                    m1_hat, m2_hat, attention, att_u = model(batch['x'], batch['mel'])
+                    att_diff_loss = F.l1_loss(attention, att_aligner.detach())
 
-                duration_avg.add(time.time() - start)
-                speed = 1. / duration_avg.get()
-                msg = f'| Epoch: {e}/{epochs} ({i}/{total_iters}) | Loss: {loss_avg.get():#.4} ' \
-                      f'| Att score {att_score} | Att diff loss {att_diff_loss}' \
-                      f'| {speed:#.2} steps/s | Step: {k}k | '
 
-                if step % self.train_cfg['checkpoint_every'] == 0:
-                    save_checkpoint(model=model, optim=optimizer, config=self.config,
-                                    path=self.paths.taco_checkpoints / f'taco_step{k}k.pt')
+                    m1_loss = F.l1_loss(m1_hat, batch['mel'])
+                    m2_loss = F.l1_loss(m2_hat, batch['mel'])
+                    loss = m1_loss + m2_loss + att_diff_loss
+                    optimizer.zero_grad()
+                    loss.backward()
+                    torch.nn.utils.clip_grad_norm_(model.parameters(),
+                                                   self.train_cfg['clip_grad_norm'])
+                    optimizer.step()
+                    loss_avg.add(loss.item())
+                    step = model.get_step()
+                    k = step // 1000
+                    _, att_score = attention_score(attention, batch['mel_len'])
+                    att_score = torch.mean(att_score)
 
-                if step % self.train_cfg['plot_every'] == 0:
+                    duration_avg.add(time.time() - start)
+                    speed = 1. / duration_avg.get()
+                    msg = f'| Epoch: {e}/{epochs} ({i}/{total_iters}) | Loss: {loss_avg.get():#.4} ' \
+                          f'| Att score {att_score} | Att diff loss {att_diff_loss}' \
+                          f'| {speed:#.2} steps/s | Step: {k}k | '
+
+                    if step % self.train_cfg['checkpoint_every'] == 0:
+                        save_checkpoint(model=model, optim=optimizer, config=self.config,
+                                        path=self.paths.taco_checkpoints / f'taco_step{k}k.pt')
+
+                if aligner.get_step() % self.train_cfg['plot_every'] == 0:
                     self.generate_plots(model, aligner, session)
 
                 self.writer.add_scalar('Attention_Score/train', att_score, model.get_step())
