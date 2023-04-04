@@ -129,7 +129,7 @@ class TacoTrainer:
                                                    self.train_cfg['clip_grad_norm'])
                     aligner_optim.step()
 
-                if aligner.get_step() > 0:
+                if aligner.get_step() > 2000:
 
                     start = time.time()
                     model.train()
