@@ -276,6 +276,8 @@ class MultiForwardTacotron(nn.Module):
             energy_hat = self.energy_pred(x, x_emb, speaker_emb).transpose(1, 2)
             energy_hat = energy_function(energy_hat)
 
+            x = self.embedding(x)
+
             x = torch.cat([x, x_emb], dim=-1)
 
             return self._generate_mel(x=x,
