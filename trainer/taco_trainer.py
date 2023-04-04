@@ -124,6 +124,7 @@ class TacoTrainer:
                 m1_hat, m2_hat, attention, att_u = model(batch['x'], batch['mel'])
                 att_aligner = aligner(batch['x'], batch['mel'])
                 ctc_loss = self.forward_loss(att_aligner, text_lens=batch['x_len'], mel_lens=batch['mel_len'])
+                optimizer.zero_grad()
                 if not torch.isnan(ctc_loss) or torch.isinf(ctc_loss):
                     ctc_loss.backward()
                     torch.nn.utils.clip_grad_norm_(model.parameters(),
@@ -200,34 +201,29 @@ class TacoTrainer:
         return val_loss / len(val_set), val_att_score / len(val_set)
 
     @ignore_exception
-    def generate_plots(self, model: Tacotron, aligner, Aligner, session: TTSSession) -> None:
+    def generate_plots(self, model: Tacotron, aligner, session: TTSSession) -> None:
 
         model.eval()
+
         device = next(model.parameters()).device
         batch = session.val_sample
         batch = to_device(batch, device=device)
 
-        att_aligner = aligner(batch)
-        att_aligner = np.now(att_aligner)[0]
+        with torch.no_grad():
+            att_aligner = aligner(batch['x'], batch['mel']).softmax(-1)
+            att_aligner = np_now(att_aligner)[0]
+            m1_hat, m2_hat, att, att_u = model(batch['x'], batch['mel'])
 
-
-        m1_hat, m2_hat, att, att_u = model(batch['x'], batch['mel'])
         att = np_now(att)[0]
-        m1_hat = np_now(m1_hat)[0, :600, :]
         m2_hat = np_now(m2_hat)[0, :600, :]
         m_target = np_now(batch['mel'])[0, :600, :]
 
         att_fig = plot_attention(att)
         att_aligner_fig = plot_attention(att_aligner)
-        m1_hat_fig = plot_mel(m1_hat)
-        m2_hat_fig = plot_mel(m2_hat)
         m_target_fig = plot_mel(m_target)
 
         self.writer.add_figure('Ground_Truth_Aligned/attention', att_fig, model.step)
         self.writer.add_figure('Ground_Truth_Aligned/attention_aligner', att_aligner_fig, model.step)
-        self.writer.add_figure('Ground_Truth_Aligned/target', m_target_fig, model.step)
-        self.writer.add_figure('Ground_Truth_Aligned/linear', m1_hat_fig, model.step)
-        self.writer.add_figure('Ground_Truth_Aligned/postnet', m2_hat_fig, model.step)
 
         m2_hat_wav = self.dsp.griffinlim(m2_hat)
         target_wav = self.dsp.griffinlim(m_target)
