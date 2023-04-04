@@ -118,6 +118,7 @@ class TacoTrainer:
         self.forward_loss = self.forward_loss.to(device)
         for e in range(1, epochs + 1):
             for i, batch in enumerate(session.train_set, 1):
+                batch = to_device(batch, device=device)
                 att_aligner = aligner(batch['x'], batch['mel'])
                 ctc_loss = self.forward_loss(att_aligner, text_lens=batch['x_len'], mel_lens=batch['mel_len'])
                 aligner_optim.zero_grad()
@@ -129,7 +130,6 @@ class TacoTrainer:
 
                 if aligner.get_step() > 2000:
 
-                    batch = to_device(batch, device=device)
                     start = time.time()
                     model.train()
                     m1_hat, m2_hat, attention, att_u = model(batch['x'], batch['mel'])
