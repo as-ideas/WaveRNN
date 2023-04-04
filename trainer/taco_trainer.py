@@ -124,7 +124,7 @@ class TacoTrainer:
                 m1_hat, m2_hat, attention, att_u = model(batch['x'], batch['mel'])
                 att_aligner = aligner(batch['x'], batch['mel'])
                 ctc_loss = self.forward_loss(att_aligner, text_lens=batch['x_len'], mel_lens=batch['mel_len'])
-                optimizer.zero_grad()
+                aligner_optim.zero_grad()
                 if not torch.isnan(ctc_loss) or torch.isinf(ctc_loss):
                     ctc_loss.backward()
                     torch.nn.utils.clip_grad_norm_(model.parameters(),
