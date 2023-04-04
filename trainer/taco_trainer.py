@@ -2,6 +2,7 @@ import time
 
 import torch
 import torch.nn.functional as F
+import tqdm
 from torch.optim import Adam
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import Dataset
@@ -117,7 +118,7 @@ class TacoTrainer:
 
         self.forward_loss = self.forward_loss.to(device)
         for e in range(1, epochs + 1):
-            for i, batch in enumerate(session.train_set, 1):
+            for i, batch in tqdm.tqdm(enumerate(session.train_set, 1), total=len(session.train_set)):
                 batch = to_device(batch, device=device)
                 att_aligner = aligner(batch['x'], batch['mel'])
                 ctc_loss = self.forward_loss(att_aligner, text_lens=batch['x_len'], mel_lens=batch['mel_len'])
@@ -155,6 +156,7 @@ class TacoTrainer:
                     msg = f'| Epoch: {e}/{epochs} ({i}/{total_iters}) | Loss: {loss_avg.get():#.4} ' \
                           f'| Att score {att_score} | Att diff loss {att_diff_loss}' \
                           f'| {speed:#.2} steps/s | Step: {k}k | '
+                    stream(msg)
 
                     if step % self.train_cfg['checkpoint_every'] == 0:
                         save_checkpoint(model=model, optim=optimizer, config=self.config,
@@ -171,7 +173,6 @@ class TacoTrainer:
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
                 self.writer.add_scalar('Params/learning_rate', session.lr, model.get_step())
 
-                stream(msg)
 
             val_loss, val_att_score = self.evaluate(model, session.val_set)
             self.writer.add_scalar('Loss/val', val_loss, model.get_step())
