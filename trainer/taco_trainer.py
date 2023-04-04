@@ -129,7 +129,7 @@ class TacoTrainer:
                                                    self.train_cfg['clip_grad_norm'])
                     aligner_optim.step()
 
-                if aligner.get_step() > 0:
+                if aligner.get_step() > 2000:
 
                     start = time.time()
                     model.train()
@@ -164,7 +164,7 @@ class TacoTrainer:
                     self.writer.add_scalar('Attention_Score/train', att_score, aligner.get_step())
                     self.writer.add_scalar('Loss/train', loss, aligner.get_step())
                     #self.writer.add_scalar('Att_Diff_Loss/train', att_diff_loss, aligner.get_step())
-                    if aligner.get_step() % self.train_cfg['plot_every'] == 0:
+                    if model.get_step() % self.train_cfg['plot_every'] == 0:
                         self.generate_plots(model, aligner, session)
 
                 self.writer.add_scalar('CTCLoss/train', ctc_loss, aligner.get_step())
