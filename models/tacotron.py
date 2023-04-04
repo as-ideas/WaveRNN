@@ -120,7 +120,7 @@ class LSA(nn.Module):
         self.cumulative = torch.zeros(b, t, device=device)
         self.attention = torch.zeros(b, t, device=device)
 
-    def forward(self, encoder_seq_proj, query, t):
+    def forward(self, encoder_seq_proj, query, t, att_t):
 
         if t == 0: self.init_attention(encoder_seq_proj)
 
@@ -135,8 +135,8 @@ class LSA(nn.Module):
         # Smooth Attention
         #scores = torch.sigmoid(u) / torch.sigmoid(u).sum(dim=1, keepdim=True)
         scores = F.softmax(u, dim=1)
-        self.attention = scores
-        self.cumulative += self.attention
+        self.attention = att_t + scores
+        self.cumulative += att_t + self.attention
 
         return scores.unsqueeze(-1).transpose(1, 2), u.unsqueeze(-1).transpose(1, 2)
 
@@ -164,7 +164,7 @@ class Decoder(nn.Module):
         return prev * mask + current * (1 - mask)
 
     def forward(self, encoder_seq, encoder_seq_proj, prenet_in,
-                hidden_states, cell_states, context_vec, t):
+                hidden_states, cell_states, context_vec, t, att_in_t):
 
         # Need this for reshaping mels
         batch_size = encoder_seq.size(0)
@@ -181,7 +181,7 @@ class Decoder(nn.Module):
         attn_hidden = self.attn_rnn(attn_rnn_in.squeeze(1), attn_hidden)
 
         # Compute the attention scores
-        scores, u = self.attn_net(encoder_seq_proj, attn_hidden, t)
+        scores, u = self.attn_net(encoder_seq_proj, attn_hidden, t, att_in_t)
 
         # Dot product to create the context vector
         context_vec = scores @ encoder_seq
@@ -255,7 +255,7 @@ class Tacotron(nn.Module):
     def r(self, value: int) -> None:
         self.decoder.r = self.decoder.r.new_tensor(value, requires_grad=False)
 
-    def forward(self, x: torch.tensor, m: torch.tensor) -> torch.tensor:
+    def forward(self, x: torch.tensor, m: torch.tensor, att_in: torch.Tensor) -> torch.tensor:
         device = next(self.parameters()).device  # use same device as parameters
 
         if self.training:
@@ -293,7 +293,7 @@ class Tacotron(nn.Module):
             prenet_in = m[:, :, t - 1] if t > 0 else go_frame
             mel_frames, scores, hidden_states, cell_states, context_vec, u = \
                 self.decoder(encoder_seq, encoder_seq_proj, prenet_in,
-                             hidden_states, cell_states, context_vec, t)
+                             hidden_states, cell_states, context_vec, t, att_in[:, t, :])
             mel_outputs.append(mel_frames)
             attn_scores.append(scores)
             attn_u.append(u)
