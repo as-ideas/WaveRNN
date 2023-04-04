@@ -130,13 +130,13 @@ class LSA(nn.Module):
         processed_loc = self.L(self.conv(location).transpose(1, 2))
 
         u = self.v(torch.tanh(processed_query + encoder_seq_proj + processed_loc))
-        u = u.squeeze(-1)
+        u = u.squeeze(-1) + 10. * att_t
 
         # Smooth Attention
         #scores = torch.sigmoid(u) / torch.sigmoid(u).sum(dim=1, keepdim=True)
         scores = F.softmax(u, dim=1)
-        self.attention = att_t + scores
-        self.cumulative += att_t + self.attention
+        self.attention = scores
+        self.cumulative += self.attention
 
         return scores.unsqueeze(-1).transpose(1, 2), u.unsqueeze(-1).transpose(1, 2)
 
