@@ -194,8 +194,9 @@ class TacoTrainer:
         batch = to_device(batch, device=device)
 
         with torch.no_grad():
-            att_aligner = aligner(batch['x'], batch['mel']).softmax(-1)
+            att_aligner = aligner(batch['x'], batch['mel'])
             m1_hat, m2_hat, att, att_u = model(batch['x'], batch['mel'], att_aligner)
+            att_aligner = att_aligner.softmax(-1)
 
         att_aligner = np_now(att_aligner)[0]
         att = np_now(att)[0]
