@@ -128,10 +128,11 @@ class TransformerModel(nn.Module):
         return output
 
     def generate(self, src: Tensor) -> Tensor:
-        src_pad = make_token_len_mask(src)
-        src = self.encoder(src) * math.sqrt(self.d_model)
-        src = self.pos_encoder(src)
-        output = self.transformer_encoder(src, src_key_padding_mask=src_pad)
+        with torch.no_grad():
+            src_pad = make_token_len_mask(src)
+            src = self.encoder(src) * math.sqrt(self.d_model)
+            src = self.pos_encoder(src)
+            output = self.transformer_encoder(src, src_key_padding_mask=src_pad)
         return output
 
     @classmethod
