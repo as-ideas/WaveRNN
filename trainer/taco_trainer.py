@@ -2,6 +2,7 @@ import time
 
 import torch
 import torch.nn.functional as F
+from torch.optim import Adam
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import Dataset
 from torch.utils.tensorboard import SummaryWriter
@@ -112,6 +113,8 @@ class TacoTrainer:
         duration_avg = Averager()
         device = next(model.parameters()).device  # use same device as model parameters
         aligner = Aligner(num_chars=len(phonemes)).to(device)
+        aligner_optim = Adam(aligner.parameters(), lr=1e-4)
+
         self.forward_loss = self.forward_loss.to(device)
         for e in range(1, epochs + 1):
             for i, batch in enumerate(session.train_set, 1):
@@ -121,12 +124,17 @@ class TacoTrainer:
                 m1_hat, m2_hat, attention, att_u = model(batch['x'], batch['mel'])
                 att_aligner = aligner(batch['x'], batch['mel'])
                 ctc_loss = self.forward_loss(att_aligner, text_lens=batch['x_len'], mel_lens=batch['mel_len'])
+                if not torch.isnan(ctc_loss) or torch.isinf(ctc_loss):
+                    ctc_loss.backward()
+                    torch.nn.utils.clip_grad_norm_(model.parameters(),
+                                                   self.train_cfg['clip_grad_norm'])
+                    aligner_optim.step()
 
                 att_diff_loss = F.l1_loss(attention, att_aligner.detach())
 
                 m1_loss = F.l1_loss(m1_hat, batch['mel'])
                 m2_loss = F.l1_loss(m2_hat, batch['mel'])
-                loss = m1_loss + m2_loss + ctc_loss + att_diff_loss
+                loss = m1_loss + m2_loss + att_diff_loss
                 optimizer.zero_grad()
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(),
@@ -135,10 +143,13 @@ class TacoTrainer:
                 loss_avg.add(loss.item())
                 step = model.get_step()
                 k = step // 1000
+                _, att_score = attention_score(attention, batch['mel_len'])
+                att_score = torch.mean(att_score)
 
                 duration_avg.add(time.time() - start)
                 speed = 1. / duration_avg.get()
                 msg = f'| Epoch: {e}/{epochs} ({i}/{total_iters}) | Loss: {loss_avg.get():#.4} ' \
+                      f'| Att score {att_score} | Att diff loss {att_diff_loss}' \
                       f'| {speed:#.2} steps/s | Step: {k}k | '
 
                 if step % self.train_cfg['checkpoint_every'] == 0:
@@ -146,10 +157,8 @@ class TacoTrainer:
                                     path=self.paths.taco_checkpoints / f'taco_step{k}k.pt')
 
                 if step % self.train_cfg['plot_every'] == 0:
-                    self.generate_plots(model, session)
+                    self.generate_plots(model, aligner, session)
 
-                _, att_score = attention_score(attention, batch['mel_len'])
-                att_score = torch.mean(att_score)
                 self.writer.add_scalar('Attention_Score/train', att_score, model.get_step())
                 self.writer.add_scalar('Loss/train', loss, model.get_step())
                 self.writer.add_scalar('Att_Diff_Loss/train', att_diff_loss, model.get_step())
@@ -165,6 +174,9 @@ class TacoTrainer:
             self.writer.add_scalar('Attention_Score/val', val_att_score, model.get_step())
             save_checkpoint(model=model, optim=optimizer, config=self.config,
                             path=self.paths.taco_checkpoints / 'latest_model.pt')
+
+            save_checkpoint(model=aligner, optim=aligner_optim, config=self.config,
+                            path=self.paths.taco_checkpoints / 'latest_aligner.pt')
 
             loss_avg.reset()
             duration_avg.reset()
@@ -188,11 +200,17 @@ class TacoTrainer:
         return val_loss / len(val_set), val_att_score / len(val_set)
 
     @ignore_exception
-    def generate_plots(self, model: Tacotron, session: TTSSession) -> None:
+    def generate_plots(self, model: Tacotron, aligner, Aligner, session: TTSSession) -> None:
+
         model.eval()
         device = next(model.parameters()).device
         batch = session.val_sample
         batch = to_device(batch, device=device)
+
+        att_aligner = aligner(batch)
+        att_aligner = np.now(att_aligner)[0]
+
+
         m1_hat, m2_hat, att, att_u = model(batch['x'], batch['mel'])
         att = np_now(att)[0]
         m1_hat = np_now(m1_hat)[0, :600, :]
@@ -200,11 +218,13 @@ class TacoTrainer:
         m_target = np_now(batch['mel'])[0, :600, :]
 
         att_fig = plot_attention(att)
+        att_aligner_fig = plot_attention(att_aligner)
         m1_hat_fig = plot_mel(m1_hat)
         m2_hat_fig = plot_mel(m2_hat)
         m_target_fig = plot_mel(m_target)
 
         self.writer.add_figure('Ground_Truth_Aligned/attention', att_fig, model.step)
+        self.writer.add_figure('Ground_Truth_Aligned/attention_aligner', att_aligner_fig, model.step)
         self.writer.add_figure('Ground_Truth_Aligned/target', m_target_fig, model.step)
         self.writer.add_figure('Ground_Truth_Aligned/linear', m1_hat_fig, model.step)
         self.writer.add_figure('Ground_Truth_Aligned/postnet', m2_hat_fig, model.step)
