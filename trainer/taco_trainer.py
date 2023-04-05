@@ -82,6 +82,9 @@ class TacoTrainer:
               optimizer: Optimizer) -> None:
         tts_schedule = self.train_cfg['schedule']
         tts_schedule = parse_schedule(tts_schedule)
+        aligner = Aligner(num_chars=len(phonemes)).to(next(model.parameters()).device)
+        aligner_optim = Adam(aligner.parameters(), lr=1e-4)
+
         for i, session_params in enumerate(tts_schedule, 1):
             r, lr, max_step, bs = session_params
             if model.get_step() < max_step:
@@ -92,10 +95,13 @@ class TacoTrainer:
                 session = TTSSession(
                     index=i, r=r, lr=lr, max_step=max_step,
                     bs=bs, train_set=train_set, val_set=val_set)
-                self.train_session(model, optimizer, session=session)
+                self.train_session(model, optimizer, aligner, aligner_optim, session=session)
 
-    def train_session(self, model: Tacotron,
+    def train_session(self,
+                      model: Tacotron,
                       optimizer: Optimizer,
+                      aligner,
+                      aligner_optim,
                       session: TTSSession) -> None:
 
         current_step = model.get_step()
@@ -113,8 +119,7 @@ class TacoTrainer:
         loss_avg = Averager()
         duration_avg = Averager()
         device = next(model.parameters()).device  # use same device as model parameters
-        aligner = Aligner(num_chars=len(phonemes)).to(device)
-        aligner_optim = Adam(aligner.parameters(), lr=1e-4)
+
 
         self.forward_loss = self.forward_loss.to(device)
         for e in range(1, epochs + 1):
