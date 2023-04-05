@@ -245,9 +245,9 @@ class Tacotron(nn.Module):
         super().__init__()
         self.n_mels = n_mels
         self.att_conv = Sequential(
-            nn.Conv2d(1, 64, (7, 7), padding=(3, 3)),
+            nn.Conv2d(1, 16, (7, 7), padding=(3, 3)),
             nn.LeakyReLU(0.2),
-            nn.Conv2d(64, 1, (3, 3), padding=(1, 1))
+            nn.Conv2d(16, 1, (3, 3), padding=(1, 1))
         )
         self.lstm_dims = lstm_dims
         self.decoder_dims = decoder_dims
