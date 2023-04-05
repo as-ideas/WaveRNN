@@ -4,7 +4,7 @@ from typing import Union, Dict, Any, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn import Embedding, GRU
+from torch.nn import Embedding, GRU, Sequential
 
 from models.common_layers import CBHG
 from utils.text.symbols import phonemes
@@ -244,6 +244,11 @@ class Tacotron(nn.Module):
                  stop_threshold: float) -> None:
         super().__init__()
         self.n_mels = n_mels
+        self.att_conv = Sequential(
+            nn.Conv2d(1, 16, (5, 5), padding=(2, 2)),
+            nn.LeakyReLU(0.2),
+            nn.Conv2d(16, 1, (5, 5), padding=(2, 2))
+        )
         self.lstm_dims = lstm_dims
         self.decoder_dims = decoder_dims
         self.encoder = Encoder(embed_dims, num_chars, encoder_dims,
@@ -298,6 +303,8 @@ class Tacotron(nn.Module):
 
         # Need a couple of lists for outputs
         mel_outputs, attn_scores, attn_u = [], [], []
+
+        att_in = self.att_conv(att_in.unsqueeze(1)).squeeze(1)
 
         # Run the decoder loop
         for t in range(0, steps, self.r):
