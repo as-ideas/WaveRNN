@@ -107,7 +107,7 @@ class Attention(nn.Module):
 class LSA(nn.Module):
     def __init__(self, attn_dim, kernel_size=31, filters=32):
         super().__init__()
-        self.conv = nn.Conv1d(4, filters, padding=(kernel_size - 1) // 2, kernel_size=kernel_size, bias=False)
+        self.conv = nn.Conv1d(2, filters, padding=(kernel_size - 1) // 2, kernel_size=kernel_size, bias=False)
         #self.conv_2 = nn.Conv1d(2, filters, padding=(kernel_size - 1) // 2, kernel_size=kernel_size, bias=False)
         self.L = nn.Linear(filters, attn_dim, bias=True)
         self.W = nn.Linear(attn_dim, attn_dim, bias=True)
