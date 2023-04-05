@@ -244,11 +244,11 @@ class Tacotron(nn.Module):
                  stop_threshold: float) -> None:
         super().__init__()
         self.n_mels = n_mels
-        #self.att_conv = Sequential(
-        #    nn.Conv2d(1, 16, (5, 5), padding=(2, 2)),
-        #    nn.LeakyReLU(0.2),
-        #    nn.Conv2d(16, 1, (5, 5), padding=(2, 2))
-        #)
+        self.att_conv = Sequential(
+            nn.Conv2d(1, 64, (7, 7), padding=(3, 3)),
+            nn.LeakyReLU(0.2),
+            nn.Conv2d(64, 1, (3, 3), padding=(1, 1))
+        )
         self.lstm_dims = lstm_dims
         self.decoder_dims = decoder_dims
         self.encoder = Encoder(embed_dims, num_chars, encoder_dims,
@@ -304,7 +304,7 @@ class Tacotron(nn.Module):
         # Need a couple of lists for outputs
         mel_outputs, attn_scores, attn_u = [], [], []
 
-        #att_in = self.att_conv(att_in.unsqueeze(1)).squeeze(1)
+        att_in = self.att_conv(att_in.unsqueeze(1)).squeeze(1)
 
         # Run the decoder loop
         for t in range(0, steps, self.r):
@@ -361,6 +361,8 @@ class Tacotron(nn.Module):
 
         # Need a couple of lists for outputs
         mel_outputs, attn_scores = [], []
+
+
 
         # Run the decoder loop
         for t in range(0, steps, self.r):
