@@ -107,9 +107,10 @@ class Attention(nn.Module):
 class LSA(nn.Module):
     def __init__(self, attn_dim, kernel_size=31, filters=32):
         super().__init__()
-        self.conv = nn.Conv1d(3, filters, padding=(kernel_size - 1) // 2, kernel_size=kernel_size, bias=False)
-        #self.conv_2 = nn.Conv1d(2, filters, padding=(kernel_size - 1) // 2, kernel_size=kernel_size, bias=False)
+        self.conv = nn.Conv1d(2, filters, padding=(kernel_size - 1) // 2, kernel_size=kernel_size, bias=False)
+        self.conv_2 = nn.Conv1d(2, filters, padding=(kernel_size - 1) // 2, kernel_size=kernel_size, bias=False)
         self.L = nn.Linear(filters, attn_dim, bias=True)
+        self.L2 = nn.Linear(filters, attn_dim, bias=True)
         self.W = nn.Linear(attn_dim, attn_dim, bias=True)
         self.v = nn.Linear(attn_dim, 1, bias=False)
         self.cumulative = None
@@ -133,11 +134,11 @@ class LSA(nn.Module):
         location = torch.cat([self.cumulative.unsqueeze(1), self.attention.unsqueeze(1), att_t.unsqueeze(1)
                               #self.cumulative_2.unsqueeze(1), self.attention_2.unsqueeze(1),
                               ], dim=1)
-        #location_2 = torch.cat([self.cumulative_2.unsqueeze(1), self.attention_2.unsqueeze(1)], dim=1)
+        location_2 = torch.cat([self.cumulative_2.unsqueeze(1), self.attention_2.unsqueeze(1)], dim=1)
         processed_loc = self.L(self.conv(location).transpose(1, 2))
-        #processed_loc_2 = self.L(self.conv(location_2).transpose(1, 2))
+        processed_loc_2 = self.L2(self.conv(location_2).transpose(1, 2))
 
-        u = self.v(torch.tanh(processed_query + encoder_seq_proj + processed_loc))
+        u = self.v(torch.tanh(processed_query + encoder_seq_proj + processed_loc + processed_loc_2))
         u = u.squeeze(-1)
 
         # Smooth Attention
