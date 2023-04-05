@@ -131,7 +131,7 @@ class LSA(nn.Module):
         processed_query = self.W(query).unsqueeze(1)
 
         location = torch.cat([self.cumulative.unsqueeze(1), self.attention.unsqueeze(1),
-                              self.cumulative_2.unsqueeze(1), self.attention_2.unsqueeze(1),
+                              #self.cumulative_2.unsqueeze(1), self.attention_2.unsqueeze(1),
                               ], dim=1)
         #location_2 = torch.cat([self.cumulative_2.unsqueeze(1), self.attention_2.unsqueeze(1)], dim=1)
         processed_loc = self.L(self.conv(location).transpose(1, 2))
@@ -142,7 +142,7 @@ class LSA(nn.Module):
 
         # Smooth Attention
         #scores = torch.sigmoid(u) / torch.sigmoid(u).sum(dim=1, keepdim=True)
-        scores = F.softmax(u, dim=1)
+        scores = F.softmax(u + att_t, dim=1)
         self.attention = scores
         self.attention_2 = att_t
         self.cumulative += self.attention
