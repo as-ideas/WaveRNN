@@ -131,7 +131,7 @@ class LSA(nn.Module):
 
         processed_query = self.W(query).unsqueeze(1)
 
-        location = torch.cat([self.cumulative.unsqueeze(1), self.attention.unsqueeze(1), att_t.unsqueeze(1)
+        location = torch.cat([self.cumulative.unsqueeze(1), self.attention.unsqueeze(1)
                               #self.cumulative_2.unsqueeze(1), self.attention_2.unsqueeze(1),
                               ], dim=1)
         location_2 = torch.cat([self.cumulative_2.unsqueeze(1), self.attention_2.unsqueeze(1)], dim=1)
@@ -305,7 +305,7 @@ class Tacotron(nn.Module):
         # Need a couple of lists for outputs
         mel_outputs, attn_scores, attn_u = [], [], []
 
-        att_in = self.att_conv(att_in.unsqueeze(1)).squeeze(1)
+        #att_in = self.att_conv(att_in.unsqueeze(1)).squeeze(1)
 
         # Run the decoder loop
         for t in range(0, steps, self.r):
