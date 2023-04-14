@@ -167,12 +167,15 @@ class ForwardTacotron(nn.Module):
     def generate(self,
                  x: torch.Tensor,
                  alpha=1.0,
+                 dur_hat=None,
                  pitch_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x,
                  energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, torch.Tensor]:
-        dur_hat = self.dur_pred(x, alpha=alpha)
-        dur_hat = dur_hat.squeeze(2)
-        if torch.sum(dur_hat.long()) <= 0:
-            torch.fill_(dur_hat, value=2.)
+
+        if dur_hat is None:
+            dur_hat = self.dur_pred(x, alpha=alpha)
+            dur_hat = dur_hat.squeeze(2)
+            if torch.sum(dur_hat.long()) <= 0:
+                torch.fill_(dur_hat, value=2.)
         pitch_hat = self.pitch_pred(x).transpose(1, 2)
         pitch_hat = pitch_function(pitch_hat)
         energy_hat = self.energy_pred(x).transpose(1, 2)

@@ -208,8 +208,8 @@ if __name__ == '__main__':
 
     val_strings = ['naɪn,, fʁaʊ lampʁɛçt, diː meːdiən zɪnt nɪçt ʃʊlt.']
 
-    tts_path = 'welt_voice/tts_model/model.pt'
-    voc_path = 'welt_voice/voc_model/model.pt'
+    tts_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/tts_model/model.pt'
+    voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     print('Using device:', device)
@@ -220,7 +220,7 @@ if __name__ == '__main__':
     model_base = ForwardTacotron.from_checkpoint(tts_path)
     model_base.eval()
     print(f'\nInitialized tts model: {model}\n')
-    optimizer = optim.Adam(model.parameters(), lr=1e-6)
+    optimizer = optim.Adam(model.postnet.parameters(), lr=1e-6)
 
 
     melgan = Generator(80)
@@ -229,10 +229,12 @@ if __name__ == '__main__':
     melgan = melgan.to(device)
     model = model.to(device)
     model_base = model_base.to(device)
+    model_base.eval()
+    model.train()
 
 
 
-    df = pd.read_csv('welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
+    df = pd.read_csv('/Users/cschaefe/datasets/nlp/welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
     df.dropna(inplace=True)
     strings = df['phonemes']
     strings = [s for s in strings if len(s) > 10 and len(s) < 100]
@@ -257,38 +259,44 @@ if __name__ == '__main__':
 
     for epoch in range(10000):
         for batch in dataloader:
-            #print(step, batch.size())
             batch = batch.to(device)
+            with torch.no_grad():
+                out_base = model.generate(batch)
 
+            batch_base = {
 
-            with torch.set_grad_enabled(True):
-                with torch.no_grad():
-                    out_base = model_base.generate(batch)
-                out = model.generate(batch)
+                'x': batch,
+                'mel': out_base['mel_post'],
+                'dur': out_base['dur'],
+                'pitch': out_base['pitch'].squeeze(1),
+                'energy': out_base['energy'].squeeze(1),
+                'mel_len': torch.tensor(out_base['mel_post'].size(0)).unsqueeze(0).to(device),
+            }
+            out = model(batch_base)
 
-                audio = melgan(out['mel_post'])
-                audio = audio.squeeze(1)
+            audio = melgan(out['mel_post'])
+            audio = audio.squeeze(1)
 
-                audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
-                                            sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
-                                            win_size=1024)
+            audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
+                                        sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
+                                        win_size=1024)
 
-                loss = F.l1_loss(audio_mel, out_base['mel_post']) / loss_acc
-                loss_sum += loss.item()
+            loss = F.l1_loss(audio_mel, out_base['mel_post']) / loss_acc
+            loss_sum += loss.item()
 
-                loss.backward()
+            loss.backward()
 
-                print(step, loss)
+            print(step, loss)
 
-                if (step + 1) % loss_acc == 0:
-                    optimizer.step()
-                    optimizer.zero_grad()
-                    sw.add_scalar('mel_loss_avg/train', loss_sum / loss_acc, global_step=step)
-                    loss_sum = 0
+            if (step + 1) % loss_acc == 0:
+                optimizer.step()
+                optimizer.zero_grad()
+                sw.add_scalar('mel_loss_avg/train', loss_sum / loss_acc, global_step=step)
+                loss_sum = 0
 
             sw.add_scalar('mel_loss/train', loss, global_step=step)
 
-            if step % 1000 == 0:
+            if step % 10 == 0:
                 model.eval()
                 melgan.eval()
                 for i, batch in enumerate(val_dataloader):
@@ -296,7 +304,15 @@ if __name__ == '__main__':
                     val_loss = 0
                     with torch.no_grad():
                         out_base = model_base.generate(batch)
-                        out = model.generate(batch)
+                        batch_base = {
+                            'x': batch,
+                            'mel': out_base['mel_post'],
+                            'dur': out_base['dur'],
+                            'pitch': out_base['pitch'].squeeze(1),
+                            'energy': out_base['energy'].squeeze(1),
+                            'mel_len': torch.tensor(out_base['mel_post'].size(1)).unsqueeze(0).to(device),
+                        }
+                        out = model(batch_base)
                         audio = melgan(out['mel_post'])
                         audio = audio.squeeze(1)
                         audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
