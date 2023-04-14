@@ -220,7 +220,7 @@ if __name__ == '__main__':
     model_base = ForwardTacotron.from_checkpoint(tts_path)
     model_base.eval()
     print(f'\nInitialized tts model: {model}\n')
-    optimizer = optim.Adam(model.postnet.parameters(), lr=1e-6)
+    optimizer = optim.Adam(model.parameters(), lr=1e-6)
 
 
     melgan = Generator(80)
@@ -261,18 +261,18 @@ if __name__ == '__main__':
         for batch in dataloader:
             batch = batch.to(device)
             with torch.no_grad():
-                out_base = model.generate(batch)
+                out_base = model_base.generate(batch)
 
             batch_base = {
-
                 'x': batch,
                 'mel': out_base['mel_post'],
                 'dur': out_base['dur'],
                 'pitch': out_base['pitch'].squeeze(1),
                 'energy': out_base['energy'].squeeze(1),
-                'mel_len': torch.tensor(out_base['mel_post'].size(0)).unsqueeze(0).to(device),
+                'mel_len': torch.tensor(out_base['mel_post'].size(-1)).unsqueeze(0).to(device),
             }
             out = model(batch_base)
+            out_gen = model.generate(batch)
 
             audio = melgan(out['mel_post'])
             audio = audio.squeeze(1)
@@ -281,7 +281,7 @@ if __name__ == '__main__':
                                         sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                         win_size=1024)
 
-            loss = F.l1_loss(audio_mel, out_base['mel_post']) / loss_acc
+            loss = F.l1_loss(audio_mel, out_base['mel_post'])
             loss_sum += loss.item()
 
             loss.backward()
@@ -313,6 +313,7 @@ if __name__ == '__main__':
                             'mel_len': torch.tensor(out_base['mel_post'].size(1)).unsqueeze(0).to(device),
                         }
                         out = model(batch_base)
+                        out_gen = model.generate(batch)
                         audio = melgan(out['mel_post'])
                         audio = audio.squeeze(1)
                         audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
@@ -327,6 +328,7 @@ if __name__ == '__main__':
                     sw.add_audio(f'audio_generated_{i}', audio.detach().cpu(), sample_rate=22050, global_step=step)
                     with torch.no_grad():
                         audio_base = melgan(out_base['mel_post'].squeeze(1)).detach().cpu()
+                        audio_gen = melgan(out_gen['mel_post'].squeeze(1)).detach().cpu()
                     sw.add_audio(f'audio_target_{i}', audio_base, sample_rate=22050, global_step=step)
 
                     sw.add_figure(f'generated_{i}', mel_plot, global_step=step)

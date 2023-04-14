@@ -144,12 +144,12 @@ class ForwardTacotron(nn.Module):
 
         x = self.lr(x, dur)
 
-        x = pack_padded_sequence(x, lengths=mel_lens.cpu(), enforce_sorted=False,
-                                 batch_first=True)
+        #x = pack_padded_sequence(x, lengths=mel_lens.cpu(), enforce_sorted=False,
+        #                         batch_first=True)
 
         x, _ = self.lstm(x)
 
-        x, _ = pad_packed_sequence(x, padding_value=self.padding_value, batch_first=True)
+        #x, _ = pad_packed_sequence(x, padding_value=self.padding_value, batch_first=True)
 
         x = self.lin(x)
         x = x.transpose(1, 2)
