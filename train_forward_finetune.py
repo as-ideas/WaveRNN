@@ -235,7 +235,7 @@ if __name__ == '__main__':
     random = Random(42)
     random.shuffle(strings)
 
-    dataset = StringDataset(strings)
+    dataset = StringDataset(val_strings)
     val_dataset = StringDataset(val_strings)
 
     dataloader = DataLoader(dataset, batch_size=1, collate_fn=collate_fn,
@@ -304,9 +304,9 @@ if __name__ == '__main__':
                     mel_plot = plot_mel(audio_mel.squeeze().detach().cpu().numpy())
                     mel_plot_target = plot_mel(out_base['mel_post'].squeeze().detach().cpu().numpy())
                     sw.add_scalar('mel_loss/val', val_loss / len(val_dataloader), global_step=step)
-                    sw.add_audio(f'audio_generated_{i}', audio, sample_rate=22050, global_step=step)
+                    sw.add_audio(f'audio_generated_{i}', audio.detach().cpu(), sample_rate=22050, global_step=step)
                     with torch.no_grad():
-                        audio_base = melgan(out_base['mel_post'].squeeze(1))
+                        audio_base = melgan(out_base['mel_post'].squeeze(1)).detach().cpu()
                     sw.add_audio(f'audio_target_{i}', audio_base, sample_rate=22050, global_step=step)
 
                     sw.add_figure(f'generated_{i}', mel_plot, global_step=step)
