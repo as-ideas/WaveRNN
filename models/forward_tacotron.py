@@ -169,7 +169,6 @@ class ForwardTacotron(nn.Module):
                  alpha=1.0,
                  pitch_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x,
                  energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, torch.Tensor]:
-        self.eval()
         dur_hat = self.dur_pred(x, alpha=alpha)
         dur_hat = dur_hat.squeeze(2)
         if torch.sum(dur_hat.long()) <= 0:
