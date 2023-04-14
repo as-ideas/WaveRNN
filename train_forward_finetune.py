@@ -315,7 +315,7 @@ if __name__ == '__main__':
                 model.train()
                 melgan.train()
                 checkpoint['model'] = model.state_dict()
-                torch.save(checkpoint, 'forward_taco_finetuned.pt')
+                torch.save(checkpoint, 'checkpoints/forward_taco_finetuned.pt')
             step += 1
 
 
