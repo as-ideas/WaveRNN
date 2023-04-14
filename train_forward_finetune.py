@@ -223,9 +223,10 @@ if __name__ == '__main__':
 
 
     melgan = Generator(80)
-    checkpoint = torch.load(voc_path, map_location=torch.device('cpu'))
-    melgan.load_state_dict(checkpoint['model_g'])
+    voc_checkpoint = torch.load(voc_path, map_location=torch.device('cpu'))
+    melgan.load_state_dict(voc_checkpoint['model_g'])
     melgan = melgan.to(device)
+    model = model.to(device)
 
 
 
