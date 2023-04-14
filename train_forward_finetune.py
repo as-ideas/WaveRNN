@@ -206,7 +206,9 @@ class StringDataset(Dataset):
 
 if __name__ == '__main__':
 
-    strings = ['diː t͡seː-deː-ʔuː-t͡sɛntʁaːlə lɛst iːɐ ʃpɪt͡sn̩pɛʁzonaːl dʊʁçt͡ʃɛkn̩: ɪm jʏŋstn̩ mɪtɡliːdɐbʁiːf fɔn bʊndəsɡəʃɛft͡sfyːʁɐ ʃtɛfan hɛnəvɪç (axtʔʊntfɪʁt͡sɪç) vɪʁt diː t͡seː-deː-ʔuː-baːzɪs aʊfɡəfɔʁdɐt, an aɪnɐ bəfʁaːɡʊŋ dɛs tʁiːʁɐ paʁtaɪən fɔʁʃɐs uːvə jan (nɔɪnʔʊntfʏnft͡sɪç) taɪlt͡suneːmən.']
+    val_strings = ['iːɐ man, foːɐ axt jaːʁən foːɐ deːm kʁiːk ɪn zyːʁiən ɡəfloːən, hoːltə diː hɔɪtə zɛksʔʊntdʁaɪsɪç jɛːʁɪɡə mɪt deːɐ ɡəmaɪnzaːmən tɔxtɐ t͡svaɪtaʊzn̩tziːpt͡seːn naːx bɛʁliːn ʊnt ɛɐʔœfnətə aɪn kafeː.',
+               'diː t͡seː-deː-ʔuː-t͡sɛntʁaːlə lɛst iːɐ ʃpɪt͡sn̩pɛʁzonaːl dʊʁçt͡ʃɛkn̩: ɪm jʏŋstn̩ mɪtɡliːdɐbʁiːf fɔn bʊndəsɡəʃɛft͡sfyːʁɐ ʃtɛfan hɛnəvɪç (axtʔʊntfɪʁt͡sɪç) vɪʁt diː t͡seː-deː-ʔuː-baːzɪs aʊfɡəfɔʁdɐt, an aɪnɐ bəfʁaːɡʊŋ dɛs tʁiːʁɐ paʁtaɪən fɔʁʃɐs uːvə jan (nɔɪnʔʊntfʏnft͡sɪç) taɪlt͡suneːmən.',
+                   'das taŋkʃtɛlən dɔʁt t͡svɪʃn̩ axt͡seːn uːɐ ʊnt deːm fʁyːən mɔʁɡŋ̍ dɪçt zɪnt, ɪst ɪn aɪnɪɡn̩ ʁeɡioːnən kaɪnə aʊsnaːmə meːɐ - andɐs als nɔx foːɐ aɪn paːɐ jaːʁən.']
 
     tts_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/tts_model/model.pt'
     voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
@@ -216,8 +218,9 @@ if __name__ == '__main__':
 
     # Instantiate Forward TTS Model
     model = ForwardTacotron.from_checkpoint(tts_path)
+    model_base = ForwardTacotron.from_checkpoint(tts_path)
     print(f'\nInitialized tts model: {model}\n')
-    optimizer = optim.Adam(model.parameters(), lr=1e-4)
+    optimizer = optim.Adam(model.parameters(), lr=1e-6)
 
 
     melgan = Generator(80)
@@ -227,23 +230,31 @@ if __name__ == '__main__':
 
 
 
-
-
     df = pd.read_csv('/Users/cschaefe/datasets/nlp/welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
     df.dropna(inplace=True)
     #strings = df['phonemes']
     #strings = [s for s in strings if len(s) > 10 and len(s) < 300]
     random = Random(42)
-    random.shuffle(strings)
+    random.shuffle(val_strings)
 
-    dataset = StringDataset(strings)
+    dataset = StringDataset(val_strings)
 
-    dataloader = DataLoader(dataset, batch_size=1, collate_fn=collate_fn,
+    dataloader = DataLoader(dataset, batch_size=3, collate_fn=collate_fn,
                             sampler=None)
 
-    for epoch in range(100):
+    val_dataloader = DataLoader(dataset, batch_size=1, collate_fn=collate_fn,
+                            sampler=None)
+
+    sw = SummaryWriter('checkpoints/logs_finetune')
+
+    step = 0
+
+    for epoch in range(10000):
         for batch in dataloader:
             batch = batch.to(device)
+            with torch.no_grad():
+                out_base = model_base.generate(batch)
+
             out = model.generate(batch)
 
             audio = melgan(out['mel_post'])
@@ -252,14 +263,43 @@ if __name__ == '__main__':
             audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
                                         sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                         win_size=1024)
-            print(audio_mel.size())
-            loss = F.l1_loss(out['mel_post'], audio_mel)
 
-            print(loss)
+            loss = F.l1_loss(out_base['mel_post'], audio_mel)
+
+            print(step, loss)
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+
+            sw.add_scalar('mel_loss', loss, global_step=step)
+            if step % 10 == 0:
+                model.eval()
+                melgan.eval()
+                for i, batch in enumerate(val_dataloader):
+                    batch = batch.to(device)
+                    with torch.no_grad():
+                        out_base = model.generate(batch)
+                        out = model.generate(batch)
+                        audio = melgan(out['mel_post'])
+                        audio = audio.squeeze(1)
+                        audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
+                                                    sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
+                                                    win_size=1024)
+
+                    mel_plot = plot_mel(audio_mel.squeeze().detach().cpu().numpy())
+                    mel_plot_target = plot_mel(out_base['mel_post'].squeeze().detach().cpu().numpy())
+
+                    sw.add_audio(f'audio_generated_{i}', audio, sample_rate=22050, global_step=step)
+                    with torch.no_grad():
+                        audio_base = melgan(out_base['mel_post'].squeeze(1))
+                    sw.add_audio(f'audio_target_{i}', audio_base, sample_rate=22050, global_step=step)
+
+                    sw.add_figure(f'generated_{i}', mel_plot, global_step=step)
+                    sw.add_figure(f'target_{i}', mel_plot_target, global_step=step)
+                model.train()
+                melgan.train()
+            step += 1
 
 
 
