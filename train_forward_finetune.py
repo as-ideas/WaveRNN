@@ -218,6 +218,7 @@ if __name__ == '__main__':
     model = ForwardTacotron.from_checkpoint(tts_path)
     checkpoint = torch.load(tts_path, map_location=torch.device('cpu'))
     model_base = ForwardTacotron.from_checkpoint(tts_path)
+    model_base.eval()
     print(f'\nInitialized tts model: {model}\n')
     optimizer = optim.Adam(model.parameters(), lr=1e-6)
 
