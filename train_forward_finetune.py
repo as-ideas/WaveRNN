@@ -208,14 +208,15 @@ if __name__ == '__main__':
 
     val_strings = ['naɪn,, fʁaʊ lampʁɛçt, diː meːdiən zɪnt nɪçt ʃʊlt.']
 
-    tts_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/tts_model/model.pt'
-    voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
+    tts_path = 'welt_voice/tts_model/model.pt'
+    voc_path = 'welt_voice/voc_model/model.pt'
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     print('Using device:', device)
 
     # Instantiate Forward TTS Model
     model = ForwardTacotron.from_checkpoint(tts_path)
+    checkpoint = torch.load(tts_path, map_location=torch.device('cpu'))
     model_base = ForwardTacotron.from_checkpoint(tts_path)
     print(f'\nInitialized tts model: {model}\n')
     optimizer = optim.Adam(model.parameters(), lr=1e-6)
@@ -228,7 +229,7 @@ if __name__ == '__main__':
 
 
 
-    df = pd.read_csv('/Users/cschaefe/datasets/nlp/welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
+    df = pd.read_csv('welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
     df.dropna(inplace=True)
     strings = df['phonemes']
     strings = [s for s in strings if len(s) > 10 and len(s) < 100]
@@ -284,7 +285,7 @@ if __name__ == '__main__':
 
             sw.add_scalar('mel_loss/train', loss, global_step=step)
 
-            if step % 10 == 0:
+            if step % 1000 == 0:
                 model.eval()
                 melgan.eval()
                 for i, batch in enumerate(val_dataloader):
@@ -313,6 +314,8 @@ if __name__ == '__main__':
                     sw.add_figure(f'target_{i}', mel_plot_target, global_step=step)
                 model.train()
                 melgan.train()
+                checkpoint['model'] = model.state_dict()
+                torch.save(checkpoint, 'forward_taco_finetuned.pt')
             step += 1
 
 
