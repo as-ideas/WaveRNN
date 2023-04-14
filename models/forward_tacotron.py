@@ -210,6 +210,8 @@ class ForwardTacotron(nn.Module):
         x = x.transpose(1, 2)
         x = self.prenet(x)
 
+
+
         pitch_proj = self.pitch_proj(pitch_hat)
         pitch_proj = pitch_proj.transpose(1, 2)
         x = x + pitch_proj * self.pitch_strength

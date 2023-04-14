@@ -206,9 +206,7 @@ class StringDataset(Dataset):
 
 if __name__ == '__main__':
 
-    val_strings = ['iːɐ man, foːɐ axt jaːʁən foːɐ deːm kʁiːk ɪn zyːʁiən ɡəfloːən, hoːltə diː hɔɪtə zɛksʔʊntdʁaɪsɪç jɛːʁɪɡə mɪt deːɐ ɡəmaɪnzaːmən tɔxtɐ t͡svaɪtaʊzn̩tziːpt͡seːn naːx bɛʁliːn ʊnt ɛɐʔœfnətə aɪn kafeː.',
-               'diː t͡seː-deː-ʔuː-t͡sɛntʁaːlə lɛst iːɐ ʃpɪt͡sn̩pɛʁzonaːl dʊʁçt͡ʃɛkn̩: ɪm jʏŋstn̩ mɪtɡliːdɐbʁiːf fɔn bʊndəsɡəʃɛft͡sfyːʁɐ ʃtɛfan hɛnəvɪç (axtʔʊntfɪʁt͡sɪç) vɪʁt diː t͡seː-deː-ʔuː-baːzɪs aʊfɡəfɔʁdɐt, an aɪnɐ bəfʁaːɡʊŋ dɛs tʁiːʁɐ paʁtaɪən fɔʁʃɐs uːvə jan (nɔɪnʔʊntfʏnft͡sɪç) taɪlt͡suneːmən.',
-                   'das taŋkʃtɛlən dɔʁt t͡svɪʃn̩ axt͡seːn uːɐ ʊnt deːm fʁyːən mɔʁɡŋ̍ dɪçt zɪnt, ɪst ɪn aɪnɪɡn̩ ʁeɡioːnən kaɪnə aʊsnaːmə meːɐ - andɐs als nɔx foːɐ aɪn paːɐ jaːʁən.']
+    val_strings = ['naɪn,, fʁaʊ lampʁɛçt, diː meːdiən zɪnt nɪçt ʃʊlt.']
 
     tts_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/tts_model/model.pt'
     voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
@@ -232,64 +230,80 @@ if __name__ == '__main__':
 
     df = pd.read_csv('/Users/cschaefe/datasets/nlp/welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
     df.dropna(inplace=True)
-    #strings = df['phonemes']
-    #strings = [s for s in strings if len(s) > 10 and len(s) < 300]
+    strings = df['phonemes']
+    strings = [s for s in strings if len(s) > 10 and len(s) < 100]
     random = Random(42)
-    random.shuffle(val_strings)
+    random.shuffle(strings)
 
-    dataset = StringDataset(val_strings)
+    dataset = StringDataset(strings)
+    val_dataset = StringDataset(val_strings)
 
-    dataloader = DataLoader(dataset, batch_size=3, collate_fn=collate_fn,
+    dataloader = DataLoader(dataset, batch_size=1, collate_fn=collate_fn,
                             sampler=None)
 
-    val_dataloader = DataLoader(dataset, batch_size=1, collate_fn=collate_fn,
+    val_dataloader = DataLoader(val_dataset, batch_size=1, collate_fn=collate_fn,
                             sampler=None)
 
     sw = SummaryWriter('checkpoints/logs_finetune')
 
     step = 0
+    loss_acc = 1
+    loss_sum = 0
+
 
     for epoch in range(10000):
         for batch in dataloader:
+            #print(step, batch.size())
             batch = batch.to(device)
-            with torch.no_grad():
-                out_base = model_base.generate(batch)
 
-            out = model.generate(batch)
 
-            audio = melgan(out['mel_post'])
-            audio = audio.squeeze(1)
+            with torch.set_grad_enabled(True):
+                with torch.no_grad():
+                    out_base = model_base.generate(batch)
+                out = model.generate(batch)
 
-            audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
-                                        sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
-                                        win_size=1024)
+                audio = melgan(out['mel_post'])
+                audio = audio.squeeze(1)
 
-            loss = F.l1_loss(out_base['mel_post'], audio_mel)
+                audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
+                                            sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
+                                            win_size=1024)
 
-            print(step, loss)
+                loss = F.l1_loss(audio_mel, out_base['mel_post']) / loss_acc
+                loss_sum += loss.item()
 
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+                loss.backward()
 
-            sw.add_scalar('mel_loss', loss, global_step=step)
+                print(step, loss)
+
+                if (step + 1) % loss_acc == 0:
+                    optimizer.step()
+                    optimizer.zero_grad()
+                    sw.add_scalar('mel_loss_avg/train', loss_sum / loss_acc, global_step=step)
+                    loss_sum = 0
+
+            sw.add_scalar('mel_loss/train', loss, global_step=step)
+
             if step % 10 == 0:
                 model.eval()
                 melgan.eval()
                 for i, batch in enumerate(val_dataloader):
                     batch = batch.to(device)
+                    val_loss = 0
                     with torch.no_grad():
-                        out_base = model.generate(batch)
+                        out_base = model_base.generate(batch)
                         out = model.generate(batch)
                         audio = melgan(out['mel_post'])
                         audio = audio.squeeze(1)
                         audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
                                                     sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                                     win_size=1024)
+                        val_loss += F.l1_loss(audio_mel, out_base['mel_post'])
+
 
                     mel_plot = plot_mel(audio_mel.squeeze().detach().cpu().numpy())
                     mel_plot_target = plot_mel(out_base['mel_post'].squeeze().detach().cpu().numpy())
-
+                    sw.add_scalar('mel_loss/val', val_loss / len(val_dataloader), global_step=step)
                     sw.add_audio(f'audio_generated_{i}', audio, sample_rate=22050, global_step=step)
                     with torch.no_grad():
                         audio_base = melgan(out_base['mel_post'].squeeze(1))
