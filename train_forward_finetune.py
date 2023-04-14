@@ -227,6 +227,7 @@ if __name__ == '__main__':
     melgan.load_state_dict(voc_checkpoint['model_g'])
     melgan = melgan.to(device)
     model = model.to(device)
+    model_base = model_base.to(device)
 
 
 
