@@ -253,16 +253,7 @@ if __name__ == '__main__':
             with torch.no_grad():
                 out_base = model.generate(batch)
 
-            batch_base = {
-                'x': batch,
-                'mel': out_base['mel_post'],
-                'dur': out_base['dur'],
-                'pitch': out_base['pitch'].squeeze(1),
-                'energy': out_base['energy'].squeeze(1),
-                'mel_len': torch.tensor(out_base['mel_post'].size(-1)).unsqueeze(0).to(device),
-            }
-
-            out = model.postnet(batch_base['mel'])
+            out = model.postnet(out_base['mel'])
             out = model.post_proj(out).transpose(1, 2)
 
             audio = melgan(out)
@@ -292,15 +283,7 @@ if __name__ == '__main__':
                     val_loss = 0
                     with torch.no_grad():
                         out_base = model.generate(batch)
-                        batch_base = {
-                            'x': batch,
-                            'mel': out_base['mel_post'],
-                            'dur': out_base['dur'],
-                            'pitch': out_base['pitch'].squeeze(1),
-                            'energy': out_base['energy'].squeeze(1),
-                            'mel_len': torch.tensor(out_base['mel_post'].size(1)).unsqueeze(0).to(device),
-                        }
-                        out = model.postnet(batch_base['mel'])
+                        out = model.postnet(out_base['mel'])
                         out = model.post_proj(out).transpose(1, 2)
                         audio = melgan(out)
                         audio = audio.squeeze(1)
