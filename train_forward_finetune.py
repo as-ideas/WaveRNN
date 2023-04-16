@@ -201,8 +201,10 @@ if __name__ == '__main__':
 
     val_strings = ['naɪn,, fʁaʊ lampʁɛçt, diː meːdiən zɪnt nɪçt ʃʊlt.', 'diː t͡seː-deː-ʔuː-t͡sɛntʁaːlə lɛst iːɐ ʃpɪt͡sn̩pɛʁzonaːl dʊʁçt͡ʃɛkn̩: ɪm jʏŋstn̩ mɪtɡliːdɐbʁiːf fɔn bʊndəsɡəʃɛft͡sfyːʁɐ ʃtɛfan hɛnəvɪç (axtʔʊntfɪʁt͡sɪç) vɪʁt diː t͡seː-deː-ʔuː-baːzɪs aʊfɡəfɔʁdɐt, an aɪnɐ bəfʁaːɡʊŋ dɛs tʁiːʁɐ paʁtaɪən fɔʁʃɐs uːvə jan (nɔɪnʔʊntfʏnft͡sɪç) taɪlt͡suneːmən.']
 
-    tts_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/tts_model/model.pt'
-    voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
+    #tts_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/tts_model/model.pt'
+    #voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
+    tts_path = 'welt_voice/tts_model/model.pt'
+    voc_path = 'welt_voice/voc_model/model.pt'
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     print('Using device:', device)
@@ -222,7 +224,8 @@ if __name__ == '__main__':
     print(f'\nInitialized tts model: {model}\n')
     optimizer = optim.Adam(list(model.postnet.parameters()) + list(model.post_proj.parameters()), lr=5e-6)
 
-    df = pd.read_csv('/Users/cschaefe/datasets/nlp/welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
+    #df = pd.read_csv('/Users/cschaefe/datasets/nlp/welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
+    df = pd.read_csv('welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
     df.dropna(inplace=True)
     strings = df['phonemes']
     strings = [s for s in strings if len(s) > 10 and len(s) < 100]
@@ -238,7 +241,7 @@ if __name__ == '__main__':
     val_dataloader = DataLoader(val_dataset, batch_size=1, collate_fn=collate_fn,
                             sampler=None)
 
-    sw = SummaryWriter('checkpoints/logs_finetune')
+    sw = SummaryWriter('checkpoints/logs_finetune_postnet_l2')
 
     step = 0
     loss_acc = 1
@@ -329,7 +332,7 @@ if __name__ == '__main__':
                 model.post_proj.train()
                 melgan.train()
                 checkpoint['model'] = model.state_dict()
-                torch.save(checkpoint, 'checkpoints/forward_taco_finetuned.pt')
+                torch.save(checkpoint, 'checkpoints/forward_taco_finetuned_post.pt')
             step += 1
 
 
