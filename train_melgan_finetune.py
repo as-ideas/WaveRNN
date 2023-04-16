@@ -199,7 +199,7 @@ class StringDataset(Dataset):
 
 if __name__ == '__main__':
 
-    val_strings = ['naɪn,, fʁaʊ lampʁɛçt, diː meːdiən zɪnt nɪçt ʃʊlt.', 'diː t͡seː-deː-ʔuː-t͡sɛntʁaːlə lɛst iːɐ ʃpɪt͡sn̩pɛʁzonaːl dʊʁçt͡ʃɛkn̩: ɪm jʏŋstn̩ mɪtɡliːdɐbʁiːf fɔn bʊndəsɡəʃɛft͡sfyːʁɐ ʃtɛfan hɛnəvɪç (axtʔʊntfɪʁt͡sɪç) vɪʁt diː t͡seː-deː-ʔuː-baːzɪs aʊfɡəfɔʁdɐt, an aɪnɐ bəfʁaːɡʊŋ dɛs tʁiːʁɐ paʁtaɪən fɔʁʃɐs uːvə jan (nɔɪnʔʊntfʏnft͡sɪç) taɪlt͡suneːmən.']
+    val_strings = ['naɪn,, fʁaʊ lampʁɛçt, diː meːdiən zɪnt nɪçt ʃʊlt.']
 
     tts_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/tts_model/model.pt'
     voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
@@ -210,17 +210,19 @@ if __name__ == '__main__':
     # Instantiate Forward TTS Model
     model = ForwardTacotron.from_checkpoint(tts_path)
     checkpoint = torch.load(tts_path, map_location=torch.device('cpu'))
+    model_base = ForwardTacotron.from_checkpoint(tts_path)
+    model_base.eval()
+    print(f'\nInitialized tts model: {model}\n')
 
     melgan = Generator(80)
     voc_checkpoint = torch.load(voc_path, map_location=torch.device('cpu'))
     melgan.load_state_dict(voc_checkpoint['model_g'])
     melgan = melgan.to(device)
+    melgan.train()
     model = model.to(device)
-    model.eval()
-    model.postnet.train()
-    model.post_proj.train()
-    print(f'\nInitialized tts model: {model}\n')
-    optimizer = optim.Adam(list(model.postnet.parameters()) + list(model.post_proj.parameters()), lr=5e-6)
+    model_base = model_base.to(device)
+    model_base.eval()
+    optimizer = optim.Adam(melgan.parameters(), lr=1e-5)
 
     df = pd.read_csv('/Users/cschaefe/datasets/nlp/welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
     df.dropna(inplace=True)
@@ -248,71 +250,42 @@ if __name__ == '__main__':
         for batch in tqdm.tqdm(dataloader, total=len(dataloader)):
             batch = batch.to(device)
             with torch.no_grad():
-                out_base = model.generate(batch)
+                out_base = model_base.generate(batch)
 
-            batch_base = {
-                'x': batch,
-                'mel': out_base['mel_post'],
-                'dur': out_base['dur'],
-                'pitch': out_base['pitch'].squeeze(1),
-                'energy': out_base['energy'].squeeze(1),
-                'mel_len': torch.tensor(out_base['mel_post'].size(-1)).unsqueeze(0).to(device),
-            }
-
-            out = model.postnet(batch_base['mel'])
-            out = model.post_proj(out).transpose(1, 2)
-
-            audio = melgan(out)
+            audio = melgan(out_base['mel_post'])
             audio = audio.squeeze(1)
 
             audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
                                         sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                         win_size=1024)
 
-            loss = F.mse_loss(audio_mel, out_base['mel_post'])
+            loss = F.l1_loss(audio_mel, out_base['mel_post'].detach())
+            loss_sum += loss.item()
 
-            optimizer.zero_grad()
             loss.backward()
-            optimizer.step()
 
-            print(step, loss)
-
-            sw.add_scalar('mel_loss_avg/train', loss_sum / loss_acc, global_step=step)
+            if (step + 1) % loss_acc == 0:
+                optimizer.step()
+                optimizer.zero_grad()
+                sw.add_scalar('mel_loss_avg/train', loss_sum / loss_acc, global_step=step)
+                loss_sum = 0
 
             sw.add_scalar('mel_loss/train', loss, global_step=step)
 
-            if step % 10 == 0:
+            if step % 100 == 0:
                 model.eval()
                 melgan.eval()
                 for i, batch in enumerate(val_dataloader):
                     batch = batch.to(device)
                     val_loss = 0
                     with torch.no_grad():
-                        out_base = model.generate(batch)
-                        batch_base = {
-                            'x': batch,
-                            'mel': out_base['mel_post'],
-                            'dur': out_base['dur'],
-                            'pitch': out_base['pitch'].squeeze(1),
-                            'energy': out_base['energy'].squeeze(1),
-                            'mel_len': torch.tensor(out_base['mel_post'].size(1)).unsqueeze(0).to(device),
-                        }
-                        out = model.postnet(batch_base['mel'])
-                        out = model.post_proj(out).transpose(1, 2)
-                        audio = melgan(out)
+                        out_base = model_base.generate(batch)
+                        audio = melgan(out_base['mel_post'])
                         audio = audio.squeeze(1)
                         audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
                                                     sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                                     win_size=1024)
-                        val_loss += F.mse_loss(audio_mel, out_base['mel_post'])
-
-                        out_gen = model.generate(batch)
-                        audio = melgan(out_gen['mel_post'])
-                        audio = audio.squeeze(1)
-                        audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
-                                                    sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
-                                                    win_size=1024)
-
+                        val_loss += F.l1_loss(audio_mel, out_base['mel_post'])
 
                     mel_plot = plot_mel(audio_mel.squeeze().detach().cpu().numpy())
                     mel_plot_target = plot_mel(out_base['mel_post'].squeeze().detach().cpu().numpy())
@@ -320,16 +293,13 @@ if __name__ == '__main__':
                     sw.add_audio(f'audio_generated_{i}', audio.detach().cpu(), sample_rate=22050, global_step=step)
                     with torch.no_grad():
                         audio_base = melgan(out_base['mel_post'].squeeze(1)).detach().cpu()
-                        audio_gen = melgan(out_gen['mel_post'].squeeze(1)).detach().cpu()
                     sw.add_audio(f'audio_target_{i}', audio_base, sample_rate=22050, global_step=step)
 
                     sw.add_figure(f'generated_{i}', mel_plot, global_step=step)
                     sw.add_figure(f'target_{i}', mel_plot_target, global_step=step)
-                model.postnet.train()
-                model.post_proj.train()
+                model.train()
                 melgan.train()
-                checkpoint['model'] = model.state_dict()
-                torch.save(checkpoint, 'checkpoints/forward_taco_finetuned.pt')
+                torch.save({'model_g': melgan.state_dict()}, 'checkpoints/melgan_finetuned.pt')
             step += 1
 
 
