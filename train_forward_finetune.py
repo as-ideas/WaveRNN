@@ -272,7 +272,7 @@ if __name__ == '__main__':
                                         sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                         win_size=1024)
 
-            loss = F.mse_loss(audio_mel, out_base['mel_post'])
+            loss = F.mse_loss(audio_mel, out_base['mel'])
 
             optimizer.zero_grad()
             loss.backward()
@@ -307,7 +307,7 @@ if __name__ == '__main__':
                         audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
                                                     sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                                     win_size=1024)
-                        val_loss += F.mse_loss(audio_mel, out_base['mel_post'])
+                        val_loss += F.mse_loss(audio_mel, out_base['mel'])
 
                         out_gen = model.generate(batch)
                         audio = melgan(out_gen['mel_post'])
