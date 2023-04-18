@@ -201,16 +201,17 @@ if __name__ == '__main__':
 
     val_strings = ['naɪn,, fʁaʊ lampʁɛçt, diː meːdiən zɪnt nɪçt ʃʊlt.', 'diː t͡seː-deː-ʔuː-t͡sɛntʁaːlə lɛst iːɐ ʃpɪt͡sn̩pɛʁzonaːl dʊʁçt͡ʃɛkn̩: ɪm jʏŋstn̩ mɪtɡliːdɐbʁiːf fɔn bʊndəsɡəʃɛft͡sfyːʁɐ ʃtɛfan hɛnəvɪç (axtʔʊntfɪʁt͡sɪç) vɪʁt diː t͡seː-deː-ʔuː-baːzɪs aʊfɡəfɔʁdɐt, an aɪnɐ bəfʁaːɡʊŋ dɛs tʁiːʁɐ paʁtaɪən fɔʁʃɐs uːvə jan (nɔɪnʔʊntfʏnft͡sɪç) taɪlt͡suneːmən.']
 
-    #tts_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/tts_model/model.pt'
-    #voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
-    tts_path = 'welt_voice/tts_model/model.pt'
-    voc_path = 'welt_voice/voc_model/model.pt'
+    tts_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/tts_model/model.pt'
+    voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
+    #tts_path = 'welt_voice/tts_model/model.pt'
+    #voc_path = 'welt_voice/voc_model/model.pt'
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     print('Using device:', device)
 
     # Instantiate Forward TTS Model
     model = ForwardTacotron.from_checkpoint(tts_path)
+    model_base = ForwardTacotron.from_checkpoint(tts_path)
     checkpoint = torch.load(tts_path, map_location=torch.device('cpu'))
 
     melgan = Generator(80)
@@ -219,13 +220,14 @@ if __name__ == '__main__':
     melgan = melgan.to(device)
     model = model.to(device)
     model.eval()
+    model_base.eval()
     model.postnet.train()
     model.post_proj.train()
     print(f'\nInitialized tts model: {model}\n')
-    optimizer = optim.Adam(list(model.postnet.parameters()) + list(model.post_proj.parameters()), lr=5e-6)
+    optimizer = optim.Adam(list(model.postnet.parameters()) + list(model.post_proj.parameters()), lr=1e-5)
 
     #df = pd.read_csv('/Users/cschaefe/datasets/nlp/welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
-    df = pd.read_csv('welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
+    df = pd.read_csv('/Users/cschaefe/datasets/nlp/welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
     df.dropna(inplace=True)
     strings = df['phonemes']
     strings = [s for s in strings if len(s) > 10 and len(s) < 100]
@@ -241,7 +243,7 @@ if __name__ == '__main__':
     val_dataloader = DataLoader(val_dataset, batch_size=1, collate_fn=collate_fn,
                             sampler=None)
 
-    sw = SummaryWriter('checkpoints/logs_finetune_postnet_l2')
+    sw = SummaryWriter('checkpoints/logs_finetune_postnet_l2_local')
 
     step = 0
     loss_acc = 1
@@ -251,9 +253,9 @@ if __name__ == '__main__':
         for batch in tqdm.tqdm(dataloader, total=len(dataloader)):
             batch = batch.to(device)
             with torch.no_grad():
-                out_base = model.generate(batch)
+                out_base = model_base.generate(batch)
 
-            out = model.postnet(out_base['mel'])
+            out = model.postnet(out_base['mel_post'])
             out = model.post_proj(out).transpose(1, 2)
 
             audio = melgan(out)
@@ -263,7 +265,12 @@ if __name__ == '__main__':
                                         sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                         win_size=1024)
 
-            loss = F.mse_loss(audio_mel, out_base['mel'])
+            loss = 10000.*F.mse_loss(torch.exp(audio_mel), torch.exp(out_base['mel_post']))
+
+            #loss_time = F.l1_loss(audio_mel, out_base['mel_post'], reduction='none')
+            #loss_time = loss_time.mean(dim=-1)
+            #print(loss_time)
+            #fig = plot_pitch(loss_time.detach().cpu().numpy())
 
             optimizer.zero_grad()
             loss.backward()
@@ -275,22 +282,29 @@ if __name__ == '__main__':
 
             sw.add_scalar('mel_loss/train', loss, global_step=step)
 
-            if step % 10 == 0:
+            if step % 100 == 0:
                 model.eval()
                 melgan.eval()
                 for i, batch in enumerate(val_dataloader):
                     batch = batch.to(device)
                     val_loss = 0
                     with torch.no_grad():
-                        out_base = model.generate(batch)
-                        out = model.postnet(out_base['mel'])
+                        out_base = model_base.generate(batch)
+                        out = model.postnet(out_base['mel_post'])
                         out = model.post_proj(out).transpose(1, 2)
                         audio = melgan(out)
                         audio = audio.squeeze(1)
                         audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
                                                     sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                                     win_size=1024)
-                        val_loss += F.mse_loss(audio_mel, out_base['mel'])
+                        val_loss += 10000.*F.mse_loss(torch.exp(audio_mel), torch.exp(out_base['mel_post']))
+
+                        loss_time = 10000.*F.mse_loss(torch.exp(audio_mel), torch.exp(out_base['mel_post']), reduction='none')
+                        loss_time = loss_time.mean(dim=1)[0]
+                        print(step, i, loss_time)
+                        time_fig = plot_pitch(loss_time.detach().cpu().numpy())
+                        sw.add_figure(f'mel_loss_time_{i}/val', time_fig, global_step=step)
+
 
                         out_gen = model.generate(batch)
                         audio = melgan(out_gen['mel_post'])
