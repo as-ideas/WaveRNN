@@ -259,7 +259,10 @@ if __name__ == '__main__':
                                         sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                         win_size=1024)
 
-            loss = 10000.*F.mse_loss(torch.exp(audio_mel), torch.exp(out_base['mel_post']))
+            loss = torch.abs(torch.exp(audio_mel) - torch.exp(out_base['mel_post']))
+            loss = loss.mean(dim=1)
+            loss = loss ** 2
+            loss = 10000. * loss.mean()
 
             #loss_time = F.l1_loss(audio_mel, out_base['mel_post'], reduction='none')
             #loss_time = loss_time.mean(dim=-1)
@@ -289,9 +292,13 @@ if __name__ == '__main__':
                         audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
                                                     sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                                     win_size=1024)
-                        val_loss += 10000.*F.mse_loss(torch.exp(audio_mel), torch.exp(out_base['mel_post']))
+                        loss = torch.abs(torch.exp(audio_mel) - torch.exp(out_base['mel_post']))
+                        loss = loss.mean(dim=1)
+                        loss = loss ** 2
+                        loss = 10000. * loss.mean()
+                        val_loss += loss.item()
 
-                        loss_time = 10000.*F.mse_loss(torch.exp(audio_mel), torch.exp(out_base['mel_post']), reduction='none')
+                        loss_time = 10000.*torch.abs(torch.exp(audio_mel) - torch.exp(out_base['mel_post']))
                         loss_time = loss_time.mean(dim=1)[0]
                         print(step, i, loss_time)
                         time_fig = plot_pitch(loss_time.detach().cpu().numpy())
