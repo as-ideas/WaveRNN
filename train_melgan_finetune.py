@@ -231,7 +231,7 @@ if __name__ == '__main__':
     random = Random(42)
     random.shuffle(strings)
 
-    dataset = StringDataset(val_strings)
+    dataset = StringDataset(strings)
     val_dataset = StringDataset(val_strings)
 
     dataloader = DataLoader(dataset, batch_size=1, collate_fn=collate_fn,
