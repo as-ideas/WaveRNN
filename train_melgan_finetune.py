@@ -240,14 +240,16 @@ if __name__ == '__main__':
         def __init__(self):
             super(Adapter, self).__init__()
             self.conv = nn.Conv1d(80, 256, 3, padding=1)
-            self.gru = nn.GRU(256, 256, bidirectional=True, batch_first=True)
-            self.lin = nn.Linear(512, 80)
+            self.conv_2 = nn.Conv1d(256, 80, 3, padding=1)
+            #self.gru = nn.GRU(256, 256, bidirectional=True, batch_first=True)
+            #self.lin = nn.Linear(512, 80)
 
         def forward(self, x):
             x = self.conv(x)
-            x, _ = self.gru(x.transpose(1, 2))
-            x = self.lin(x)
-            x = x.transpose(1, 2)
+            # x, _ = self.gru(x.transpose(1, 2))
+            # x = self.lin(x)
+            #x = x.transpose(1, 2)
+            x = self.conv_2(x)
             return x
 
     #adapter = Sequential(
@@ -297,6 +299,8 @@ if __name__ == '__main__':
                         audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
                                                     sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                                     win_size=1024)
+
+
                         loss = F.mse_loss(torch.exp(audio_mel), torch.exp(out_base['mel_post']))
                         loss = 1000. * loss
                         val_loss += loss.item()
@@ -344,7 +348,7 @@ if __name__ == '__main__':
                                         win_size=1024)
 
             loss = F.mse_loss(torch.exp(audio_mel), torch.exp(out_base['mel_post'])) * 1000.
-            loss_log = F.l1_loss(audio_mel, out_base['mel_post']) * 10.
+            loss_log = F.l1_loss(ada, out_base['mel_post'])
 
             print(step, loss)
             print(step, loss_log)
@@ -353,16 +357,17 @@ if __name__ == '__main__':
             #loss_time = loss_time.mean(dim=-1)
             #print(loss_time)
             #fig = plot_pitch(loss_time.detach().cpu().numpy())
-            loss = loss + loss_log
+            loss_tot = loss + loss_log
 
             optimizer.zero_grad()
-            loss.backward()
+            loss_tot.backward()
             optimizer.step()
 
 
             sw.add_scalar('mel_loss_avg/train', loss_sum / loss_acc, global_step=step)
 
             sw.add_scalar('mel_loss/train', loss, global_step=step)
+            sw.add_scalar('mel_log_loss/train', loss, global_step=step)
 
 
             step += 1
