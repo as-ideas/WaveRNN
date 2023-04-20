@@ -315,18 +315,9 @@ if __name__ == '__main__':
                         mel_plot_target = plot_mel(out_base['mel_post'].squeeze().detach().cpu().numpy())
 
                         sw.add_audio(f'audio_generated_{i}', audio_inf.detach().cpu(), sample_rate=22050, global_step=step)
-                        with torch.no_grad():
-                            audio_base = melgan.inference(out_base['mel_post'])
-                            audio_base_mel = mel_spectrogram(audio_base, n_fft=1024, num_mels=80,
-                                                        sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
-                                                        win_size=1024)
-                            mel_plot_target_base = plot_mel(audio_base_mel.squeeze().detach().cpu().numpy())
-
-                        sw.add_audio(f'audio_target_{i}', audio_base.detach().cpu(), sample_rate=22050, global_step=step)
 
                         sw.add_figure(f'generated_{i}', mel_plot, global_step=step)
                         sw.add_figure(f'target_tts_{i}', mel_plot_target, global_step=step)
-                        sw.add_figure(f'target_{i}', mel_plot_target_base, global_step=step)
                         sw.add_scalar('mel_loss/val', val_loss / len(val_dataloader), global_step=step)
                         model.postnet.train()
                         model.post_proj.train()
