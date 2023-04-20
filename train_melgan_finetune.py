@@ -255,7 +255,7 @@ if __name__ == '__main__':
     #    weight_norm(nn.Conv1d(512, 80, 5, padding=2)),
     #)
     adapter = Adapter()
-    optimizer = optim.Adam(adapter.parameters(), lr=1e-4)
+    optimizer = optim.Adam(adapter.parameters(), lr=1e-5)
 
     #df = pd.read_csv('/Users/cschaefe/datasets/nlp/welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
     df = pd.read_csv('/Users/cschaefe/datasets/nlp/welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
@@ -317,7 +317,7 @@ if __name__ == '__main__':
                         sw.add_audio(f'audio_generated_{i}', audio_inf.detach().cpu(), sample_rate=22050, global_step=step)
                         with torch.no_grad():
                             audio_base = melgan.inference(out_base['mel_post'].squeeze(1)).detach().cpu()
-                            audio_base_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
+                            audio_base_mel = mel_spectrogram(audio_base, n_fft=1024, num_mels=80,
                                                         sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                                         win_size=1024)
                             mel_plot_target_base = plot_mel(audio_base_mel.squeeze().detach().cpu().numpy())
@@ -345,7 +345,7 @@ if __name__ == '__main__':
                                         win_size=1024)
 
             loss = F.mse_loss(torch.exp(audio_mel), torch.exp(out_base['mel_post'])) * 1000.
-            loss_log = F.l1_loss(audio_mel, out_base['mel_post']) * 0.
+            loss_log = F.l1_loss(audio_mel, out_base['mel_post']) * 10.
 
             print(step, loss)
             print(step, loss_log)
