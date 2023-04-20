@@ -2,6 +2,7 @@ import argparse
 import itertools
 import os
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Union
 import math
@@ -22,7 +23,8 @@ import pandas as pd
 import torch
 import tqdm
 from torch import nn, Tensor
-from torch.nn import TransformerEncoder, TransformerEncoderLayer
+from torch.nn import TransformerEncoder, TransformerEncoderLayer, Sequential
+from torch.nn.utils import weight_norm
 from torch.utils.data import Dataset, DataLoader, Sampler
 from torch.utils.tensorboard import SummaryWriter
 
@@ -33,7 +35,7 @@ from torch import optim
 from torch.utils.data.dataloader import DataLoader
 
 from models.fast_pitch import FastPitch
-from models.forward_tacotron import ForwardTacotron
+from models.forward_tacotron import ForwardTacotron, ForwardSeriesTransformer
 from trainer.common import to_device
 from trainer.forward_trainer import ForwardTrainer
 from trainer.multi_forward_trainer import MultiForwardTrainer
@@ -44,6 +46,7 @@ from utils.dsp import DSP
 from utils.files import read_config
 from utils.paths import Paths
 
+import ruamel.yaml
 
 
 def dynamic_range_compression(x, C=1, clip_val=1e-5):
@@ -194,9 +197,6 @@ class StringDataset(Dataset):
 
 
 
-
-
-
 if __name__ == '__main__':
 
     val_strings = ['naɪn,, fʁaʊ lampʁɛçt, diː meːdiən zɪnt nɪçt ʃʊlt.', 'diː t͡seː-deː-ʔuː-t͡sɛntʁaːlə lɛst iːɐ ʃpɪt͡sn̩pɛʁzonaːl dʊʁçt͡ʃɛkn̩: ɪm jʏŋstn̩ mɪtɡliːdɐbʁiːf fɔn bʊndəsɡəʃɛft͡sfyːʁɐ ʃtɛfan hɛnəvɪç (axtʔʊntfɪʁt͡sɪç) vɪʁt diː t͡seː-deː-ʔuː-baːzɪs aʊfɡəfɔʁdɐt, an aɪnɐ bəfʁaːɡʊŋ dɛs tʁiːʁɐ paʁtaɪən fɔʁʃɐs uːvə jan (nɔɪnʔʊntfʏnft͡sɪç) taɪlt͡suneːmən.']
@@ -212,7 +212,20 @@ if __name__ == '__main__':
     # Instantiate Forward TTS Model
     model = ForwardTacotron.from_checkpoint(tts_path)
     model_base = ForwardTacotron.from_checkpoint(tts_path).to(device)
-    checkpoint = torch.load(tts_path, map_location=torch.device('cpu'))
+
+    speed_factor, pitch_factor = 1., 1.
+    phoneme_min_duration = {}
+    if (Path(tts_path).parent/'config.yaml').exists():
+        with open(str(Path(tts_path).parent/'config.yaml'), 'rb') as data_yaml:
+            config = ruamel.yaml.YAML().load(data_yaml)
+            speed_factor = config.get('speed_factor', 1)
+            #pitch_factor = config.get('pitch_factor', 1)
+            phoneme_min_duration = config.get('phoneme_min_duration', {})
+
+    series_transformer = ForwardSeriesTransformer(tokenizer=Tokenizer(),
+                                                  phoneme_min_duration=phoneme_min_duration,
+                                                  speed_factor=speed_factor,
+                                                  pitch_factor=pitch_factor)
 
     melgan = Generator(80)
     voc_checkpoint = torch.load(voc_path, map_location=torch.device('cpu'))
@@ -220,8 +233,29 @@ if __name__ == '__main__':
     melgan = melgan.to(device)
     model = model.to(device)
     model_base.eval()
+    melgan.eval()
     print(f'\nInitialized tts model: {model}\n')
-    optimizer = optim.Adam(melgan.parameters(), lr=1e-5)
+
+    class Adapter(nn.Module):
+        def __init__(self):
+            super(Adapter, self).__init__()
+            self.conv = nn.Conv1d(80, 256, 3, padding=1)
+            self.gru = nn.GRU(256, 256, bidirectional=True, batch_first=True)
+            self.lin = nn.Linear(512, 80)
+
+        def forward(self, x):
+            x = self.conv(x)
+            x, _ = self.gru(x.transpose(1, 2))
+            x = self.lin(x)
+            x = x.transpose(1, 2)
+            return x
+
+    #adapter = Sequential(
+    #    weight_norm(nn.Conv1d(80, 512, 5, padding=2)),
+    #    weight_norm(nn.Conv1d(512, 80, 5, padding=2)),
+    #)
+    adapter = Adapter()
+    optimizer = optim.Adam(adapter.parameters(), lr=1e-5)
 
     #df = pd.read_csv('/Users/cschaefe/datasets/nlp/welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
     df = pd.read_csv('/Users/cschaefe/datasets/nlp/welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
@@ -250,28 +284,32 @@ if __name__ == '__main__':
         for batch in tqdm.tqdm(dataloader, total=len(dataloader)):
             batch = batch.to(device)
             with torch.no_grad():
-                out_base = model_base.generate(batch)
+                out_base = model_base.generate(batch, series_transformer=series_transformer)
 
-            audio = melgan(out_base['mel_post'])
+            ada = adapter(out_base['mel_post'])
+            audio = melgan(ada+out_base['mel_post'])
             audio = audio.squeeze(1)
 
             audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
                                         sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                         win_size=1024)
 
-            loss = F.mse_loss(torch.exp(audio_mel), torch.exp(out_base['mel_post']))
-            loss = 1000. * loss
+            loss = F.mse_loss(torch.exp(audio_mel), torch.exp(out_base['mel_post'])) * 1000.
+            loss_log = F.l1_loss(audio_mel, out_base['mel_post']) * 0.
+
+            print(step, loss)
+            print(step, loss_log)
 
             #loss_time = F.l1_loss(audio_mel, out_base['mel_post'], reduction='none')
             #loss_time = loss_time.mean(dim=-1)
             #print(loss_time)
             #fig = plot_pitch(loss_time.detach().cpu().numpy())
+            loss = loss + loss_log
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-            print(step, loss)
 
             sw.add_scalar('mel_loss_avg/train', loss_sum / loss_acc, global_step=step)
 
@@ -284,8 +322,9 @@ if __name__ == '__main__':
                 for i, batch in enumerate(val_dataloader):
                     batch = batch.to(device)
                     with torch.no_grad():
-                        out_base = model_base.generate(batch)
-                        audio = melgan(out_base['mel_post'])
+                        out_base = model_base.generate(batch, series_transformer)
+                        ada = adapter(out_base['mel_post'])
+                        audio = melgan(ada+out_base['mel_post'])
                         audio = audio.squeeze(1)
                         audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
                                                     sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
@@ -295,13 +334,14 @@ if __name__ == '__main__':
                         val_loss += loss.item()
 
                         loss_time = F.mse_loss(torch.exp(audio_mel), torch.exp(out_base['mel_post']), reduction='none')
-                        loss_time = 1000 * loss_time.mean(dim=1)
+                        loss_time = 1000 * loss_time
                         loss_time = loss_time.mean(dim=1)[0]
                         print(step, i, loss_time)
                         time_fig = plot_pitch(loss_time.detach().cpu().numpy())
                         sw.add_figure(f'mel_loss_time_{i}/val', time_fig, global_step=step)
 
-                        audio = melgan(out_base['mel_post'])
+                        ada = adapter(out_base['mel_post'])
+                        audio = melgan(ada+out_base['mel_post'])
                         audio = audio.squeeze(1)
                         audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
                                                     sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
@@ -312,6 +352,7 @@ if __name__ == '__main__':
                     sw.add_audio(f'audio_generated_{i}', audio.detach().cpu(), sample_rate=22050, global_step=step)
                     with torch.no_grad():
                         audio_base = melgan(out_base['mel_post'].squeeze(1)).detach().cpu()
+                    sw.add_audio(f'audio_target_{i}', audio_base.detach().cpu(), sample_rate=22050, global_step=step)
 
                     sw.add_figure(f'generated_{i}', mel_plot, global_step=step)
                     sw.add_figure(f'target_{i}', mel_plot_target, global_step=step)
@@ -319,7 +360,7 @@ if __name__ == '__main__':
                 model.postnet.train()
                 model.post_proj.train()
                 melgan.train()
-                torch.save({'model_g': melgan.state_dict()}, 'checkpoints/melgan_finetuned.pt')
+                torch.save({'ada': adapter.state_dict()}, 'checkpoints/ada_finetuned_mse.pt')
             step += 1
 
 

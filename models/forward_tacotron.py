@@ -1,5 +1,6 @@
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Union, Callable, Dict, Any
+from typing import Union, Callable, Dict, Any, Tuple
 import numpy as np
 import torch
 import torch.nn as nn
@@ -37,6 +38,63 @@ class SeriesPredictor(nn.Module):
         x, _ = self.rnn(x)
         x = self.lin(x)
         return x / alpha
+
+
+@dataclass
+class ForwardSeries:
+    x: torch.Tensor
+    durations: torch.Tensor
+    energy: torch.Tensor
+    pitch: torch.Tensor
+
+import re
+
+class ForwardSeriesTransformer():
+
+    def __init__(self,
+                 tokenizer,
+                 phoneme_min_duration: Dict[str, Tuple[int, ...]],
+                 speed_factor: float,
+                 pitch_factor: float) -> None:
+        self._tokenizer = tokenizer
+        self._phoneme_min_dur = phoneme_min_duration
+        self._speed_factor = speed_factor
+        self._pitch_factor = pitch_factor
+        for key, val in phoneme_min_duration.items():
+            if len(key) != len(val):
+                raise ValueError(f'Found malformed config values for initializing ForwardSeriesTransformer! '
+                                 f'Expected are entries of phoneme_min_dur with key and value of same length'
+                                 f'(E.g. key=", ", val="(1, 10)"). Found invalid key, val pair: ({key}, {val})')
+
+    def __call__(self, pred: ForwardSeries) -> None:
+        """
+        Transforms the series predictions from the forward model. Specifically, it
+        allows for increasing/decreasing speed and pitch fluctuations as well as
+        manual setting of phoneme durations (e.g. for commas) for improved prosody.
+
+        Args:
+            pred: SeriesPrediction object containing the predicted values for pitch, energy, durations
+
+        Returns: None, the transformation is performed inplace.
+        """
+
+        try:
+            batch_size, time_steps, feat_dim = pred.pitch.size()
+            if batch_size != 1:
+                raise ValueError(f'Series transformer expects batch size to be 1! '
+                                 f'Found pitch input: {pred.pitch.size()}')
+            text = self._tokenizer.decode([int(t) for t in pred.x[0]])
+            pred.durations = pred.durations * self._speed_factor
+            pred.pitch = pred.pitch * self._pitch_factor
+
+            for phon_seq, phon_vals in self._phoneme_min_dur.items():
+                matches = list(re.finditer(phon_seq, text))
+                for m in matches:
+                    start, end = m.span()
+                    for phon_index, phon_val in zip(range(start, end, 1), phon_vals):
+                        pred.durations[0, phon_index] = max(pred.durations[0, phon_index], phon_val)
+        except Exception:
+            self.logger.error(f'Could not transform series!', exc_info=True)
 
 
 class ForwardTacotron(nn.Module):
@@ -166,23 +224,25 @@ class ForwardTacotron(nn.Module):
 
     def generate(self,
                  x: torch.Tensor,
-                 alpha=1.0,
-                 dur_hat=None,
-                 pitch_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x,
-                 energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, torch.Tensor]:
-
-        if dur_hat is None:
-            dur_hat = self.dur_pred(x, alpha=alpha)
-            dur_hat = dur_hat.squeeze(2)
-            if torch.sum(dur_hat.long()) <= 0:
-                torch.fill_(dur_hat, value=2.)
+                 series_transformer: Callable[[ForwardSeries], None]) -> Dict[str, torch.Tensor]:
+        self.eval()
+        # Fixing breaking synth of empty texts
+        if x.size(1) == 0:
+            x = torch.full((1, 2), fill_value=0, device=x.device)
+        dur_hat = self.dur_pred(x)
+        dur_hat = dur_hat.squeeze(2)
+        # Fixing breaking synth of silent texts
+        if torch.sum(dur_hat.long()) <= 0:
+            torch.fill_(dur_hat, value=2.)
         pitch_hat = self.pitch_pred(x).transpose(1, 2)
-        pitch_hat = pitch_function(pitch_hat)
         energy_hat = self.energy_pred(x).transpose(1, 2)
-        energy_hat = energy_function(energy_hat)
-        return self._generate_mel(x=x, dur_hat=dur_hat,
-                                  pitch_hat=pitch_hat,
-                                  energy_hat=energy_hat)
+
+        series = ForwardSeries(x=x, pitch=pitch_hat, energy=energy_hat, durations=dur_hat)
+        series_transformer(series)
+
+        return self._generate_mel(x=series.x, dur_hat=series.durations,
+                                  pitch_hat=series.pitch,
+                                  energy_hat=series.energy)
 
     @torch.jit.export
     def generate_jit(self,
