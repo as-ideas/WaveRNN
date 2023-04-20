@@ -199,7 +199,7 @@ class StringDataset(Dataset):
 
 if __name__ == '__main__':
 
-    val_strings = ['naɪn,, fʁaʊ lampʁɛçt, diː meːdiən zɪnt nɪçt ʃʊlt.', 'diː t͡seː-deː-ʔuː-t͡sɛntʁaːlə lɛst iːɐ ʃpɪt͡sn̩pɛʁzonaːl dʊʁçt͡ʃɛkn̩: ɪm jʏŋstn̩ mɪtɡliːdɐbʁiːf fɔn bʊndəsɡəʃɛft͡sfyːʁɐ ʃtɛfan hɛnəvɪç (axtʔʊntfɪʁt͡sɪç) vɪʁt diː t͡seː-deː-ʔuː-baːzɪs aʊfɡəfɔʁdɐt, an aɪnɐ bəfʁaːɡʊŋ dɛs tʁiːʁɐ paʁtaɪən fɔʁʃɐs uːvə jan (nɔɪnʔʊntfʏnft͡sɪç) taɪlt͡suneːmən.']
+    val_strings = ['naɪn, fʁaʊ lampʁɛçt, diː meːdiən zɪnt nɪçt ʃʊlt.', 'diː t͡seː-deː-ʔuː-t͡sɛntʁaːlə lɛst iːɐ ʃpɪt͡sn̩pɛʁzonaːl dʊʁçt͡ʃɛkn̩: ɪm jʏŋstn̩ mɪtɡliːdɐbʁiːf fɔn bʊndəsɡəʃɛft͡sfyːʁɐ ʃtɛfan hɛnəvɪç (axtʔʊntfɪʁt͡sɪç) vɪʁt diː t͡seː-deː-ʔuː-baːzɪs aʊfɡəfɔʁdɐt, an aɪnɐ bəfʁaːɡʊŋ dɛs tʁiːʁɐ paʁtaɪən fɔʁʃɐs uːvə jan (nɔɪnʔʊntfʏnft͡sɪç) taɪlt͡suneːmən.']
 
     tts_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/tts_model/model.pt'
     voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
@@ -255,7 +255,7 @@ if __name__ == '__main__':
     #    weight_norm(nn.Conv1d(512, 80, 5, padding=2)),
     #)
     adapter = Adapter()
-    optimizer = optim.Adam(adapter.parameters(), lr=1e-5)
+    optimizer = optim.Adam(adapter.parameters(), lr=1e-4)
 
     #df = pd.read_csv('/Users/cschaefe/datasets/nlp/welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
     df = pd.read_csv('/Users/cschaefe/datasets/nlp/welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
@@ -282,6 +282,50 @@ if __name__ == '__main__':
 
     for epoch in range(10000):
         for batch in tqdm.tqdm(dataloader, total=len(dataloader)):
+
+            if step % 100 == 0:
+                model.eval()
+                melgan.eval()
+                val_loss = 0
+                for i, batch in enumerate(val_dataloader):
+                    batch = batch.to(device)
+                    with torch.no_grad():
+                        out_base = model_base.generate(batch, series_transformer)
+                        ada = adapter(out_base['mel_post'])
+                        audio = melgan(ada+out_base['mel_post'])
+                        audio = audio.squeeze(1)
+                        audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
+                                                    sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
+                                                    win_size=1024)
+                        loss = F.mse_loss(torch.exp(audio_mel), torch.exp(out_base['mel_post']))
+                        loss = 1000. * loss
+                        val_loss += loss.item()
+
+                        loss_time = F.mse_loss(torch.exp(audio_mel), torch.exp(out_base['mel_post']), reduction='none')
+                        loss_time = 1000 * loss_time
+                        loss_time = loss_time.mean(dim=1)[0]
+                        print(step, i, loss_time)
+                        time_fig = plot_pitch(loss_time.detach().cpu().numpy())
+                        sw.add_figure(f'mel_loss_time_{i}/val', time_fig, global_step=step)
+
+                        audio_inf = melgan.inference(ada+out_base['mel_post'])
+                        #audio_inf = audio_inf.squeeze(1)
+
+                        mel_plot = plot_mel(audio_mel.squeeze().detach().cpu().numpy())
+                        mel_plot_target = plot_mel(out_base['mel_post'].squeeze().detach().cpu().numpy())
+
+                        sw.add_audio(f'audio_generated_{i}', audio_inf.detach().cpu(), sample_rate=22050, global_step=step)
+                        with torch.no_grad():
+                            audio_base = melgan.inference(out_base['mel_post'].squeeze(1)).detach().cpu()
+                        sw.add_audio(f'audio_target_{i}', audio_base.detach().cpu(), sample_rate=22050, global_step=step)
+
+                        sw.add_figure(f'generated_{i}', mel_plot, global_step=step)
+                        sw.add_figure(f'target_{i}', mel_plot_target, global_step=step)
+                        sw.add_scalar('mel_loss/val', val_loss / len(val_dataloader), global_step=step)
+                        model.postnet.train()
+                        model.post_proj.train()
+                        torch.save({'ada': adapter.state_dict()}, 'checkpoints/ada_finetuned_mse.pt')
+
             batch = batch.to(device)
             with torch.no_grad():
                 out_base = model_base.generate(batch, series_transformer=series_transformer)
@@ -315,52 +359,7 @@ if __name__ == '__main__':
 
             sw.add_scalar('mel_loss/train', loss, global_step=step)
 
-            if step % 100 == 0:
-                model.eval()
-                melgan.eval()
-                val_loss = 0
-                for i, batch in enumerate(val_dataloader):
-                    batch = batch.to(device)
-                    with torch.no_grad():
-                        out_base = model_base.generate(batch, series_transformer)
-                        ada = adapter(out_base['mel_post'])
-                        audio = melgan(ada+out_base['mel_post'])
-                        audio = audio.squeeze(1)
-                        audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
-                                                    sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
-                                                    win_size=1024)
-                        loss = F.mse_loss(torch.exp(audio_mel), torch.exp(out_base['mel_post']))
-                        loss = 1000. * loss
-                        val_loss += loss.item()
 
-                        loss_time = F.mse_loss(torch.exp(audio_mel), torch.exp(out_base['mel_post']), reduction='none')
-                        loss_time = 1000 * loss_time
-                        loss_time = loss_time.mean(dim=1)[0]
-                        print(step, i, loss_time)
-                        time_fig = plot_pitch(loss_time.detach().cpu().numpy())
-                        sw.add_figure(f'mel_loss_time_{i}/val', time_fig, global_step=step)
-
-                        ada = adapter(out_base['mel_post'])
-                        audio = melgan(ada+out_base['mel_post'])
-                        audio = audio.squeeze(1)
-                        audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
-                                                    sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
-                                                    win_size=1024)
-
-                    mel_plot = plot_mel(audio_mel.squeeze().detach().cpu().numpy())
-                    mel_plot_target = plot_mel(out_base['mel_post'].squeeze().detach().cpu().numpy())
-                    sw.add_audio(f'audio_generated_{i}', audio.detach().cpu(), sample_rate=22050, global_step=step)
-                    with torch.no_grad():
-                        audio_base = melgan(out_base['mel_post'].squeeze(1)).detach().cpu()
-                    sw.add_audio(f'audio_target_{i}', audio_base.detach().cpu(), sample_rate=22050, global_step=step)
-
-                    sw.add_figure(f'generated_{i}', mel_plot, global_step=step)
-                    sw.add_figure(f'target_{i}', mel_plot_target, global_step=step)
-                sw.add_scalar('mel_loss/val', val_loss / len(val_dataloader), global_step=step)
-                model.postnet.train()
-                model.post_proj.train()
-                melgan.train()
-                torch.save({'ada': adapter.state_dict()}, 'checkpoints/ada_finetuned_mse.pt')
             step += 1
 
 
