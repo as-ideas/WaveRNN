@@ -316,7 +316,7 @@ if __name__ == '__main__':
 
                         sw.add_audio(f'audio_generated_{i}', audio_inf.detach().cpu(), sample_rate=22050, global_step=step)
                         with torch.no_grad():
-                            audio_base = melgan.inference(out_base['mel_post'].squeeze(1)).detach().cpu()
+                            audio_base = melgan.inference(out_base['mel_post'])
                             audio_base_mel = mel_spectrogram(audio_base, n_fft=1024, num_mels=80,
                                                         sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                                         win_size=1024)
