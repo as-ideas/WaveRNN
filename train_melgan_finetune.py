@@ -320,7 +320,7 @@ if __name__ == '__main__':
             with torch.no_grad():
                 out_base = model_base.generate(batch, series_transformer=series_transformer)
 
-            ada = model.postnet(out_base['mel_post'])
+            ada = model.postnet(out_base['mel'])
             ada = model.post_proj(ada).transpose(1, 2)
             audio = melgan(ada)
             audio = audio.squeeze(1)
