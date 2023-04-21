@@ -121,6 +121,83 @@ def collate_fn(batch):
     return torch.nn.utils.rnn.pad_sequence(batch, batch_first=True)
 
 
+class Identity(nn.Module):
+    def __init__(self):
+        super(Identity, self).__init__()
+
+    def forward(self, x):
+        return x
+
+
+class Discriminator(nn.Module):
+    def __init__(self):
+        super(Discriminator, self).__init__()
+
+        self.discriminator = nn.ModuleList([
+            nn.Sequential(
+                nn.ReflectionPad1d(7),
+                nn.utils.weight_norm(nn.Conv1d(1, 16, kernel_size=15, stride=1)),
+                nn.LeakyReLU(0.2, inplace=True),
+            ),
+            nn.Sequential(
+                nn.utils.weight_norm(nn.Conv1d(16, 64, kernel_size=41, stride=4, padding=20, groups=4)),
+                nn.LeakyReLU(0.2, inplace=True),
+            ),
+            nn.Sequential(
+                nn.utils.weight_norm(nn.Conv1d(64, 256, kernel_size=41, stride=4, padding=20, groups=16)),
+                nn.LeakyReLU(0.2, inplace=True),
+            ),
+            nn.Sequential(
+                nn.utils.weight_norm(nn.Conv1d(256, 1024, kernel_size=41, stride=4, padding=20, groups=64)),
+                nn.LeakyReLU(0.2, inplace=True),
+            ),
+            nn.Sequential(
+                nn.utils.weight_norm(nn.Conv1d(1024, 1024, kernel_size=41, stride=4, padding=20, groups=256)),
+                nn.LeakyReLU(0.2, inplace=True),
+            ),
+            nn.Sequential(
+                nn.utils.weight_norm(nn.Conv1d(1024, 1024, kernel_size=5, stride=1, padding=2)),
+                nn.LeakyReLU(0.2, inplace=True),
+            ),
+            nn.utils.weight_norm(nn.Conv1d(1024, 1, kernel_size=3, stride=1, padding=1)),
+        ])
+
+    def forward(self, x):
+        '''
+            returns: (list of 6 features, discriminator score)
+            we directly predict score without last sigmoid function
+            since we're using Least Squares GAN (https://arxiv.org/abs/1611.04076)
+        '''
+        features = list()
+        for module in self.discriminator:
+            x = module(x)
+            features.append(x)
+        return features[:-1], features[-1]
+
+
+class MultiScaleDiscriminator(nn.Module):
+
+    def __init__(self):
+        super(MultiScaleDiscriminator, self).__init__()
+
+        self.discriminators = nn.ModuleList(
+            [Discriminator() for _ in range(3)]
+        )
+
+        self.pooling = nn.ModuleList(
+            [Identity()] +
+            [nn.AvgPool1d(kernel_size=4, stride=2, padding=1, count_include_pad=False) for _ in range(1, 3)]
+        )
+
+    def forward(self, x):
+        ret = list()
+
+        for pool, disc in zip(self.pooling, self.discriminators):
+            x = pool(x)
+            ret.append(disc(x))
+
+        return ret  # [(feat, score), (feat, score), (feat, score)]
+
 class BinnedLengthSampler(Sampler):
     def __init__(self, lengths, batch_size, bin_size):
         _, self.idx = torch.sort(torch.tensor(lengths).long())
@@ -206,8 +283,10 @@ if __name__ == '__main__':
                                                   pitch_factor=pitch_factor)
 
     melgan = Generator(80)
+    disc = MultiScaleDiscriminator()
     voc_checkpoint = torch.load(voc_path, map_location=torch.device('cpu'))
     melgan.load_state_dict(voc_checkpoint['model_g'])
+    disc.load_state_dict(voc_checkpoint['model_d'])
     melgan = melgan.to(device)
     model = model.to(device)
     model.postnet.train()
@@ -325,23 +404,36 @@ if __name__ == '__main__':
             audio = melgan(ada)
             audio = audio.squeeze(1)
 
+            with torch.no_grad():
+                audio_real = melgan(out_base['mel_post'])
+
+            d_fake = disc(audio.unsqueeze(1))
+            d_real = disc(audio_real)
+            g_loss = 0
+            for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
+                g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
+                for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
+                    g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
+
             audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
                                         sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                         win_size=1024)
 
+            g_loss = g_loss * 0.01
+
             #loss = F.l1_loss(audio_mel, out_base['mel_post']) * 10.
-            loss_log = F.l1_loss(ada, out_base['mel_post'])
+            #loss_log = F.l1_loss(ada, out_base['mel_post'])
             loss_exp = F.mse_loss(torch.exp(audio_mel), torch.exp(out_base['mel_post'])) * 1000.
 
-            print(step, loss)
+            print(step, loss_exp, g_loss)
             #print(step, loss_log)
-            print(step, loss_exp)
+            #print(step, loss_exp)
 
             #loss_time = F.l1_loss(audio_mel, out_base['mel_post'], reduction='none')
             #loss_time = loss_time.mean(dim=-1)
             #print(loss_time)
             #fig = plot_pitch(loss_time.detach().cpu().numpy())
-            loss_tot = (loss_exp + loss_log)
+            loss_tot = (loss_exp + g_loss)
             optimizer.zero_grad()
             loss_tot.backward()
             optimizer.step()
@@ -349,7 +441,7 @@ if __name__ == '__main__':
 
             sw.add_scalar('mel_exp_loss/train', loss_exp, global_step=step)
             #sw.add_scalar('mel_loss/train', loss, global_step=step)
-            sw.add_scalar('mel_log_loss/train', loss_log, global_step=step)
+            sw.add_scalar('g_loss/train', g_loss, global_step=step)
 
 
             step += 1
