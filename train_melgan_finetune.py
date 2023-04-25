@@ -12,6 +12,7 @@ import torch
 import torch.nn.functional as F
 # Define the dataset
 import tqdm
+from dp.phonemizer import Phonemizer
 from librosa.filters import mel as librosa_mel_fn
 from torch import nn
 from torch import optim
@@ -55,6 +56,24 @@ def spectral_de_normalize_torch(magnitudes):
 
 mel_basis = {}
 hann_window = {}
+
+import torch
+import torch.nn as nn
+import torch.nn.init as init
+
+
+class ConvFilter(nn.Module):
+    def __init__(self):
+        super().__init__()
+        # Define the convolutional layer
+        self.conv = nn.Conv2d(1, 1, (5, 1), 1, (2, 0))
+        # Initialize the weights of the convolutional layer to 1
+        init.constant_(self.conv.weight, 1)
+        # Initialize the biases of
+        self.requires_grad_(False)
+
+    def forward(self, x):
+        return self.conv(x)
 
 
 def mel_spectrogram(y, n_fft, num_mels, sampling_rate, hop_size, win_size, fmin, fmax, center=False):
@@ -154,15 +173,20 @@ class BinnedLengthSampler(Sampler):
 
 
 class StringDataset(Dataset):
-    def __init__(self, strings):
+    def __init__(self, strings, phonemizer=None):
         self.strings = strings
         self.tokenizer = Tokenizer()
+        self.phonemizer = phonemizer
 
     def __len__(self):
         return len(self.strings)
 
     def __getitem__(self, idx):
         string = self.strings[idx]
+        if self.phonemizer is not None:
+            string = self.phonemizer(string, lang='de')
+            if 'θ' in string:
+                print(string)
         indices = self.tokenizer(string)
         return torch.LongTensor(indices)
 
@@ -177,7 +201,7 @@ class StringDataset(Dataset):
 
 if __name__ == '__main__':
 
-    val_strings = ['naɪn, fʁaʊ lampʁɛçt, diː meːdiən zɪnt nɪçt ʃʊlt.', 'diː t͡seː-deː-ʔuː-t͡sɛntʁaːlə lɛst iːɐ ʃpɪt͡sn̩pɛʁzonaːl dʊʁçt͡ʃɛkn̩: ɪm jʏŋstn̩ mɪtɡliːdɐbʁiːf fɔn bʊndəsɡəʃɛft͡sfyːʁɐ ʃtɛfan hɛnəvɪç (axtʔʊntfɪʁt͡sɪç) vɪʁt diː t͡seː-deː-ʔuː-baːzɪs aʊfɡəfɔʁdɐt, an aɪnɐ bəfʁaːɡʊŋ dɛs tʁiːʁɐ paʁtaɪən fɔʁʃɐs uːvə jan (nɔɪnʔʊntfʏnft͡sɪç) taɪlt͡suneːmən.']
+    val_strings = ['najaː, man t͡sɛɐdɛŋkt diː zaxn̩ zoː zeːɐ.', 'naɪn, fʁaʊ lampʁɛçt, diː meːdiən zɪnt nɪçt ʃʊlt.', 'diː t͡seː-deː-ʔuː-t͡sɛntʁaːlə lɛst iːɐ ʃpɪt͡sn̩pɛʁzonaːl dʊʁçt͡ʃɛkn̩: ɪm jʏŋstn̩ mɪtɡliːdɐbʁiːf fɔn bʊndəsɡəʃɛft͡sfyːʁɐ ʃtɛfan hɛnəvɪç (axtʔʊntfɪʁt͡sɪç) vɪʁt diː t͡seː-deː-ʔuː-baːzɪs aʊfɡəfɔʁdɐt, an aɪnɐ bəfʁaːɡʊŋ dɛs tʁiːʁɐ paʁtaɪən fɔʁʃɐs uːvə jan (nɔɪnʔʊntfʏnft͡sɪç) taɪlt͡suneːmən.']
 
     tts_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/tts_model/model.pt'
     voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
@@ -197,7 +221,8 @@ if __name__ == '__main__':
         with open(str(Path(tts_path).parent/'config.yaml'), 'rb') as data_yaml:
             config = ruamel.yaml.YAML().load(data_yaml)
             speed_factor = config.get('speed_factor', 1)
-            #pitch_factor = config.get('pitch_factor', 1)
+            pitch_factor = config.get('pitch_factor', 1)
+            print('pitch factor: ', pitch_factor)
             phoneme_min_duration = config.get('phoneme_min_duration', {})
 
     series_transformer = ForwardSeriesTransformer(tokenizer=Tokenizer(),
@@ -238,12 +263,12 @@ if __name__ == '__main__':
     #)
     adapter = Adapter()
     optimizer = optim.Adam(list(model.postnet.rnn.parameters()) + list(model.post_proj.parameters()), lr=1e-5)
-
+    phonemizer = Phonemizer.from_checkpoint('/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/phon_model/model.pt')
     #df = pd.read_csv('/Users/cschaefe/datasets/nlp/welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
-    df = pd.read_csv('/Users/cschaefe/datasets/nlp/welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
+    df = pd.read_csv('/Users/cschaefe/datasets/tts-synth-data/welt/processed_metadata.tsv', sep='\t', encoding='utf-8')
     df.dropna(inplace=True)
-    strings = df['phonemes']
-    strings = [s for s in strings if len(s) > 10 and len(s) < 100]
+    strings = df['text_phonemized']
+    strings = [s for s in strings if len(s) > 10 and len(s) < 300]
     random = Random(42)
     random.shuffle(strings)
 
@@ -261,6 +286,8 @@ if __name__ == '__main__':
     step = 0
     loss_acc = 1
     loss_sum = 0
+
+    conv_filter = ConvFilter().to(device)
 
     for epoch in range(10000):
         for batch in tqdm.tqdm(dataloader, total=len(dataloader)):
@@ -285,7 +312,13 @@ if __name__ == '__main__':
                         loss = F.l1_loss(audio_mel, out_base['mel_post'])
                         val_loss += loss.item()
 
-                        loss_time = F.mse_loss(torch.exp(audio_mel), torch.exp(out_base['mel_post']), reduction='none')
+                        #torch.save(audio_mel, '/Users/cschaefe/datasets/welt_fuckup/fuckup.pt')
+                        #torch.save(out_base['mel_post'], '/Users/cschaefe/datasets/fuckup_postnet.pt')
+
+                        mel_mask = audio_mel > -1
+
+
+                        loss_time = torch.exp(audio_mel) - torch.exp(out_base['mel_post'])
                         loss_time = 10 * loss_time
                         loss_time = loss_time.mean(dim=1)[0]
                         print(step, i, loss_time)
@@ -295,9 +328,18 @@ if __name__ == '__main__':
                         audio_inf = melgan.inference(ada)
                         #audio_inf = audio_inf.squeeze(1)
 
-                        mel_plot = plot_mel(audio_mel.squeeze().detach().cpu().numpy())
-                        mel_plot_target = plot_mel(out_base['mel_post'].squeeze().detach().cpu().numpy())
+                        mel_plot = plot_mel(audio_mel.squeeze().detach().cpu().numpy()[:100, :100])
+                        mel_plot_target = plot_mel(out_base['mel_post'].squeeze().detach().cpu().numpy()[:100, :100])
+                        mel_diff = (audio_mel - out_base['mel_post']).squeeze().detach().cpu().numpy()[:100, :100]
+                        mel_exp_diff = (torch.exp(audio_mel) - torch.exp(out_base['mel_post'])).squeeze().detach().cpu().numpy()[:100, :100]
+                        mel_diff_plot = plot_mel(mel_diff)
+                        diff_filt = conv_filter(torch.exp(audio_mel) - torch.exp(out_base['mel_post']))
+                        mel_exp_diff_conv = (diff_filt).squeeze().detach().cpu().numpy()[:100, :100]
 
+
+
+                        mel_exp_diff_plot = plot_mel(mel_exp_diff)
+                        mel_exp_diff_conv_plot = plot_mel(mel_exp_diff_conv)
                         sw.add_audio(f'audio_generated_{i}', audio_inf.detach().cpu(), sample_rate=22050, global_step=step)
                         with torch.no_grad():
                             audio_base = melgan(out_base['mel']).squeeze(1)
@@ -310,9 +352,12 @@ if __name__ == '__main__':
 
                         sw.add_figure(f'generated_{i}', mel_plot, global_step=step)
                         sw.add_figure(f'target_tts_{i}', mel_plot_target, global_step=step)
-                    sw.add_scalar('mel_loss/val', val_loss / len(val_dataloader), global_step=step)
-                    checkpoint['model'] = model.state_dict()
-                    torch.save(checkpoint, 'checkpoints/forward_taco_finetuned_post.pt')
+                        sw.add_figure(f'diff_tts_{i}', mel_diff_plot, global_step=step)
+                        sw.add_figure(f'diff_exp_tts_{i}', mel_exp_diff_plot, global_step=step)
+                        sw.add_figure(f'diff_exp_conv_tts_{i}', mel_exp_diff_conv_plot, global_step=step)
+                sw.add_scalar('mel_loss/val', val_loss / len(val_dataloader), global_step=step)
+                checkpoint['model'] = model.state_dict()
+                torch.save(checkpoint, 'checkpoints/forward_taco_finetuned_post_new.pt')
                 model.postnet.rnn.train()
                 model.post_proj.train()
 
@@ -331,9 +376,13 @@ if __name__ == '__main__':
 
             #loss = F.l1_loss(audio_mel, out_base['mel_post']) * 10.
             loss_log = F.l1_loss(ada, out_base['mel_post'])
-            loss_exp = F.mse_loss(torch.exp(audio_mel), torch.exp(out_base['mel_post'])) * 1000.
+            mel_mask = audio_mel > -1
 
-            print(step, loss)
+            #loss_exp = F.mse_loss(torch.exp(audio_mel), torch.exp(out_base['mel_post'])) * 1000.
+            #loss_exp = F.mse_loss(torch.exp(audio_mel[mel_mask]), torch.exp(out_base['mel_post'][mel_mask])) / (mel_mask.sum() + 1e-9) * 100000.
+            loss_exp = torch.norm(torch.exp(audio_mel) - torch.exp(out_base['mel_post']), p="fro") / torch.norm(torch.exp(out_base['mel_post']), p="fro") * 10.
+
+            #print(step, loss)
             #print(step, loss_log)
             print(step, loss_exp)
 

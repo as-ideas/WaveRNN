@@ -389,9 +389,9 @@ if __name__ == '__main__':
 
                         sw.add_figure(f'generated_{i}', mel_plot, global_step=step)
                         sw.add_figure(f'target_tts_{i}', mel_plot_target, global_step=step)
-                    sw.add_scalar('mel_loss/val', val_loss / len(val_dataloader), global_step=step)
-                    checkpoint['model'] = model.state_dict()
-                    torch.save(checkpoint, 'checkpoints/forward_taco_finetuned_post.pt')
+                sw.add_scalar('mel_loss/val', val_loss / len(val_dataloader), global_step=step)
+                checkpoint['model'] = model.state_dict()
+                torch.save(checkpoint, 'checkpoints/forward_taco_finetuned_post.pt')
                 model.postnet.rnn.train()
                 model.post_proj.train()
 
@@ -419,7 +419,7 @@ if __name__ == '__main__':
                                         sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                         win_size=1024)
 
-            g_loss = g_loss * 0.01
+            g_loss = g_loss * 0.001
 
             #loss = F.l1_loss(audio_mel, out_base['mel_post']) * 10.
             #loss_log = F.l1_loss(ada, out_base['mel_post'])
