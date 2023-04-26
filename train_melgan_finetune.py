@@ -304,7 +304,7 @@ if __name__ == '__main__':
                 for i, batch in enumerate(val_dataloader):
                     batch = batch.to(device)
                     with torch.no_grad():
-                        out_base = model.generate(batch, checkpoint['speaker_embeddings']['welt'])
+                        out_base = model.generate(batch, checkpoint['speaker_embeddings']['welt'], series_transformer=series_transformer)
                         ada = model.postnet(out_base['mel'])
                         ada = model.post_proj(ada).transpose(1, 2)
                         audio = melgan(ada)
@@ -369,7 +369,7 @@ if __name__ == '__main__':
 
             batch = batch.to(device)
             with torch.no_grad():
-                out_base = model_base.generate(batch, checkpoint['speaker_embeddings']['welt'])
+                out_base = model_base.generate(batch, checkpoint['speaker_embeddings']['welt'],series_transformer=series_transformer)
 
             ada = model.postnet(out_base['mel'])
             ada = model.post_proj(ada).transpose(1, 2)
