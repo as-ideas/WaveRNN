@@ -140,7 +140,7 @@ if __name__ == '__main__':
 
     files = list(Path('/Users/cschaefe/datasets/finetuning/bild_welt_masked_mels').glob('**/*.pt'))
     dataset = BaseDataet(files)
-    dataloader = DataLoader(dataset, batch_size=2, num_workers=2)
+    dataloader = DataLoader(dataset, batch_size=8, num_workers=2)
     tts_path = '/Users/cschaefe/stream_tts_models/mm_6cons/model.pt'
     voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
     sw = SummaryWriter('checkpoints/logs_finetune_batched')
@@ -201,13 +201,10 @@ if __name__ == '__main__':
                     loss_exp = torch.norm(torch.exp(audio_mel) - torch.exp(ada), p="fro") / torch.norm(torch.exp(ada), p="fro") * 10.
                     val_loss += loss_exp.item()
 
-                    mel_mask = audio_mel > -1
-
                     loss_time = (torch.exp(audio_mel) - torch.exp(ada)) ** 2
                     loss_time = 10 * loss_time
                     loss_time = loss_time.mean(dim=1)[0]
 
-                    print(step, i, loss_time)
                     time_fig = plot_pitch(loss_time.detach().cpu().numpy())
                     sw.add_figure(f'mel_loss_time_{i}/val', time_fig, global_step=step)
 
@@ -235,11 +232,17 @@ if __name__ == '__main__':
         batch = {'mel': train_batch['mel'].to(device), 'mel_post': train_batch['mel_post'].to(device)}
         ada = model.postnet(batch['mel'])
         ada = model.post_proj(ada).transpose(1, 2)
+
         audio = melgan(ada)
         audio = audio.squeeze(1)
         audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
                                     sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                     win_size=1024)
+
+        audio_mel[batch['mel_post'] < -11] = -11.51
+        ada[batch['mel_post'] < -11] = -11.51
+        batch['mel_post'][batch['mel_post'] < -11] = -11.51
+
         loss_exp = torch.norm(torch.exp(audio_mel) - torch.exp(batch['mel_post']), p="fro") / torch.norm(torch.exp(batch['mel_post']), p="fro") * 10.
         loss_log = F.l1_loss(ada, batch['mel_post'])
 
@@ -253,5 +256,5 @@ if __name__ == '__main__':
         sw.add_scalar('mel_exp_loss/train', loss_exp, global_step=step)
         sw.add_scalar('mel_log_loss/train', loss_log, global_step=step)
 
-        print(step, loss_exp, loss_tot)
+        print(step, loss_exp, loss_log)
 
