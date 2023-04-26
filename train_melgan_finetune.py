@@ -202,7 +202,7 @@ class StringDataset(Dataset):
 
 if __name__ == '__main__':
 
-    val_strings = ['najaː, man t͡sɛɐdɛŋkt diː zaxn̩ zoː zeːɐ.', 'naɪn, fʁaʊ lampʁɛçt, diː meːdiən zɪnt nɪçt ʃʊlt.','ɛs ɪst ʃaːdə, das diː eːʔuː als diː humaːnstə ʊnt moʁaːlɪʃstə alɐ lɛndɐɡʁʊpiːʁʊŋən anɡəzeːən vɪʁt, aːbɐ ziː vɔlən diː mɛnʃn̩ʁɛçtə nɪçt aʊfʁɛçtʔɛɐhaltn̩ ʊnt deːn maɡnɪt͡ski ɛkt nɪçt nʊt͡sn̩.']
+    val_strings = ['ɡant͡s ɔɪʁoːpa?', 'najaː, man t͡sɛɐdɛŋkt diː zaxn̩ zoː zeːɐ.', 'naɪn, fʁaʊ lampʁɛçt, diː meːdiən zɪnt nɪçt ʃʊlt.','ɛs ɪst ʃaːdə, das diː eːʔuː als diː humaːnstə ʊnt moʁaːlɪʃstə alɐ lɛndɐɡʁʊpiːʁʊŋən anɡəzeːən vɪʁt, aːbɐ ziː vɔlən diː mɛnʃn̩ʁɛçtə nɪçt aʊfʁɛçtʔɛɐhaltn̩ ʊnt deːn maɡnɪt͡ski ɛkt nɪçt nʊt͡sn̩.']
                    #'ɛs ɪst aɪnɐ deːɐ vɪçtɪçstn̩ foːɐʃlɛːɡə deːɐ unioːn t͡suːɐ bəkɛmp͡fʊŋ dɛs kliːmavandl̩s, aːbɐ deːɐ plaːn ɪst ɪns ʃtɔkn̩ ɡəʁaːtn̩, daː dɔɪt͡ʃlant aɪnvɛndə ɛɐhoːbn̩ hat.'
         #]#, 'naɪn, fʁaʊ lampʁɛçt, diː meːdiən zɪnt nɪçt ʃʊlt.', 'diː t͡seː-deː-ʔuː-t͡sɛntʁaːlə lɛst iːɐ ʃpɪt͡sn̩pɛʁzonaːl dʊʁçt͡ʃɛkn̩: ɪm jʏŋstn̩ mɪtɡliːdɐbʁiːf fɔn bʊndəsɡəʃɛft͡sfyːʁɐ ʃtɛfan hɛnəvɪç (axtʔʊntfɪʁt͡sɪç) vɪʁt diː t͡seː-deː-ʔuː-baːzɪs aʊfɡəfɔʁdɐt, an aɪnɐ bəfʁaːɡʊŋ dɛs tʁiːʁɐ paʁtaɪən fɔʁʃɐs uːvə jan (nɔɪnʔʊntfʏnft͡sɪç) taɪlt͡suneːmən.']
 
