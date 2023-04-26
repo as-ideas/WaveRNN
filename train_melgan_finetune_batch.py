@@ -303,7 +303,7 @@ if __name__ == '__main__':
                 for i, batch in enumerate(val_dataloader):
                     batch = batch.to(device)
                     with torch.no_grad():
-                        out_base = model_base.generate(batch, checkpoint['speaker_embeddings']['welt'], series_transformer=series_transformer)
+                        out_base = model.generate(batch, checkpoint['speaker_embeddings']['welt'], series_transformer=series_transformer)
                         ada = model.postnet(out_base['mel'])
                         ada = model.post_proj(ada).transpose(1, 2)
                         audio = melgan(ada)
@@ -396,7 +396,7 @@ if __name__ == '__main__':
             #loss_time = loss_time.mean(dim=-1)
             #print(loss_time)
             #fig = plot_pitch(loss_time.detach().cpu().numpy())
-            loss_tot = (loss_exp + loss_log)
+            loss_tot = (loss_exp + 0*loss_log)
             optimizer.zero_grad()
             loss_tot.backward()
             optimizer.step()
