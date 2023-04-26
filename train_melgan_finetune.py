@@ -23,6 +23,7 @@ from torch.utils.tensorboard import SummaryWriter
 from melgan import Generator
 from models.fast_pitch import FastPitch
 from models.forward_tacotron import ForwardTacotron, ForwardSeriesTransformer
+from models.multi_forward_tacotron import MultiForwardTacotron
 from trainer.common import to_device
 from utils.display import *
 from utils.text.symbols import phonemes
@@ -201,9 +202,12 @@ class StringDataset(Dataset):
 
 if __name__ == '__main__':
 
-    val_strings = ['najaː, man t͡sɛɐdɛŋkt diː zaxn̩ zoː zeːɐ.', 'naɪn, fʁaʊ lampʁɛçt, diː meːdiən zɪnt nɪçt ʃʊlt.', 'diː t͡seː-deː-ʔuː-t͡sɛntʁaːlə lɛst iːɐ ʃpɪt͡sn̩pɛʁzonaːl dʊʁçt͡ʃɛkn̩: ɪm jʏŋstn̩ mɪtɡliːdɐbʁiːf fɔn bʊndəsɡəʃɛft͡sfyːʁɐ ʃtɛfan hɛnəvɪç (axtʔʊntfɪʁt͡sɪç) vɪʁt diː t͡seː-deː-ʔuː-baːzɪs aʊfɡəfɔʁdɐt, an aɪnɐ bəfʁaːɡʊŋ dɛs tʁiːʁɐ paʁtaɪən fɔʁʃɐs uːvə jan (nɔɪnʔʊntfʏnft͡sɪç) taɪlt͡suneːmən.']
+    val_strings = ['najaː, man t͡sɛɐdɛŋkt diː zaxn̩ zoː zeːɐ.',
+    'ɛs ɪst ʃaːdə, das diː eːʔuː als diː humaːnstə ʊnt moʁaːlɪʃstə alɐ lɛndɐɡʁʊpiːʁʊŋən anɡəzeːən vɪʁt, aːbɐ ziː vɔlən diː mɛnʃn̩ʁɛçtə nɪçt aʊfʁɛçtʔɛɐhaltn̩ ʊnt deːn maɡnɪt͡ski ɛkt nɪçt nʊt͡sn̩.',
+                   #'ɛs ɪst aɪnɐ deːɐ vɪçtɪçstn̩ foːɐʃlɛːɡə deːɐ unioːn t͡suːɐ bəkɛmp͡fʊŋ dɛs kliːmavandl̩s, aːbɐ deːɐ plaːn ɪst ɪns ʃtɔkn̩ ɡəʁaːtn̩, daː dɔɪt͡ʃlant aɪnvɛndə ɛɐhoːbn̩ hat.'
+        ]#, 'naɪn, fʁaʊ lampʁɛçt, diː meːdiən zɪnt nɪçt ʃʊlt.', 'diː t͡seː-deː-ʔuː-t͡sɛntʁaːlə lɛst iːɐ ʃpɪt͡sn̩pɛʁzonaːl dʊʁçt͡ʃɛkn̩: ɪm jʏŋstn̩ mɪtɡliːdɐbʁiːf fɔn bʊndəsɡəʃɛft͡sfyːʁɐ ʃtɛfan hɛnəvɪç (axtʔʊntfɪʁt͡sɪç) vɪʁt diː t͡seː-deː-ʔuː-baːzɪs aʊfɡəfɔʁdɐt, an aɪnɐ bəfʁaːɡʊŋ dɛs tʁiːʁɐ paʁtaɪən fɔʁʃɐs uːvə jan (nɔɪnʔʊntfʏnft͡sɪç) taɪlt͡suneːmən.']
 
-    tts_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/tts_model/model.pt'
+    tts_path = '/Users/cschaefe/stream_tts_models/mm_6cons/model.pt'
     voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
     #tts_path = 'welt_voice/tts_model/model.pt'
     #voc_path = 'welt_voice/voc_model/model.pt'
@@ -212,8 +216,9 @@ if __name__ == '__main__':
     print('Using device:', device)
 
     # Instantiate Forward TTS Model
-    model = ForwardTacotron.from_checkpoint(tts_path)
-    model_base = ForwardTacotron.from_checkpoint(tts_path).to(device)
+    checkpoint = torch.load(tts_path, map_location=device)
+    model = MultiForwardTacotron.from_checkpoint(tts_path)
+    model_base = MultiForwardTacotron.from_checkpoint(tts_path).to(device)
 
     speed_factor, pitch_factor = 1., 1.
     phoneme_min_duration = {}
@@ -221,7 +226,7 @@ if __name__ == '__main__':
         with open(str(Path(tts_path).parent/'config.yaml'), 'rb') as data_yaml:
             config = ruamel.yaml.YAML().load(data_yaml)
             speed_factor = config.get('speed_factor', 1)
-            pitch_factor = config.get('pitch_factor', 1)
+            pitch_factor = 2.#config.get('pitch_factor', 1)
             print('pitch factor: ', pitch_factor)
             phoneme_min_duration = config.get('phoneme_min_duration', {})
 
@@ -272,7 +277,7 @@ if __name__ == '__main__':
     random = Random(42)
     random.shuffle(strings)
 
-    dataset = StringDataset(strings)
+    dataset = StringDataset(val_strings)
     val_dataset = StringDataset(val_strings)
 
     dataloader = DataLoader(dataset, batch_size=1, collate_fn=collate_fn,
@@ -299,7 +304,7 @@ if __name__ == '__main__':
                 for i, batch in enumerate(val_dataloader):
                     batch = batch.to(device)
                     with torch.no_grad():
-                        out_base = model_base.generate(batch, series_transformer)
+                        out_base = model.generate(batch, checkpoint['speaker_embeddings']['welt'])
                         ada = model.postnet(out_base['mel'])
                         ada = model.post_proj(ada).transpose(1, 2)
                         audio = melgan(ada)
@@ -309,7 +314,7 @@ if __name__ == '__main__':
                                                     win_size=1024)
 
 
-                        loss = F.l1_loss(audio_mel, out_base['mel_post'])
+                        loss = F.l1_loss(audio_mel, out_base['mel'])
                         val_loss += loss.item()
 
                         #torch.save(audio_mel, '/Users/cschaefe/datasets/welt_fuckup/fuckup.pt')
@@ -330,6 +335,7 @@ if __name__ == '__main__':
 
                         mel_plot = plot_mel(audio_mel.squeeze().detach().cpu().numpy()[:100, :100])
                         mel_plot_target = plot_mel(out_base['mel_post'].squeeze().detach().cpu().numpy()[:100, :100])
+                        mel_plot_ada = plot_mel(ada.squeeze().detach().cpu().numpy()[:100, :100])
                         mel_diff = (audio_mel - out_base['mel_post']).squeeze().detach().cpu().numpy()[:100, :100]
                         mel_exp_diff = (torch.exp(audio_mel) - torch.exp(out_base['mel_post'])).squeeze().detach().cpu().numpy()[:100, :100]
                         mel_diff_plot = plot_mel(mel_diff)
@@ -352,9 +358,9 @@ if __name__ == '__main__':
 
                         sw.add_figure(f'generated_{i}', mel_plot, global_step=step)
                         sw.add_figure(f'target_tts_{i}', mel_plot_target, global_step=step)
+                        sw.add_figure(f'ada_tts_{i}', mel_plot_ada, global_step=step)
                         sw.add_figure(f'diff_tts_{i}', mel_diff_plot, global_step=step)
                         sw.add_figure(f'diff_exp_tts_{i}', mel_exp_diff_plot, global_step=step)
-                        sw.add_figure(f'diff_exp_conv_tts_{i}', mel_exp_diff_conv_plot, global_step=step)
                 sw.add_scalar('mel_loss/val', val_loss / len(val_dataloader), global_step=step)
                 checkpoint['model'] = model.state_dict()
                 torch.save(checkpoint, 'checkpoints/forward_taco_finetuned_post_new.pt')
@@ -363,7 +369,7 @@ if __name__ == '__main__':
 
             batch = batch.to(device)
             with torch.no_grad():
-                out_base = model_base.generate(batch, series_transformer=series_transformer)
+                out_base = model_base.generate(batch, checkpoint['speaker_embeddings']['welt'])
 
             ada = model.postnet(out_base['mel'])
             ada = model.post_proj(ada).transpose(1, 2)

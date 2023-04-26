@@ -8,6 +8,7 @@ from torch.nn import Embedding
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 from models.common_layers import CBHG, LengthRegulator, BatchNormConv
+from models.forward_tacotron import ForwardSeries
 from utils.text.symbols import phonemes
 
 
@@ -243,26 +244,26 @@ class MultiForwardTacotron(nn.Module):
     def generate(self,
                  x: torch.Tensor,
                  speaker_emb: torch.Tensor,
-                 alpha=1.0,
-                 pitch_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x,
-                 energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, torch.Tensor]:
+                 series_transformer: Callable[[ForwardSeries], None]) -> Dict[str, torch.Tensor]:
         self.eval()
         with torch.no_grad():
             pitch_cond_hat = self.pitch_cond_pred(x, speaker_emb).squeeze(-1)
             pitch_cond_hat = torch.argmax(pitch_cond_hat.squeeze(), dim=1).long().unsqueeze(0)
-            dur_hat = self.dur_pred(x, pitch_cond_hat, speaker_emb, alpha=alpha).squeeze(-1)
+            dur_hat = self.dur_pred(x, pitch_cond_hat, speaker_emb, alpha=1).squeeze(-1)
             if torch.sum(dur_hat.long()) <= 0:
                 torch.fill_(dur_hat, value=2.)
             pitch_hat = self.pitch_pred(x, pitch_cond_hat, speaker_emb).transpose(1, 2)
-            pitch_hat = pitch_function(pitch_hat)
             energy_hat = self.energy_pred(x, speaker_emb).transpose(1, 2)
-            energy_hat = energy_function(energy_hat)
-            return self._generate_mel(x=x,
-                                      dur_hat=dur_hat,
-                                      pitch_hat=pitch_hat,
-                                      energy_hat=energy_hat,
-                                      pitch_cond_hat=pitch_cond_hat,
-                                      semb=speaker_emb)
+
+        series = ForwardSeries(x=x, pitch=pitch_hat, energy=energy_hat, durations=dur_hat)
+        series_transformer(series)
+
+        return self._generate_mel(x=series.x,
+                                  dur_hat=series.durations,
+                                  pitch_hat=series.pitch,
+                                  energy_hat=series.energy,
+                                  pitch_cond_hat=pitch_cond_hat,
+                                  semb=speaker_emb)
 
     def get_step(self) -> int:
         return self.step.data.item()
