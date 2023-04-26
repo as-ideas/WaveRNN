@@ -216,7 +216,7 @@ if __name__ == '__main__':
 
     # Instantiate Forward TTS Model
     checkpoint = torch.load(tts_path, map_location=device)
-    model = MultiForwardTacotron.from_checkpoint(tts_path)
+    model = MultiForwardTacotron.from_checkpoint(tts_path).to(device)
     model_base = MultiForwardTacotron.from_checkpoint(tts_path).to(device)
 
     speed_factor, pitch_factor = 1., 1.
@@ -303,7 +303,7 @@ if __name__ == '__main__':
                 for i, batch in enumerate(val_dataloader):
                     batch = batch.to(device)
                     with torch.no_grad():
-                        out_base = model_base.generate(batch, checkpoint['speaker_embeddings']['welt'], series_transformer=series_transformer)
+                        out_base = model_base.generate(batch, checkpoint['speaker_embeddings']['welt'].to(device), series_transformer=series_transformer)
                         ada = model.postnet(out_base['mel'])
                         ada = model.post_proj(ada).transpose(1, 2)
                         audio = melgan(ada)
@@ -369,7 +369,7 @@ if __name__ == '__main__':
 
             batch = batch.to(device)
             with torch.no_grad():
-                out_base = model_base.generate(batch, checkpoint['speaker_embeddings']['welt'],series_transformer=series_transformer)
+                out_base = model_base.generate(batch, checkpoint['speaker_embeddings']['welt'].to(device),series_transformer=series_transformer)
 
             ada = model.postnet(out_base['mel'])
             ada = model.post_proj(ada).transpose(1, 2)
