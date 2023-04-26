@@ -206,7 +206,7 @@ if __name__ == '__main__':
                    #'ɛs ɪst aɪnɐ deːɐ vɪçtɪçstn̩ foːɐʃlɛːɡə deːɐ unioːn t͡suːɐ bəkɛmp͡fʊŋ dɛs kliːmavandl̩s, aːbɐ deːɐ plaːn ɪst ɪns ʃtɔkn̩ ɡəʁaːtn̩, daː dɔɪt͡ʃlant aɪnvɛndə ɛɐhoːbn̩ hat.'
         #]#, 'naɪn, fʁaʊ lampʁɛçt, diː meːdiən zɪnt nɪçt ʃʊlt.', 'diː t͡seː-deː-ʔuː-t͡sɛntʁaːlə lɛst iːɐ ʃpɪt͡sn̩pɛʁzonaːl dʊʁçt͡ʃɛkn̩: ɪm jʏŋstn̩ mɪtɡliːdɐbʁiːf fɔn bʊndəsɡəʃɛft͡sfyːʁɐ ʃtɛfan hɛnəvɪç (axtʔʊntfɪʁt͡sɪç) vɪʁt diː t͡seː-deː-ʔuː-baːzɪs aʊfɡəfɔʁdɐt, an aɪnɐ bəfʁaːɡʊŋ dɛs tʁiːʁɐ paʁtaɪən fɔʁʃɐs uːvə jan (nɔɪnʔʊntfʏnft͡sɪç) taɪlt͡suneːmən.']
 
-    tts_path = '/Users/cschaefe/stream_tts_models/mm_6cons/model.pt'
+    tts_path = '/Users/cschaefe/stream_tts_models/bild_welt_masked_welt/model.pt'
     voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
     #tts_path = 'welt_voice/tts_model/model.pt'
     #voc_path = 'welt_voice/voc_model/model.pt'
@@ -269,10 +269,10 @@ if __name__ == '__main__':
     optimizer = optim.Adam(list(model.postnet.rnn.parameters()) + list(model.post_proj.parameters()), lr=1e-5)
     #phonemizer = Phonemizer.from_checkpoint('/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/phon_model/model.pt')
     #df = pd.read_csv('/Users/cschaefe/datasets/nlp/welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
-    df = pd.read_csv('/Users/cschaefe/datasets/tts-synth-data/welt/processed_metadata.tsv', sep='\t', encoding='utf-8')
-    df.dropna(inplace=True)
+    df = pd.read_csv('/Users/cschaefe/datasets/finetuning/metadata_processed.tsv', sep='\t', encoding='utf-8')
+    #df.dropna(inplace=True)
     strings = df['text_phonemized']
-    strings = [s for s in strings if len(s) > 10 and len(s) < 300]
+    strings = [s for s in strings if len(s) > 10 and len(s) < 1000]
     random = Random(42)
     random.shuffle(strings)
 
@@ -292,123 +292,12 @@ if __name__ == '__main__':
     loss_sum = 0
 
     conv_filter = ConvFilter().to(device)
-
-    for epoch in range(10000):
-        for train_batch in tqdm.tqdm(dataloader, total=len(dataloader)):
-
-            if step % 100 == 0:
-                model.eval()
-                melgan.eval()
-                val_loss = 0
-                for i, batch in enumerate(val_dataloader):
-                    batch = batch.to(device)
-                    with torch.no_grad():
-                        out_base = model_base.generate(batch, checkpoint['speaker_embeddings']['welt'].to(device), series_transformer=series_transformer)
-                        ada = model.generate(batch, checkpoint['speaker_embeddings']['welt'].to(device), series_transformer=series_transformer)['mel_post']
-                        #ada = model.postnet(out_base['mel'])
-                        #ada = model.post_proj(ada).transpose(1, 2)
-                        audio = melgan(ada)
-                        audio = audio.squeeze(1)
-                        audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
-                                                    sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
-                                                    win_size=1024)
-
-                        loss_exp = torch.norm(torch.exp(audio_mel) - torch.exp(out_base['mel_post']), p="fro") / torch.norm(torch.exp(out_base['mel_post']), p="fro") * 10.
-
-                        #loss = F.l1_loss(audio_mel, out_base['mel'])
-                        val_loss += loss_exp.item()
-
-                        #torch.save(audio_mel, '/Users/cschaefe/datasets/welt_fuckup/fuckup.pt')
-                        #torch.save(out_base['mel_post'], '/Users/cschaefe/datasets/fuckup_postnet.pt')
-
-                        mel_mask = audio_mel > -1
-
-
-                        loss_time = (torch.exp(audio_mel) - torch.exp(out_base['mel_post'])) ** 2
-                        loss_time = 10 * loss_time
-                        loss_time = loss_time.mean(dim=1)[0]
-                        print(step, i, loss_time)
-                        time_fig = plot_pitch(loss_time.detach().cpu().numpy())
-                        sw.add_figure(f'mel_loss_time_{i}/val', time_fig, global_step=step)
-
-                        audio_inf = melgan.inference(ada)
-                        #audio_inf = audio_inf.squeeze(1)
-
-                        mel_plot = plot_mel(audio_mel.squeeze().detach().cpu().numpy()[:100, :100])
-                        mel_plot_target = plot_mel(out_base['mel_post'].squeeze().detach().cpu().numpy()[:100, :100])
-                        mel_plot_ada = plot_mel(ada.squeeze().detach().cpu().numpy()[:100, :100])
-                        mel_diff = (audio_mel - out_base['mel_post']).squeeze().detach().cpu().numpy()[:100, :100]
-                        mel_exp_diff = (torch.exp(audio_mel) - torch.exp(out_base['mel_post'])).squeeze().detach().cpu().numpy()[:100, :100]
-                        mel_diff_plot = plot_mel(mel_diff)
-                        diff_filt = conv_filter(torch.exp(audio_mel) - torch.exp(out_base['mel_post']))
-                        mel_exp_diff_conv = (diff_filt).squeeze().detach().cpu().numpy()[:100, :100]
-
-
-
-                        mel_exp_diff_plot = plot_mel(mel_exp_diff)
-                        mel_exp_diff_conv_plot = plot_mel(mel_exp_diff_conv)
-                        sw.add_audio(f'audio_generated_{i}', audio_inf.detach().cpu(), sample_rate=22050, global_step=step)
-                        with torch.no_grad():
-                            audio_base = melgan(out_base['mel']).squeeze(1)
-                            audio_base_mel = mel_spectrogram(audio_base, n_fft=1024, num_mels=80,
-                                                        sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
-                                                        win_size=1024)
-                            mel_plot_target_base = plot_mel(audio_base_mel.squeeze().detach().cpu().numpy())
-
-                        sw.add_audio(f'audio_target_{i}', audio_base.detach().cpu(), sample_rate=22050, global_step=step)
-
-                        sw.add_figure(f'generated_{i}', mel_plot, global_step=step)
-                        sw.add_figure(f'target_tts_{i}', mel_plot_target, global_step=step)
-                        sw.add_figure(f'ada_tts_{i}', mel_plot_ada, global_step=step)
-                        sw.add_figure(f'diff_tts_{i}', mel_diff_plot, global_step=step)
-                        sw.add_figure(f'diff_exp_tts_{i}', mel_exp_diff_plot, global_step=step)
-                sw.add_scalar('mel_loss/val', val_loss / len(val_dataloader), global_step=step)
-                checkpoint['model'] = model.state_dict()
-                torch.save(checkpoint, 'checkpoints/forward_taco_finetuned_post_new.pt')
-                model.postnet.rnn.train()
-                model.post_proj.train()
-
-            batch = train_batch.to(device)
-            with torch.no_grad():
-                out_base = model_base.generate(batch, checkpoint['speaker_embeddings']['welt'].to(device),series_transformer=series_transformer)
-
-            ada = model.postnet(out_base['mel'])
-            ada = model.post_proj(ada).transpose(1, 2)
-            audio = melgan(ada)
-            audio = audio.squeeze(1)
-
-            audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
-                                        sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
-                                        win_size=1024)
-
-            #loss = F.l1_loss(audio_mel, out_base['mel_post']) * 10.
-            loss_log = F.l1_loss(ada, out_base['mel_post'])
-            mel_mask = audio_mel > -1
-
-            #loss_exp = F.mse_loss(torch.exp(audio_mel), torch.exp(out_base['mel_post'])) * 1000.
-            #loss_exp = F.mse_loss(torch.exp(audio_mel[mel_mask]), torch.exp(out_base['mel_post'][mel_mask])) / (mel_mask.sum() + 1e-9) * 100000.
-            loss_exp = torch.norm(torch.exp(audio_mel) - torch.exp(out_base['mel_post']), p="fro") / torch.norm(torch.exp(out_base['mel_post']), p="fro") * 10.
-
-            #print(step, loss)
-            #print(step, loss_log)
-            print(step, loss_exp)
-
-            #loss_time = F.l1_loss(audio_mel, out_base['mel_post'], reduction='none')
-            #loss_time = loss_time.mean(dim=-1)
-            #print(loss_time)
-            #fig = plot_pitch(loss_time.detach().cpu().numpy())
-            loss_tot = (loss_exp + loss_log)
-            optimizer.zero_grad()
-            loss_tot.backward()
-            optimizer.step()
-
-
-            sw.add_scalar('mel_exp_loss/train', loss_exp, global_step=step)
-            #sw.add_scalar('mel_loss/train', loss, global_step=step)
-            sw.add_scalar('mel_log_loss/train', loss_log, global_step=step)
-
-
-            step += 1
-
-
+    index = 0
+    for batch in tqdm.tqdm(dataloader, total=len(dataloader)):
+        batch = batch.to(device)
+        with torch.no_grad():
+            out_base = model_base.generate(batch, checkpoint['speaker_embeddings']['welt'].to(device),series_transformer=series_transformer)
+            #print(out_base['mel'])
+            index += 1
+            torch.save(out_base, f'/Users/cschaefe/datasets/finetuning/bild_welt_masked_mels/{index}.pt')
 
