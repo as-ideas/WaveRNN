@@ -252,6 +252,28 @@ class MultiForwardTacotron(nn.Module):
             dur_hat = self.dur_pred(x, pitch_cond_hat, speaker_emb, alpha=1).squeeze(-1)
             if torch.sum(dur_hat.long()) <= 0:
                 torch.fill_(dur_hat, value=2.)
+            if x[0, -1] == 9:
+                pitch_cond_hat[:, -5:] = 2
+            dur_hat = self.dur_pred(x, pitch_cond_hat, speaker_emb).squeeze(-1)
+            pitch_hat = self.pitch_pred(x, pitch_cond_hat, speaker_emb).transpose(1, 2)
+
+            pitch_diff = pitch_hat[:, :, 1:] - pitch_hat[:, :, :-1]
+            print(pitch_diff.size())
+            pitch_diff = torch.cat([torch.zeros((1, 1, 1)), pitch_diff], dim=-1)
+            pitch_hat_new = torch.clone(pitch_hat)
+
+
+            if x[0, -1] == 9:
+                for i in range(5):
+                    o = float(pitch_hat_new[0, 0, -5+i])
+                    pitch_hat_new[0, 0, -5+i] = pitch_hat_new[0, 0, -6+i] + pitch_diff[0, 0, -5+i] * 2.
+                    print(i, o, pitch_hat_new[0, 0, -5+i])
+
+            factor = 2./max(torch.abs(pitch_hat_new[0, 0, -5:]))
+            if factor < 1:
+                pitch_hat_new[0, 0, -5:] = pitch_hat_new[0, 0, -5:] * factor
+            print('factor: ', factor)
+
             pitch_hat = self.pitch_pred(x, pitch_cond_hat, speaker_emb).transpose(1, 2)
             energy_hat = self.energy_pred(x, speaker_emb).transpose(1, 2)
 
