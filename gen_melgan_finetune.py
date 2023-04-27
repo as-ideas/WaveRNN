@@ -239,8 +239,6 @@ if __name__ == '__main__':
     melgan.load_state_dict(voc_checkpoint['model_g'])
     melgan = melgan.to(device)
     model = model.to(device)
-    model.postnet.train()
-    model.post_proj.train()
     model_base.eval()
     melgan.eval()
     print(f'\nInitialized tts model: {model}\n')
@@ -296,8 +294,8 @@ if __name__ == '__main__':
     for batch in tqdm.tqdm(dataloader, total=len(dataloader)):
         batch = batch.to(device)
         with torch.no_grad():
-            out_base = model_base.generate(batch, checkpoint['speaker_embeddings']['welt'].to(device),series_transformer=series_transformer)
+            out_base = model_base.generate(batch, checkpoint['speaker_embeddings']['welt'].to(device), series_transformer=series_transformer)
             #print(out_base['mel'])
             index += 1
-            torch.save(out_base, f'/Users/cschaefe/datasets/finetuning/bild_welt_masked_mels/{index}.pt')
+            torch.save(out_base, f'/Users/cschaefe/datasets/finetuning/bild_welt_masked_mels_eval/{index}.pt')
 

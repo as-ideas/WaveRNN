@@ -94,8 +94,8 @@ def collate_fn(batch):
     return torch.nn.utils.rnn.pad_sequence(batch, batch_first=True)
 
 
-class BaseDataet(Dataset):
-    def __init__(self, files, mel_segment_len=50):
+class BaseDataset(Dataset):
+    def __init__(self, files, mel_segment_len=128):
         self.files = files
         self.mel_segment_len = mel_segment_len
 
@@ -110,8 +110,9 @@ class BaseDataet(Dataset):
         if self.mel_segment_len is not None:
             mel_pad_len = self.mel_segment_len - out_base['mel'].size(-1)
             if mel_pad_len > 0:
-                mel_pad = torch.full((mel.size(0), 80, mel_pad_len), fill_value=-11.5129)
+                mel_pad = torch.full((1, 80, mel_pad_len), fill_value=-11.5129)
                 mel = torch.cat([mel, mel_pad], dim=-1)
+                mel_post = torch.cat([mel_post, mel_pad], dim=-1)
             max_mel_start = mel.size(-1) - self.mel_segment_len
             mel_start = random.randint(0, max_mel_start)
             mel_end = mel_start + self.mel_segment_len
@@ -139,13 +140,15 @@ class StringDataset(Dataset):
 if __name__ == '__main__':
 
     files = list(Path('/Users/cschaefe/datasets/finetuning/bild_welt_masked_mels').glob('**/*.pt'))
-    dataset = BaseDataet(files)
-    dataloader = DataLoader(dataset, batch_size=8, num_workers=2)
+    dataset = BaseDataset(files)
+    dataloader = DataLoader(dataset, batch_size=32, num_workers=0)
     tts_path = '/Users/cschaefe/stream_tts_models/bild_welt_masked_welt/model.pt'
     voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
     sw = SummaryWriter('checkpoints/logs_finetune_batched')
 
-    val_strings = ['ɡant͡s ɔɪʁoːpa?', 'najaː, man t͡sɛɐdɛŋkt diː zaxn̩ zoː zeːɐ.', 'naɪn, fʁaʊ lampʁɛçt, diː meːdiən zɪnt nɪçt ʃʊlt.','ɛs ɪst ʃaːdə, das diː eːʔuː als diː humaːnstə ʊnt moʁaːlɪʃstə alɐ lɛndɐɡʁʊpiːʁʊŋən anɡəzeːən vɪʁt, aːbɐ ziː vɔlən diː mɛnʃn̩ʁɛçtə nɪçt aʊfʁɛçtʔɛɐhaltn̩ ʊnt deːn maɡnɪt͡ski ɛkt nɪçt nʊt͡sn̩.']
+    val_strings = ['ɡant͡s ɔɪʁoːpa?',
+                   'çiːna bəkɛmp͡ft diː koʁoːna-pandemiː fɔn bəɡɪn an mɪt aɪnəm ʊltʁa-ʃtʁɛŋən nəʊ-kovɪt-ʁeʒiːm.',
+                   'najaː, man t͡sɛɐdɛŋkt diː zaxn̩ zoː zeːɐ.', 'naɪn, fʁaʊ lampʁɛçt, diː meːdiən zɪnt nɪçt ʃʊlt.','ɛs ɪst ʃaːdə, das diː eːʔuː als diː humaːnstə ʊnt moʁaːlɪʃstə alɐ lɛndɐɡʁʊpiːʁʊŋən anɡəzeːən vɪʁt, aːbɐ ziː vɔlən diː mɛnʃn̩ʁɛçtə nɪçt aʊfʁɛçtʔɛɐhaltn̩ ʊnt deːn maɡnɪt͡ski ɛkt nɪçt nʊt͡sn̩.']
     val_dataset = StringDataset(val_strings)
     val_dataloader = DataLoader(val_dataset, batch_size=1, collate_fn=collate_fn,
                                 sampler=None)
@@ -242,9 +245,9 @@ if __name__ == '__main__':
                                     sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                     win_size=1024)
 
-        audio_mel[batch['mel_post'] < -11] = -11.51
-        ada[batch['mel_post'] < -11] = -11.51
-        batch['mel_post'][batch['mel_post'] < -11] = -11.51
+        #audio_mel[batch['mel_post'] < -11] = -11.51
+        #ada[batch['mel_post'] < -11] = -11.51
+        #batch['mel_post'][batch['mel_post'] < -11] = -11.51
 
         loss_exp = torch.norm(torch.exp(audio_mel) - torch.exp(batch['mel_post']), p="fro") / torch.norm(torch.exp(batch['mel_post']), p="fro") * 10.
         loss_log = F.l1_loss(ada, batch['mel_post'])

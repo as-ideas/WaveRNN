@@ -277,7 +277,7 @@ class MultiForwardTacotron(nn.Module):
             pitch_hat = self.pitch_pred(x, pitch_cond_hat, speaker_emb).transpose(1, 2)
             energy_hat = self.energy_pred(x, speaker_emb).transpose(1, 2)
 
-        series = ForwardSeries(x=x, pitch=pitch_hat, energy=energy_hat, durations=dur_hat)
+        series = ForwardSeries(x=x, pitch=pitch_hat_new, energy=energy_hat, durations=dur_hat)
         series_transformer(series)
 
         return self._generate_mel(x=series.x,
