@@ -223,7 +223,8 @@ if __name__ == '__main__':
                         sw.add_figure(f'diff_exp_tts_{i}', mel_exp_diff_plot, global_step=step)
                 sw.add_scalar('mel_loss/val', val_loss / len(val_dataloader), global_step=step)
                 checkpoint['model'] = model.state_dict()
-                torch.save(checkpoint, 'checkpoints/forward_taco_finebatch.pt')
+                k_steps = (step // 10000) * 10
+                torch.save(checkpoint, f'checkpoints/finetuning/forward_taco_finebatch_{k_steps}k.pt')
                 model.postnet.train()
                 model.post_proj.train()
 
