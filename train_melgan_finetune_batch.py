@@ -98,7 +98,7 @@ class BaseDataset(Dataset):
         if self.mel_segment_len is not None:
             mel_pad_len = self.mel_segment_len - out_base['mel'].size(-1)
             if mel_pad_len > 0:
-                mel_pad = torch.full((1, 80, mel_pad_len), fill_value=-11.5129)
+                mel_pad = torch.full((1, 80, mel_pad_len), fill_value=-11.5129).to(mel.device)
                 mel = torch.cat([mel, mel_pad], dim=-1)
                 mel_post = torch.cat([mel_post, mel_pad], dim=-1)
             max_mel_start = mel.size(-1) - self.mel_segment_len
