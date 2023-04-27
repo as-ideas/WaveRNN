@@ -141,7 +141,7 @@ if __name__ == '__main__':
     files = list(Path('/Users/cschaefe/datasets/finetuning/bild_welt_masked_mels').glob('**/*.pt'))
     dataset = BaseDataet(files)
     dataloader = DataLoader(dataset, batch_size=8, num_workers=2)
-    tts_path = '/Users/cschaefe/stream_tts_models/mm_6cons/model.pt'
+    tts_path = '/Users/cschaefe/stream_tts_models/bild_welt_masked_welt/model.pt'
     voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
     sw = SummaryWriter('checkpoints/logs_finetune_batched')
 
@@ -156,6 +156,8 @@ if __name__ == '__main__':
     # Instantiate Forward TTS Model
     checkpoint = torch.load(tts_path, map_location=device)
     model = MultiForwardTacotron.from_checkpoint(tts_path).to(device)
+    model_base = MultiForwardTacotron.from_checkpoint(tts_path).to(device)
+    model_base.eval()
     model.eval()
     model.postnet.train()
     optimizer = optim.Adam(list(model.postnet.parameters()) + list(model.post_proj.parameters()), lr=1e-5)
@@ -191,6 +193,7 @@ if __name__ == '__main__':
                 batch = batch.to(device)
                 with torch.no_grad():
                     ada = model.generate(batch, checkpoint['speaker_embeddings']['welt'].to(device), series_transformer=series_transformer)['mel_post']
+                    mel_base = model_base.generate(batch, checkpoint['speaker_embeddings']['welt'].to(device), series_transformer=series_transformer)['mel_post']
                     audio = melgan(ada)
                     audio = audio.squeeze(1)
 
@@ -198,10 +201,10 @@ if __name__ == '__main__':
                                                 sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                                 win_size=1024)
 
-                    loss_exp = torch.norm(torch.exp(audio_mel) - torch.exp(ada), p="fro") / torch.norm(torch.exp(ada), p="fro") * 10.
+                    loss_exp = torch.norm(torch.exp(audio_mel) - torch.exp(mel_base), p="fro") / torch.norm(torch.exp(mel_base), p="fro") * 10.
                     val_loss += loss_exp.item()
 
-                    loss_time = (torch.exp(audio_mel) - torch.exp(ada)) ** 2
+                    loss_time = (torch.exp(audio_mel) - torch.exp(mel_base)) ** 2
                     loss_time = 10 * loss_time
                     loss_time = loss_time.mean(dim=1)[0]
 
@@ -226,7 +229,7 @@ if __name__ == '__main__':
             sw.add_scalar('mel_loss/val', val_loss / len(val_dataloader), global_step=step)
             checkpoint['model'] = model.state_dict()
             torch.save(checkpoint, 'checkpoints/forward_taco_finetuned_post_new.pt')
-            model.postnet.rnn.train()
+            model.postnet.train()
             model.post_proj.train()
 
         batch = {'mel': train_batch['mel'].to(device), 'mel_post': train_batch['mel_post'].to(device)}
