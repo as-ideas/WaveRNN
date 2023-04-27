@@ -136,12 +136,15 @@ if __name__ == '__main__':
 
     val_strings = ['ɡant͡s ɔɪʁoːpa?',
                    'çiːna bəkɛmp͡ft diː koʁoːna-pandemiː fɔn bəɡɪn an mɪt aɪnəm ʊltʁa-ʃtʁɛŋən nəʊ-kovɪt-ʁeʒiːm.',
-                   'najaː, man t͡sɛɐdɛŋkt diː zaxn̩ zoː zeːɐ.', 'naɪn, fʁaʊ lampʁɛçt, diː meːdiən zɪnt nɪçt ʃʊlt.','ɛs ɪst ʃaːdə, das diː eːʔuː als diː humaːnstə ʊnt moʁaːlɪʃstə alɐ lɛndɐɡʁʊpiːʁʊŋən anɡəzeːən vɪʁt, aːbɐ ziː vɔlən diː mɛnʃn̩ʁɛçtə nɪçt aʊfʁɛçtʔɛɐhaltn̩ ʊnt deːn maɡnɪt͡ski ɛkt nɪçt nʊt͡sn̩.']
+                   'najaː, man t͡sɛɐdɛŋkt diː zaxn̩ zoː zeːɐ.',
+                   'naɪn, fʁaʊ lampʁɛçt, diː meːdiən zɪnt nɪçt ʃʊlt.',
+                   'ɛs ɪst ʃaːdə, das diː eːʔuː als diː humaːnstə ʊnt moʁaːlɪʃstə alɐ lɛndɐɡʁʊpiːʁʊŋən anɡəzeːən vɪʁt, aːbɐ ziː vɔlən diː mɛnʃn̩ʁɛçtə nɪçt aʊfʁɛçtʔɛɐhaltn̩ ʊnt deːn maɡnɪt͡ski ɛkt nɪçt nʊt͡sn̩.',
+                   'ɪn aɪnɐ vɛlt, ɪn deːɐ deːɐ kliːmavandl̩ ɪmɐ dʁɛŋəndɐ vɪʁt, hat diː ɔɪʁopɛːɪʃə unioːn aɪnən eːɐɡaɪt͡sɪɡn̩ plaːn foːɐɡəʃlaːɡn̩: bɪs t͡svaɪtaʊzn̩t-fʏnfʊntdʁaɪsɪç zɔlən kaɪnə aʊtos meːɐ aʊf deːn maʁkt kɔmən, diː t͡seː-ʔoː- t͡svaɪ oːdɐ andəʁə ʃaːtʃtɔfə aʊsʃtoːsn̩.']
     val_dataset = StringDataset(val_strings)
     val_dataloader = DataLoader(val_dataset, batch_size=1, collate_fn=collate_fn,
                                 sampler=None)
 
-    device = torch.device('mps')# if torch.cuda.is_available() else torch.device('cpu')
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     print('Using device:', device)
 
     # Instantiate Forward TTS Model
@@ -220,7 +223,7 @@ if __name__ == '__main__':
                         sw.add_figure(f'diff_exp_tts_{i}', mel_exp_diff_plot, global_step=step)
                 sw.add_scalar('mel_loss/val', val_loss / len(val_dataloader), global_step=step)
                 checkpoint['model'] = model.state_dict()
-                torch.save(checkpoint, 'checkpoints/forward_taco_finetuned_post_new.pt')
+                torch.save(checkpoint, 'checkpoints/forward_taco_finebatch.pt')
                 model.postnet.train()
                 model.post_proj.train()
 
