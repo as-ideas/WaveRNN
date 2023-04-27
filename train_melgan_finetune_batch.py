@@ -243,9 +243,9 @@ if __name__ == '__main__':
             #batch['mel_post'][batch['mel_post'] < -11] = -11.51
 
             loss_exp = torch.norm(torch.exp(audio_mel) - torch.exp(batch['mel_post']), p="fro") / torch.norm(torch.exp(batch['mel_post']), p="fro") * 10.
-            loss_log = F.l1_loss(audio_mel, batch['mel_post'])
+            loss_log = F.l1_loss(ada, batch['mel_post'])
 
-            loss_tot = (loss_exp + 0*loss_log)
+            loss_tot = (loss_exp + loss_log)
             optimizer.zero_grad()
             loss_tot.backward()
             optimizer.step()
