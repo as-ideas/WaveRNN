@@ -259,7 +259,7 @@ class MultiForwardTacotron(nn.Module):
 
             pitch_diff = pitch_hat[:, :, 1:] - pitch_hat[:, :, :-1]
             print(pitch_diff.size())
-            pitch_diff = torch.cat([torch.zeros((1, 1, 1)).to(x.devices), pitch_diff], dim=-1)
+            pitch_diff = torch.cat([torch.zeros((1, 1, 1)).to(x.device), pitch_diff], dim=-1)
             pitch_hat_new = torch.clone(pitch_hat)
 
 
