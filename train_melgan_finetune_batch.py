@@ -140,6 +140,7 @@ if __name__ == '__main__':
     dataloader = DataLoader(dataset, batch_size=32, num_workers=2)
     val_dataset = BaseDataset(val_files)
     val_dataloader = DataLoader(val_dataset, batch_size=32, num_workers=2)
+    val_batches = [b for b in val_dataloader]
 
     tts_path = '/Users/cschaefe/stream_tts_models/bild_welt_masked_welt/model.pt'
     voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
@@ -201,7 +202,7 @@ if __name__ == '__main__':
                 val_loss_exp = 0
                 val_loss_log = 0
 
-                for i, batch in tqdm.tqdm(enumerate(val_dataloader), total=len(val_dataloader)):
+                for i, batch in tqdm.tqdm(enumerate(val_batches), total=len(val_batches)):
                     with torch.no_grad():
                         batch = {'mel': batch['mel'].to(device), 'mel_post': batch['mel_post'].to(device)}
                         ada = model.postnet(batch['mel'])
