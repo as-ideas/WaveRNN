@@ -217,11 +217,11 @@ if __name__ == '__main__':
                         val_loss_exp += loss_exp.item()
                         val_loss_log += loss_log.item()
 
-                    sw.add_scalar('mel_loss_exp/val', val_loss_exp / len(val_dataloader), global_step=step)
-                    sw.add_scalar('mel_loss_log/val', val_loss_log / len(val_dataloader), global_step=step)
-                    checkpoint['model'] = model.state_dict()
-                    k_steps = (step // 10000) * 10
-                    torch.save(checkpoint, f'checkpoints/finetuning/forward_taco_finebatch_{k_steps}k.pt')
+                sw.add_scalar('mel_loss_exp/val', val_loss_exp / len(val_dataloader), global_step=step)
+                sw.add_scalar('mel_loss_log/val', val_loss_log / len(val_dataloader), global_step=step)
+                checkpoint['model'] = model.state_dict()
+                k_steps = (step // 10000) * 10
+                torch.save(checkpoint, f'checkpoints/finetuning/forward_taco_finebatch_{k_steps}k.pt')
 
                 for i, batch in enumerate(plot_dataloader):
                     batch = batch.to(device)
