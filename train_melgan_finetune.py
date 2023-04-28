@@ -266,7 +266,7 @@ if __name__ == '__main__':
     #    weight_norm(nn.Conv1d(512, 80, 5, padding=2)),
     #)
     adapter = Adapter()
-    optimizer = optim.Adam(list(model.postnet.rnn.parameters()) + list(model.post_proj.parameters()), lr=1e-5)
+    optimizer = optim.Adam(melgan.parameters(), lr=1e-5)
     #phonemizer = Phonemizer.from_checkpoint('/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/phon_model/model.pt')
     #df = pd.read_csv('/Users/cschaefe/datasets/nlp/welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
     df = pd.read_csv('/Users/cschaefe/datasets/tts-synth-data/welt/processed_metadata.tsv', sep='\t', encoding='utf-8')
