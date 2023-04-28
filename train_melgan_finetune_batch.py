@@ -145,7 +145,7 @@ if __name__ == '__main__':
 
     tts_path = '/Users/cschaefe/stream_tts_models/bild_welt_masked_welt/model.pt'
     voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
-    sw = SummaryWriter('checkpoints/logs_finetune_batched')
+    sw = SummaryWriter('checkpoints/logs_melgan_finetune_batched')
 
     val_strings = ['ɡant͡s ɔɪʁoːpa?',
                    'çiːna bəkɛmp͡ft diː koʁoːna-pandemiː fɔn bəɡɪn an mɪt aɪnəm ʊltʁa-ʃtʁɛŋən nəʊ-kovɪt-ʁeʒiːm.',
