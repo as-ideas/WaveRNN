@@ -134,12 +134,12 @@ if __name__ == '__main__':
 
     Random(42).shuffle(files)
 
-    n_val = 16
+    n_val = 512
     val_files = files[:n_val]
     train_files = files[n_val:]
 
     dataset = BaseDataset(train_files)
-    dataloader = DataLoader(dataset, batch_size=8, num_workers=2)
+    dataloader = DataLoader(dataset, batch_size=32, num_workers=2)
     val_dataset = BaseDataset(val_files, mel_segment_len=None)
     val_dataloader = DataLoader(val_dataset, batch_size=1, num_workers=2)
 
@@ -168,6 +168,7 @@ if __name__ == '__main__':
     model_base.eval()
     model.eval()
     model.postnet.train()
+    optimizer = optim.Adam(list(model.postnet.parameters()) + list(model.post_proj.parameters()), lr=1e-5)
     speed_factor, pitch_factor = 1., 1.
     phoneme_min_duration = {}
     if (Path(tts_path).parent/'config.yaml').exists():
@@ -186,8 +187,7 @@ if __name__ == '__main__':
     voc_checkpoint = torch.load(voc_path, map_location=torch.device('cpu'))
     melgan.load_state_dict(voc_checkpoint['model_g'])
     melgan = melgan.to(device)
-    melgan.train()
-    optimizer = optim.Adam(melgan.generator._modules['1'].parameters(), lr=1e-5)
+    melgan.eval()
 
     step = 0
 
@@ -196,7 +196,6 @@ if __name__ == '__main__':
 
             if step % 100 == 0:
                 model.eval()
-                melgan.eval()
                 val_loss_exp = 0
                 val_loss_log = 0
 
@@ -254,7 +253,6 @@ if __name__ == '__main__':
                         sw.add_figure(f'diff_exp_tts_{i}', mel_exp_diff_plot, global_step=step)
                 model.postnet.train()
                 model.post_proj.train()
-                melgan.train()
 
             batch = {'mel': train_batch['mel'].to(device), 'mel_post': train_batch['mel_post'].to(device)}
             ada = model.postnet(batch['mel'])
@@ -269,7 +267,7 @@ if __name__ == '__main__':
             loss_exp = torch.norm(torch.exp(audio_mel) - torch.exp(batch['mel_post']), p="fro") / torch.norm(torch.exp(batch['mel_post']), p="fro") * 10.
             loss_log = F.l1_loss(ada, batch['mel_post'])
 
-            loss_tot = (loss_exp + 0*loss_log)
+            loss_tot = (loss_exp + loss_log)
             optimizer.zero_grad()
             loss_tot.backward()
             optimizer.step()
