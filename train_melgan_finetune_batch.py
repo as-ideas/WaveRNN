@@ -4,6 +4,7 @@ from pathlib import Path
 import random
 from pathlib import Path
 from random import Random
+from typing import Union
 
 import ruamel.yaml
 import torch.nn.functional as F
@@ -85,7 +86,7 @@ def collate_fn(batch):
 
 
 class BaseDataset(Dataset):
-    def __init__(self, files, mel_segment_len=64):
+    def __init__(self, files, mel_segment_len: Union[int, None] = 64):
         self.files = files
         self.mel_segment_len = mel_segment_len
 
@@ -140,7 +141,6 @@ if __name__ == '__main__':
     dataloader = DataLoader(dataset, batch_size=32, num_workers=2)
     val_dataset = BaseDataset(val_files, mel_segment_len=None)
     val_dataloader = DataLoader(val_dataset, batch_size=1, num_workers=2)
-    #val_batches = [b for b in val_dataloader]
 
     tts_path = '/Users/cschaefe/stream_tts_models/bild_welt_masked_welt/model.pt'
     voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
@@ -156,9 +156,6 @@ if __name__ == '__main__':
     plot_dataset = StringDataset(val_strings)
     plot_dataloader = DataLoader(plot_dataset, batch_size=1, collate_fn=collate_fn,
                                  sampler=None)
-
-
-
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     print('Using device:', device)
