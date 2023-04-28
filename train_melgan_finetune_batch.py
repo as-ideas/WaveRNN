@@ -131,6 +131,7 @@ class StringDataset(Dataset):
 if __name__ == '__main__':
 
     files = list(Path('/Users/cschaefe/datasets/finetuning/bild_welt_masked_mels_eval').glob('**/*.pt'))
+
     Random(42).shuffle(files)
 
     n_val = 512
