@@ -134,11 +134,12 @@ if __name__ == '__main__':
 
     Random(42).shuffle(files)
 
-    n_val = 512
+    n_val = 2
     val_files = files[:n_val]
     train_files = files[n_val:]
 
-    dataset = BaseDataset(train_files)
+    mel_segment_len = 50
+    dataset = BaseDataset(train_files, mel_segment_len=mel_segment_len+2)
     dataloader = DataLoader(dataset, batch_size=32, num_workers=2)
     val_dataset = BaseDataset(val_files, mel_segment_len=None)
     val_dataloader = DataLoader(val_dataset, batch_size=1, num_workers=2)
@@ -209,10 +210,10 @@ if __name__ == '__main__':
 
                         audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
                                                     sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
-                                                    win_size=1024)
+                                                    win_size=1024)[:, :, :mel_segment_len]
 
-                        loss_exp = torch.norm(torch.exp(audio_mel) - torch.exp(batch['mel_post']), p="fro") / torch.norm(torch.exp(batch['mel_post']), p="fro") * 10.
-                        loss_log = F.l1_loss(ada, batch['mel_post'])
+                        loss_exp = torch.norm(torch.exp(audio_mel[:, :, :mel_segment_len]) - torch.exp(batch['mel_post'][:, :, :mel_segment_len]), p="fro") / torch.norm(torch.exp(batch['mel_post'][:, :, :mel_segment_len]), p="fro") * 10.
+                        loss_log = F.l1_loss(ada[:, :, :mel_segment_len], batch['mel_post'][:, :, :mel_segment_len])
                         val_loss_exp += loss_exp.item()
                         val_loss_log += loss_log.item()
 
@@ -264,8 +265,8 @@ if __name__ == '__main__':
                                         sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                         win_size=1024)
 
-            loss_exp = torch.norm(torch.exp(audio_mel) - torch.exp(batch['mel_post']), p="fro") / torch.norm(torch.exp(batch['mel_post']), p="fro") * 10.
-            loss_log = F.l1_loss(ada, batch['mel_post'])
+            loss_exp = torch.norm(torch.exp(audio_mel[:, :, :mel_segment_len]) - torch.exp(batch['mel_post'][:, :, :mel_segment_len]), p="fro") / torch.norm(torch.exp(batch['mel_post'][:, :, :mel_segment_len]), p="fro") * 10.
+            loss_log = F.l1_loss(ada[:, :, :mel_segment_len], batch['mel_post'][:, :, :mel_segment_len])
 
             loss_tot = (loss_exp + loss_log)
             optimizer.zero_grad()

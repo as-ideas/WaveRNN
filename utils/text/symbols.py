@@ -24,3 +24,6 @@ phonemes = list(
 
 phonemes_set = set(phonemes)
 silent_phonemes_indices = [i for i, p in enumerate(phonemes) if p in _pad + _punctuation]
+
+if __name__ == '__main__':
+    print(''.join(phonemes))
