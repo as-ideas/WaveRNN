@@ -1,4 +1,5 @@
 import random
+from pathlib import Path
 
 import random
 from pathlib import Path
@@ -21,13 +22,7 @@ from models.multi_forward_tacotron import MultiForwardTacotron
 from utils.display import *
 from utils.text.tokenizer import Tokenizer
 
-from typing import Callable, NamedTuple, Optional
 
-import torch
-from torchvision import models
-from torchvision.transforms import transforms
-
-DEFAULT_MODEL_NAME = 'default_model'
 def dynamic_range_compression(x, C=1, clip_val=1e-5):
     return np.log(np.clip(x, a_min=clip_val, a_max=None) * C)
 
@@ -131,35 +126,7 @@ class StringDataset(Dataset):
         indices = self.tokenizer(string)
         return torch.LongTensor(indices)
 
-class MobilenetV3(torch.nn.Module):
-    transform = transforms.Compose(
-        [
-            transforms.Resize((256, 256)),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            transforms.Normalize(
-                mean=[0.485, 0.456, 0.406],
-                std=[0.229, 0.224, 0.225]
-            ),
-        ]
-    )  # A little hesitant to use pytorch transform that came packaged with mobilenetV3 to keep the transform backward
-    # compatible with the earlier releases.
-    name = 'mobilenet_v3_small'
 
-    def __init__(self) -> None:
-        """
-        Initialize a mobilenetv3 model, cuts it at the global average pooling layer and returns the output features.
-        """
-        super().__init__()
-        mobilenet = models.mobilenet_v3_small(weights='MobileNet_V3_Small_Weights.IMAGENET1K_V1').eval()
-        self.mobilenet_gap_op = torch.nn.Sequential(
-            mobilenet.features, mobilenet.avgpool
-        )
-
-    def forward(self, x) -> torch.tensor:
-        x = self.mobilenet_gap_op(x)
-        x = x.squeeze(dim=3).squeeze(dim=2)
-        return x
 
 if __name__ == '__main__':
 
@@ -171,15 +138,18 @@ if __name__ == '__main__':
     val_files = files[:n_val]
     train_files = files[n_val:]
 
-    mel_segment_len = 50
+    mel_segment_len = 128
+    mel_segment_len_2 = 64
+
     dataset = BaseDataset(train_files, mel_segment_len=mel_segment_len)
-    dataloader = DataLoader(dataset, batch_size=8, num_workers=2)
+    dataloader = DataLoader(dataset, batch_size=8, num_workers=0)
     val_dataset = BaseDataset(val_files, mel_segment_len=None)
-    val_dataloader = DataLoader(val_dataset, batch_size=1, num_workers=2)
+    val_dataloader = DataLoader(val_dataset, batch_size=1, num_workers=0)
 
     tts_path = '/Users/cschaefe/stream_tts_models/bild_welt_masked_welt/model.pt'
     voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
-    sw = SummaryWriter('checkpoints/logs_finetune_batched_mobile')
+    sw = SummaryWriter('checkpoints/logs_finetune_batched')
+    save_path = 'checkpoints/finetuning/forward_taco_finebatch'
 
     val_strings = ['ɡant͡s ɔɪʁoːpa?',
                    'çiːna bəkɛmp͡ft diː koʁoːna-pandemiː fɔn bəɡɪn an mɪt aɪnəm ʊltʁa-ʃtʁɛŋən nəʊ-kovɪt-ʁeʒiːm.',
@@ -205,7 +175,6 @@ if __name__ == '__main__':
     optimizer = optim.Adam(list(model.postnet.parameters()) + list(model.post_proj.parameters()), lr=1e-5)
     speed_factor, pitch_factor = 1., 1.
     phoneme_min_duration = {}
-    monet = MobilenetV3().to(device)
     if (Path(tts_path).parent/'config.yaml').exists():
         with open(str(Path(tts_path).parent/'config.yaml'), 'rb') as data_yaml:
             config = ruamel.yaml.YAML().load(data_yaml)
@@ -225,9 +194,6 @@ if __name__ == '__main__':
     melgan.eval()
 
     step = 0
-    cos_sim = torch.nn.CosineSimilarity(dim=1, eps=1e-08)
-    gray = transforms.Grayscale(num_output_channels=3)
-
 
     for epoch in range(1000):
         for train_batch in dataloader:
@@ -250,11 +216,7 @@ if __name__ == '__main__':
                                                     win_size=1024)
 
                         loss_exp = torch.norm(torch.exp(audio_mel) - torch.exp(batch['mel_post']), p="fro") / torch.norm(torch.exp(batch['mel_post']), p="fro") * 10.
-                        #loss_log = F.l1_loss(ada, batch['mel_post'])
-
-                        a = monet(ada.unsqueeze(1).repeat(1, 3, 1, 1))
-                        b = monet(batch['mel_post'].unsqueeze(1).repeat(1, 3, 1, 1))
-                        loss_log = F.cosine_similarity(a, b).mean()
+                        loss_log = F.l1_loss(ada, batch['mel_post'])
                         val_loss_exp += loss_exp.item()
                         val_loss_log += loss_log.item()
 
@@ -262,7 +224,7 @@ if __name__ == '__main__':
                 sw.add_scalar('mel_loss_log/val', val_loss_log / len(val_dataloader), global_step=step)
                 checkpoint['model'] = model.state_dict()
                 k_steps = (step // 10000) * 10
-                torch.save(checkpoint, f'checkpoints/finetuning/forward_taco_finebatch_{k_steps}k.pt')
+                torch.save(checkpoint, f'{save_path}_{k_steps}k.pt')
 
                 for i, batch in enumerate(plot_dataloader):
                     batch = batch.to(device)
@@ -300,6 +262,13 @@ if __name__ == '__main__':
             ada = model.postnet(batch['mel'])
             ada = model.post_proj(ada).transpose(1, 2)
 
+            max_mel_start = ada.size(-1) - mel_segment_len_2
+            mel_start = random.randint(0, max_mel_start)
+            mel_end = mel_start + mel_segment_len_2
+
+            ada = ada[:, :, mel_start:mel_end]
+            batch['mel_post'] = batch['mel_post'][:, :, mel_start:mel_end]
+
             audio = melgan(ada)
             audio = audio.squeeze(1)
             audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
@@ -307,18 +276,8 @@ if __name__ == '__main__':
                                         win_size=1024)
 
             loss_exp = torch.norm(torch.exp(audio_mel) - torch.exp(batch['mel_post']), p="fro") / torch.norm(torch.exp(batch['mel_post']), p="fro") * 10.
-            a = monet(torch.exp(ada).unsqueeze(1).repeat(1, 3, 1, 1))
-            b = monet(torch.exp(batch['mel_post']).unsqueeze(1).repeat(1, 3, 1, 1))
-            loss_log = F.cosine_similarity(a, b).mean()
+            loss_log = F.l1_loss(ada, batch['mel_post'])
 
-            #loss_log_0 = F.l1_loss(ada[:, :, :-2], batch['mel_post'][:, :, :-2])
-            #loss_log_1 = F.l1_loss(ada[:, :, 1:-1], batch['mel_post'][:, :, :-2])
-            #loss_log_2 = F.l1_loss(ada[:, :, 2:], batch['mel_post'][:, :, :-2])
-            #loss_log = torch.minimum(loss_log_0, loss_log_1)
-            #loss_log = torch.minimum(loss_log, loss_log_2)
-
-            #print(step, loss_exp, loss_log_0, loss_log_1, loss_log_2)
-            print(step, loss_exp, loss_log)
             loss_tot = (loss_exp + loss_log)
             optimizer.zero_grad()
             loss_tot.backward()
@@ -328,8 +287,6 @@ if __name__ == '__main__':
 
             sw.add_scalar('mel_exp_loss/train', loss_exp, global_step=step)
             sw.add_scalar('mel_log_loss/train', loss_log, global_step=step)
-            #sw.add_scalar('mel_log_loss_1/train', loss_log_1, global_step=step)
-            #sw.add_scalar('mel_log_loss_2/train', loss_log_2, global_step=step)
 
-            #print(step, loss_exp, loss_log, loss_log_0, loss_log_1)
+            print(step, loss_exp, loss_log)
 
