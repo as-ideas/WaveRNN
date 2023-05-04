@@ -12,6 +12,7 @@ class Paths:
         self.quant = self.data/'quant'
         self.mel = self.data/'mel'
         self.gta = self.data/'gta'
+        self.audio = self.data/'audio'
         self.att_pred = self.data/'att_pred'
         self.alg = self.data/'alg'
         self.speaker_emb = self.data/'speaker_emb'
@@ -38,6 +39,7 @@ class Paths:
         os.makedirs(self.data, exist_ok=True)
         os.makedirs(self.quant, exist_ok=True)
         os.makedirs(self.mel, exist_ok=True)
+        os.makedirs(self.audio, exist_ok=True)
         os.makedirs(self.gta, exist_ok=True)
         os.makedirs(self.alg, exist_ok=True)
         os.makedirs(self.speaker_emb, exist_ok=True)

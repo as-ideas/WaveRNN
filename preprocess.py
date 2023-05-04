@@ -46,6 +46,7 @@ class DataPoint:
     mel: np.array
     pitch: np.array
     reference_wav: np.array
+    audio: np.array
 
 
 class Preprocessor:
@@ -70,6 +71,7 @@ class Preprocessor:
             dp = self._convert_file(item_id, path)
             np.save(self.paths.mel/f'{dp.item_id}.npy', dp.mel, allow_pickle=False)
             np.save(self.paths.raw_pitch/f'{dp.item_id}.npy', dp.pitch, allow_pickle=False)
+            np.save(self.paths.audio/f'{dp.item_id}.npy', dp.audio, allow_pickle=False)
             return dp
         except Exception as e:
             print(traceback.format_exc())
@@ -95,7 +97,8 @@ class Preprocessor:
                          mel_len=mel.shape[-1],
                          text=text,
                          pitch=pitch.astype(np.float32),
-                         reference_wav=reference_wav)
+                         reference_wav=reference_wav,
+                         audio=y)
 
 
 parser = argparse.ArgumentParser(description='Dataset preprocessing')
