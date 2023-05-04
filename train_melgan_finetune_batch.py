@@ -19,6 +19,7 @@ from torch.utils.tensorboard import SummaryWriter
 from melgan import Generator
 from models.forward_tacotron import ForwardSeriesTransformer
 from models.multi_forward_tacotron import MultiForwardTacotron
+from train_melgan_finetune_feat import MultiScaleDiscriminator
 from utils.display import *
 from utils.text.tokenizer import Tokenizer
 
@@ -139,9 +140,9 @@ if __name__ == '__main__':
     train_files = files[n_val:]
 
     dataset = BaseDataset(train_files)
-    dataloader = DataLoader(dataset, batch_size=16, num_workers=2)
+    dataloader = DataLoader(dataset, batch_size=16, num_workers=0)
     val_dataset = BaseDataset(val_files, mel_segment_len=None)
-    val_dataloader = DataLoader(val_dataset, batch_size=1, num_workers=2)
+    val_dataloader = DataLoader(val_dataset, batch_size=1, num_workers=0)
 
     tts_path = '/Users/cschaefe/stream_tts_models/bild_welt_masked_welt/model.pt'
     voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
@@ -188,7 +189,10 @@ if __name__ == '__main__':
     melgan = melgan.to(device)
     melgan.eval()
     melgan.generator._modules['1'].train()
-    optimizer = optim.Adam(melgan.generator._modules['1'].parameters(), lr=1e-4)
+    optimizer = optim.Adam(melgan.parameters(), lr=1e-5)
+    disc = MultiScaleDiscriminator()
+    disc.load_state_dict(voc_checkpoint['model_d'])
+
 
     step = 0
 
@@ -258,13 +262,18 @@ if __name__ == '__main__':
 
             audio = melgan(batch['mel_post'])
             audio = audio.squeeze(1)
+            d_fake = disc(audio.unsqueeze(1))
+            g_loss = 0
+            for (feat_fake, score_fake) in d_fake:
+                g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
+
             audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
                                         sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                         win_size=1024)
 
             loss_exp = torch.norm(torch.exp(audio_mel) - torch.exp(batch['mel_post']), p="fro") / torch.norm(torch.exp(batch['mel_post']), p="fro") * 10.
 
-            loss_tot = loss_exp
+            loss_tot = loss_exp + g_loss
             optimizer.zero_grad()
             loss_tot.backward()
             optimizer.step()
@@ -272,6 +281,7 @@ if __name__ == '__main__':
             step += 1
 
             sw.add_scalar('mel_exp_loss/train', loss_exp, global_step=step)
+            sw.add_scalar('g_loss/train', g_loss, global_step=step)
 
-            print(step, loss_exp, loss_log)
+            print(step, g_loss, loss_exp, loss_log)
 
