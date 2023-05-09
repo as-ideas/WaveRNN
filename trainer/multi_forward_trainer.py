@@ -69,15 +69,11 @@ class MultiForwardTrainer:
                       ('Batch Size', session.bs),
                       ('Learning Rate', session.lr)])
 
-
-
-
         for g in optimizer.param_groups:
             g['lr'] = session.lr
 
         averages = {'mel_loss': Averager(), 'dur_loss': Averager(), 'step_duration': Averager()}
         device = next(model.parameters()).device  # use same device as model parameters
-
 
 
         g_model = Generator(80).to(device)
@@ -91,12 +87,8 @@ class MultiForwardTrainer:
         d_optim = Adam(d_model.parameters(), lr=1e-4,  betas=(0.5, 0.9))
         d_optim.load_state_dict(voc_checkpoint['optim_d'])
 
-
-
         for e in range(1, epochs + 1):
             for i, batch in enumerate(session.train_set, 1):
-
-
 
                 batch = to_device(batch, device=device)
                 start = time.time()
@@ -120,8 +112,6 @@ class MultiForwardTrainer:
                 mel_batch = torch.zeros((mel_start.size(0), 80, 64))
                 for b in range(mel_start.size(0)):
                     mel_batch[b, :, :] = pred['mel_post'][b, :, mel_start[b]:mel_end[b]]
-
-
 
                 wav_fake = g_model(mel_batch)
                 wav_real = batch['wav'].unsqueeze(1)

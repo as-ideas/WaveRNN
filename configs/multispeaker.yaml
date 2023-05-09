@@ -1,5 +1,5 @@
 
-tts_model_id: 'multispeaker_tts'
+tts_model_id: 'bild_welt_e2e_tts'
 data_path: '/Users/cschaefe/datasets/multispeaker_welt_bild'                                        # output data path
 
 tts_model: 'multi_forward_tacotron'   # choices: [multi_forward_tacotron, multi_fast_pitch]
