@@ -3,10 +3,14 @@ from typing import Dict, Any, Union
 
 import numpy as np
 import torch
+import torch.nn.functional as F
+from torch.optim import Adam
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
+from discriminator import MultiScaleDiscriminator
+from melgan import Generator
 from models.multi_fast_pitch import MultiFastPitch
 from models.multi_forward_tacotron import MultiForwardTacotron
 from trainer.common import Averager, TTSSession, MaskedL1, to_device, np_now
@@ -39,7 +43,9 @@ class MultiForwardTrainer:
             speaker_emb = torch.from_numpy(speaker_emb).float().unsqueeze(0)
             self.speaker_embs[speaker] = speaker_emb
 
-    def train(self, model: Union[MultiForwardTacotron, MultiFastPitch], optimizer: Optimizer) -> None:
+    def train(self,
+              model: Union[MultiForwardTacotron, MultiFastPitch],
+              optimizer: Optimizer) -> None:
         forward_schedule = self.train_cfg['schedule']
         forward_schedule = parse_schedule(forward_schedule)
         for i, session_params in enumerate(forward_schedule, 1):
@@ -63,13 +69,35 @@ class MultiForwardTrainer:
                       ('Batch Size', session.bs),
                       ('Learning Rate', session.lr)])
 
+
+
+
         for g in optimizer.param_groups:
             g['lr'] = session.lr
 
         averages = {'mel_loss': Averager(), 'dur_loss': Averager(), 'step_duration': Averager()}
         device = next(model.parameters()).device  # use same device as model parameters
+
+
+
+        g_model = Generator(80).to(device)
+        d_model = MultiScaleDiscriminator()
+
+        voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
+        voc_checkpoint = torch.load(voc_path, map_location=torch.device('cpu'))
+        g_model.load_state_dict(voc_checkpoint['model_g'])
+        d_model.load_state_dict(voc_checkpoint['model_d'])
+        #g_optim = Adam(g_model.parameters(), lr=1e-4,  betas=(0.5, 0.9))
+        d_optim = Adam(d_model.parameters(), lr=1e-4,  betas=(0.5, 0.9))
+        d_optim.load_state_dict(voc_checkpoint['optim_d'])
+
+
+
         for e in range(1, epochs + 1):
             for i, batch in enumerate(session.train_set, 1):
+
+
+
                 batch = to_device(batch, device=device)
                 start = time.time()
                 model.train()
@@ -87,11 +115,43 @@ class MultiForwardTrainer:
                 energy_loss = self.l1_loss(pred['energy'], energy_target.unsqueeze(1), batch['x_len'])
                 pitch_cond_loss = self.ce_loss(pred['pitch_cond'].transpose(1, 2), batch['pitch_cond'])
 
+                mel_start = batch['mel_start']
+                mel_end = batch['mel_end']
+                mel_batch = torch.zeros((mel_start.size(0), 80, 64))
+                for b in range(mel_start.size(0)):
+                    mel_batch[b, :, :] = pred['mel_post'][b, :, mel_start[b]:mel_end[b]]
+
+
+
+                wav_fake = g_model(mel_batch)
+                wav_real = batch['wav'].unsqueeze(1)
+
+                d_loss = 0.0
+                g_loss = 0.0
+                d_fake = d_model(wav_fake.detach())
+                d_real = d_model(wav_real)
+                for (_, score_fake), (_, score_real) in zip(d_fake, d_real):
+                    d_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
+                    d_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
+                d_optim.zero_grad()
+                d_loss.backward()
+                d_optim.step()
+
+                # generator
+                d_fake = d_model(wav_fake)
+                for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
+                    g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
+                    for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
+                        g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
+
+                print('g_loss', g_loss)
+
                 loss = m1_loss + m2_loss \
                        + self.train_cfg['dur_loss_factor'] * dur_loss \
                        + self.train_cfg['pitch_loss_factor'] * pitch_loss \
                        + self.train_cfg['energy_loss_factor'] * energy_loss \
-                       + self.train_cfg['pitch_cond_loss_factor'] * pitch_cond_loss
+                       + self.train_cfg['pitch_cond_loss_factor'] * pitch_cond_loss \
+                       + g_loss
 
                 pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
                 pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()
