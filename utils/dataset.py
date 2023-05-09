@@ -126,6 +126,8 @@ class ForwardDataset(Dataset):
         self.text_dict = text_dict
         self.speaker_dict = speaker_dict
         self.tokenizer = tokenizer
+        self.mel_segment_len = 64
+        self.hop_len = 256
 
     def __getitem__(self, index: int) -> Dict[str, torch.tensor]:
         item_id = self.metadata[index]
@@ -141,9 +143,20 @@ class ForwardDataset(Dataset):
         pitch_cond = np.ones(pitch.shape)
         pitch_cond[pitch != 0] = 2
 
+        # end-2-end
+        wav, _ = np.load(str(self.paths.audio/f'{item_id}.npy'))
+        max_mel_start = mel.size(-1) - self.mel_segment_len
+        mel_start = random.randint(0, max_mel_start)
+        mel_end = mel_start + self.mel_segment_len
+        mel = mel[:, mel_start:mel_end]
+        wav_start = mel_start * self.hop_len
+        wav_end = wav_start + self.mel_segment_len * self.hop_len
+        wav = wav[wav_start:wav_end]
+
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
                 'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy,
-                'speaker_emb': speaker_emb, 'pitch_cond': pitch_cond, 'speaker_name': speaker_name}
+                'speaker_emb': speaker_emb, 'pitch_cond': pitch_cond, 'speaker_name': speaker_name,
+                'wav': wav, 'mel_start': mel_start, 'mel_end': mel_end}
 
     def __len__(self):
         return len(self.metadata)
@@ -254,11 +267,24 @@ class ForwardCollator:
         energy = _stack_to_tensor(energy).float()
         pitch_cond = [_pad1d(b['pitch_cond'][:max_x_len], max_x_len) for b in batch]
         pitch_cond = _stack_to_tensor(pitch_cond).long()
+
+        mel_start = [b['mel_start'] for b in batch]
+        mel_start = torch.tensor(mel_start)
+
+        mel_end = [b['mel_end'] for b in batch]
+        mel_end = torch.tensor(mel_end)
+
+        wav = [b['wav'] for b in batch]
+        wav = _stack_to_tensor(wav).float()
+
         output.update({
             'pitch': pitch,
             'energy': energy,
             'dur': dur,
-            'pitch_cond': pitch_cond
+            'pitch_cond': pitch_cond,
+            'mel_start': mel_start,
+            'mel_end': mel_end,
+            'wav': wav
         })
         return output
 
