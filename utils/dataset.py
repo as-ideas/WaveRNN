@@ -145,14 +145,14 @@ class ForwardDataset(Dataset):
 
         # end-2-end
         wav = np.load(str(self.paths.audio/f'{item_id}.npy'))
-        print('comp', mel.shape[-1], wav.shape[-1] // 256)
+        #print('comp', mel.shape[-1], wav.shape[-1] // 256)
         max_mel_start = mel.shape[-1] - self.mel_segment_len - 1
         mel_start = random.randint(0, max_mel_start)
         mel_end = mel_start + self.mel_segment_len
         wav_start = mel_start * self.hop_len
         wav_end = wav_start + self.mel_segment_len * self.hop_len
         wav = wav[wav_start:wav_end]
-        print('wav shape', wav.shape)
+        #print('wav shape', wav.shape)
         #assert mel.shape[-1] == 64, mel.shape
         assert wav.shape[-1] == 64 * 256, wav.shape
 
