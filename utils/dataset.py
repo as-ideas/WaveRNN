@@ -146,7 +146,7 @@ class ForwardDataset(Dataset):
         # end-2-end
         wav = np.load(str(self.paths.audio/f'{item_id}.npy'))
         #print('comp', mel.shape[-1], wav.shape[-1] // 256)
-        max_mel_start = mel.shape[-1] - self.mel_segment_len - 1
+        max_mel_start = mel.shape[-1] - self.mel_segment_len - 2
         mel_start = random.randint(0, max_mel_start)
         mel_end = mel_start + self.mel_segment_len
         wav_start = mel_start * self.hop_len
@@ -485,7 +485,7 @@ def _get_filtered_datasets(paths: Paths,
 def _filter_max_len(dataset: List[tuple], max_mel_len: int) -> List[tuple]:
     if max_mel_len is None:
         return dataset
-    return [(id, len) for id, len in dataset if 66 < len <= max_mel_len and id.startswith('welt_')]
+    return [(id, len) for id, len in dataset if 68 < len <= max_mel_len and id.startswith('welt_')]
 
 
 def _stack_to_tensor(x: List[np.array]) -> torch.Tensor:
