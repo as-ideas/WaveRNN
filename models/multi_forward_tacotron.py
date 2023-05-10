@@ -243,8 +243,7 @@ class MultiForwardTacotron(nn.Module):
 
     def generate(self,
                  x: torch.Tensor,
-                 speaker_emb: torch.Tensor,
-                 series_transformer: Callable[[ForwardSeries], None]) -> Dict[str, torch.Tensor]:
+                 speaker_emb: torch.Tensor) -> Dict[str, torch.Tensor]:
         self.eval()
         with torch.no_grad():
             pitch_cond_hat = self.pitch_cond_pred(x, speaker_emb).squeeze(-1)
@@ -278,7 +277,6 @@ class MultiForwardTacotron(nn.Module):
             energy_hat = self.energy_pred(x, speaker_emb).transpose(1, 2)
 
         series = ForwardSeries(x=x, pitch=pitch_hat_new, energy=energy_hat, durations=dur_hat)
-        series_transformer(series)
 
         return self._generate_mel(x=series.x,
                                   dur_hat=series.durations,

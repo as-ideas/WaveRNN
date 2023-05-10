@@ -169,8 +169,10 @@ class MultiForwardTrainer:
                                     meta={'speaker_embeddings': self.speaker_embs})
 
                 if step % self.train_cfg['plot_every'] == 0:
-                    self.generate_plots(model, session)
+                    self.generate_plots(model, session, g_model)
 
+                self.writer.add_scalar('g_loss/train', g_loss, model.get_step())
+                self.writer.add_scalar('d_loss/train', d_loss, model.get_step())
                 self.writer.add_scalar('Mel_Loss/train', m1_loss + m2_loss, model.get_step())
                 self.writer.add_scalar('Pitch_Loss/train', pitch_loss, model.get_step())
                 self.writer.add_scalar('Energy_Loss/train', energy_loss, model.get_step())
@@ -226,7 +228,7 @@ class MultiForwardTrainer:
         return val_losses
 
     @ignore_exception
-    def generate_plots(self, model: Union[MultiForwardTacotron, MultiFastPitch], session: TTSSession) -> None:
+    def generate_plots(self, model: Union[MultiForwardTacotron, MultiFastPitch], session: TTSSession, model_g) -> None:
         model.eval()
         device = next(model.parameters()).device
         batch = session.val_sample
@@ -237,6 +239,7 @@ class MultiForwardTrainer:
         m2_hat = np_now(pred['mel_post'])[0, :, :]
         m_target = np_now(batch['mel'])[0, :, :]
         speaker = batch['speaker_name'][0]
+
 
         m1_hat_fig = plot_mel(m1_hat)
         m2_hat_fig = plot_mel(m2_hat)
@@ -277,6 +280,8 @@ class MultiForwardTrainer:
             gen = model.generate(batch['x'][0:1, :batch['x_len'][0]], speaker_emb=speaker_emb)
             m2_hat = np_now(gen['mel_post'].squeeze())
 
+            wav_hat = model_g.inference(gen['mel_post'])
+
             m2_hat_fig = plot_mel(m2_hat)
 
             pitch_gen_fig = plot_pitch(np_now(gen['pitch'].squeeze()))
@@ -285,6 +290,7 @@ class MultiForwardTrainer:
             self.writer.add_figure(f'Pitch/generated/{speaker}', pitch_gen_fig, model.step)
             self.writer.add_figure(f'Energy/generated/{speaker}', energy_gen_fig, model.step)
             self.writer.add_figure(f'Generated/postnet/{speaker}', m2_hat_fig, model.step)
+            self.writer.add_audio(f'Generated/wav/{speaker}', wav_hat, sample_rate=22050, global_step=model.step)
 
             m2_hat_wav = self.dsp.griffinlim(m2_hat)
 
