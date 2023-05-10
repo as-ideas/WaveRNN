@@ -134,7 +134,7 @@ class MultiForwardTrainer:
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
-                print('g_loss', g_loss)
+                #print('g_loss', g_loss)
 
                 loss = m1_loss + m2_loss \
                        + self.train_cfg['dur_loss_factor'] * dur_loss \
