@@ -109,7 +109,7 @@ class MultiForwardTrainer:
 
                 mel_start = batch['mel_start']
                 mel_end = batch['mel_end']
-                mel_batch = torch.zeros((mel_start.size(0), 80, 64))
+                mel_batch = torch.zeros((mel_start.size(0), 80, 64)).to(device)
                 for b in range(mel_start.size(0)):
                     mel_batch[b, :, :] = pred['mel_post'][b, :, mel_start[b]:mel_end[b]]
 
