@@ -83,7 +83,7 @@ class MultiForwardTrainer:
         voc_checkpoint = torch.load(voc_path, map_location=torch.device('cpu'))
         g_model.load_state_dict(voc_checkpoint['model_g'])
         d_model.load_state_dict(voc_checkpoint['model_d'])
-        #g_optim = Adam(g_model.parameters(), lr=1e-4,  betas=(0.5, 0.9))
+        g_optim = Adam(g_model.parameters(), lr=1e-4,  betas=(0.5, 0.9))
         d_optim = Adam(d_model.parameters(), lr=1e-4,  betas=(0.5, 0.9))
         d_optim.load_state_dict(voc_checkpoint['optim_d'])
 
@@ -151,6 +151,7 @@ class MultiForwardTrainer:
                 torch.nn.utils.clip_grad_norm_(model.parameters(),
                                                self.train_cfg['clip_grad_norm'])
                 optimizer.step()
+                g_optim.step()
 
                 averages['mel_loss'].add(m1_loss.item() + m2_loss.item())
                 averages['dur_loss'].add(dur_loss.item())
@@ -167,6 +168,7 @@ class MultiForwardTrainer:
                     save_checkpoint(model=model, optim=optimizer, config=self.config,
                                     path=self.paths.forward_checkpoints / f'forward_step{k}k.pt',
                                     meta={'speaker_embeddings': self.speaker_embs})
+                    torch.save({'model_g': g_model.state_dict()}, self.paths.forward_checkpoints / f'melgan_step{k}.k.pt')
 
                 if step % self.train_cfg['plot_every'] == 0:
                     self.generate_plots(model, session, g_model)
