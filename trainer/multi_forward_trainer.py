@@ -77,7 +77,7 @@ class MultiForwardTrainer:
 
 
         g_model = Generator(80).to(device)
-        d_model = MultiScaleDiscriminator()
+        d_model = MultiScaleDiscriminator().to(device)
 
         voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
         voc_checkpoint = torch.load(voc_path, map_location=torch.device('cpu'))
