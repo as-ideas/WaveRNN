@@ -147,6 +147,7 @@ class MultiForwardTrainer:
                 pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()
 
                 optimizer.zero_grad()
+                g_optim.zero_grad()
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(),
                                                self.train_cfg['clip_grad_norm'])
