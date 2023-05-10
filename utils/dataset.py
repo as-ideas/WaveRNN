@@ -154,6 +154,8 @@ class ForwardDataset(Dataset):
         wav = wav[wav_start:wav_end]
         #print('wav shape', wav.shape)
         #assert mel.shape[-1] == 64, mel.shape
+        if wav.shape[-1] < 64 * 256:
+            wav = np.concatenate([wav, np.zeros(64 * 256 - wav.shape[-1])])
         assert wav.shape[-1] == 64 * 256, wav.shape
 
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
