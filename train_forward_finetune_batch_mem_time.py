@@ -283,7 +283,7 @@ if __name__ == '__main__':
             diff = (torch.exp(audio_mel) - torch.exp(batch['mel_post'])) ** 2
             diff = diff.mean(1)
             diff[diff < 0.005] = 0
-            loss_exp = 10. * diff.mean()
+            loss_exp = 10. * diff.sum()
 
             loss_log = F.l1_loss(ada, batch['mel_post'])
 
