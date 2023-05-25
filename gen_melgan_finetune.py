@@ -274,7 +274,7 @@ if __name__ == '__main__':
             if val > 0:
                 left = max(0, ind-32)
                 right = min(left + 32, out_base['mel_post'].size(-1))
-                piece = out_base['mel_post'][left:right]
+                piece = out_base['mel_post'][:, left:right]
                 score = 100 * val
                 torch.save({'mel_post': piece}, f'/Users/cschaefe/datasets/finetuning/bild_welt_masked_mels/{index}_{score:#.4}.pt')
                 index += 1
