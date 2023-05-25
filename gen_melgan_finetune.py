@@ -240,6 +240,7 @@ if __name__ == '__main__':
     model = model.to(device)
     model_base.eval()
     melgan.eval()
+
     print(f'\nInitialized tts model: {model}\n')
 
     optimizer = optim.Adam(list(model.postnet.rnn.parameters()) + list(model.post_proj.parameters()), lr=1e-5)
