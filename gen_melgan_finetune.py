@@ -202,12 +202,11 @@ class StringDataset(Dataset):
 
 if __name__ == '__main__':
 
-    val_strings = ['ɡant͡s ɔɪʁoːpa?', 'najaː, man t͡sɛɐdɛŋkt diː zaxn̩ zoː zeːɐ.', 'naɪn, fʁaʊ lampʁɛçt, diː meːdiən zɪnt nɪçt ʃʊlt.','ɛs ɪst ʃaːdə, das diː eːʔuː als diː humaːnstə ʊnt moʁaːlɪʃstə alɐ lɛndɐɡʁʊpiːʁʊŋən anɡəzeːən vɪʁt, aːbɐ ziː vɔlən diː mɛnʃn̩ʁɛçtə nɪçt aʊfʁɛçtʔɛɐhaltn̩ ʊnt deːn maɡnɪt͡ski ɛkt nɪçt nʊt͡sn̩.']
-                   #'ɛs ɪst aɪnɐ deːɐ vɪçtɪçstn̩ foːɐʃlɛːɡə deːɐ unioːn t͡suːɐ bəkɛmp͡fʊŋ dɛs kliːmavandl̩s, aːbɐ deːɐ plaːn ɪst ɪns ʃtɔkn̩ ɡəʁaːtn̩, daː dɔɪt͡ʃlant aɪnvɛndə ɛɐhoːbn̩ hat.'
-        #]#, 'naɪn, fʁaʊ lampʁɛçt, diː meːdiən zɪnt nɪçt ʃʊlt.', 'diː t͡seː-deː-ʔuː-t͡sɛntʁaːlə lɛst iːɐ ʃpɪt͡sn̩pɛʁzonaːl dʊʁçt͡ʃɛkn̩: ɪm jʏŋstn̩ mɪtɡliːdɐbʁiːf fɔn bʊndəsɡəʃɛft͡sfyːʁɐ ʃtɛfan hɛnəvɪç (axtʔʊntfɪʁt͡sɪç) vɪʁt diː t͡seː-deː-ʔuː-baːzɪs aʊfɡəfɔʁdɐt, an aɪnɐ bəfʁaːɡʊŋ dɛs tʁiːʁɐ paʁtaɪən fɔʁʃɐs uːvə jan (nɔɪnʔʊntfʏnft͡sɪç) taɪlt͡suneːmən.']
-
     tts_path = '/Users/cschaefe/stream_tts_models/bild_welt_masked_welt/model.pt'
     voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
+    speaker = 'welt'
+    df = pd.read_csv('/Users/cschaefe/datasets/finetuning/metadata_processed.tsv', sep='\t', encoding='utf-8')
+
     #tts_path = 'welt_voice/tts_model/model.pt'
     #voc_path = 'welt_voice/voc_model/model.pt'
 
@@ -243,59 +242,39 @@ if __name__ == '__main__':
     melgan.eval()
     print(f'\nInitialized tts model: {model}\n')
 
-    class Adapter(nn.Module):
-        def __init__(self):
-            super(Adapter, self).__init__()
-            self.conv = nn.Conv1d(80, 256, 3, padding=1)
-            self.conv_2 = nn.Conv1d(256, 80, 3, padding=1)
-            #self.gru = nn.GRU(256, 256, bidirectional=True, batch_first=True)
-            #self.lin = nn.Linear(512, 80)
-
-        def forward(self, x):
-            x = self.conv(x)
-            # x, _ = self.gru(x.transpose(1, 2))
-            # x = self.lin(x)
-            #x = x.transpose(1, 2)
-            x = self.conv_2(x)
-            return x
-
-    #adapter = Sequential(
-    #    weight_norm(nn.Conv1d(80, 512, 5, padding=2)),
-    #    weight_norm(nn.Conv1d(512, 80, 5, padding=2)),
-    #)
-    adapter = Adapter()
     optimizer = optim.Adam(list(model.postnet.rnn.parameters()) + list(model.post_proj.parameters()), lr=1e-5)
-    #phonemizer = Phonemizer.from_checkpoint('/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/phon_model/model.pt')
-    #df = pd.read_csv('/Users/cschaefe/datasets/nlp/welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
-    df = pd.read_csv('/Users/cschaefe/datasets/finetuning/metadata_processed.tsv', sep='\t', encoding='utf-8')
-    #df.dropna(inplace=True)
     strings = df['text_phonemized']
     strings = [s for s in strings if len(s) > 10 and len(s) < 1000]
     random = Random(42)
     random.shuffle(strings)
 
     dataset = StringDataset(strings)
-    val_dataset = StringDataset(val_strings)
 
     dataloader = DataLoader(dataset, batch_size=1, collate_fn=collate_fn,
                             sampler=None)
 
-    val_dataloader = DataLoader(val_dataset, batch_size=1, collate_fn=collate_fn,
-                                sampler=None)
-
-    sw = SummaryWriter('checkpoints/logs_finetune_postnet_l2_local')
-    checkpoint = torch.load(tts_path, map_location=torch.device('cpu'))
-    step = 0
-    loss_acc = 1
-    loss_sum = 0
-
-    conv_filter = ConvFilter().to(device)
     index = 0
     for batch in tqdm.tqdm(dataloader, total=len(dataloader)):
         batch = batch.to(device)
         with torch.no_grad():
-            out_base = model_base.generate(batch, checkpoint['speaker_embeddings']['welt'].to(device), series_transformer=series_transformer)
-            #print(out_base['mel'])
-            index += 1
-            torch.save(out_base, f'/Users/cschaefe/datasets/finetuning/bild_welt_masked_mels_eval/{index}.pt')
+            out_base = model_base.generate(batch, checkpoint['speaker_embeddings'][speaker].to(device), series_transformer=series_transformer)
+            audio = melgan(out_base['mel_post'])
+            audio = audio.squeeze(1)
+            audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
+                                        sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
+                                        win_size=1024)
+            diff = (torch.exp(audio_mel) - torch.exp(out_base['mel_post'])) ** 2
+            diff = diff.mean(1)
+            diff[diff < 0.005] = 0
+
+            ind = int(torch.argmax(diff))
+            val = float(diff[0, ind])
+
+            if val > 0:
+                left = max(0, ind-32)
+                right = min(left + 32, out_base['mel_post'].size(-1))
+                piece = out_base['mel_post'][left:right]
+                score = 100 * val
+                torch.save({'mel_post': piece}, f'/Users/cschaefe/datasets/finetuning/bild_welt_masked_mels/{index}_{score:#.4}.pt')
+                index += 1
 
