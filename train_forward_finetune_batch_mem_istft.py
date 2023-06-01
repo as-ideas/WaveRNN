@@ -130,7 +130,7 @@ class StringDataset(Dataset):
 
 if __name__ == '__main__':
 
-    files = list(Path('/Users/cschaefe/datasets/finetuning/bild_welt_masked_mels_eval').glob('**/*.pt'))
+    files = list(Path('/Users/cschaefe/datasets/finetuning/bild_welt_masked_mels').glob('**/*.pt'))
 
     Random(42).shuffle(files)
 
@@ -147,7 +147,7 @@ if __name__ == '__main__':
     val_dataloader = DataLoader(val_dataset, batch_size=1, num_workers=0)
 
     tts_path = '/Users/cschaefe/stream_tts_models/bild_welt_masked_welt/model.pt'
-    voc_path = '/Users/cschaefe/stream_tts_models/melgan_welt_istft/model.pt'
+    voc_path = '/Users/cschaefe/stream_tts_models/melgan_welt_hifi_istft/model.pt'
     sw = SummaryWriter('checkpoints/logs_finetune_batched_istft')
     save_path = 'checkpoints/finetuning/forward_taco_finebatch_istft'
 
@@ -189,7 +189,7 @@ if __name__ == '__main__':
                                                   pitch_factor=pitch_factor)
     melgan = Generator(80)
     voc_checkpoint = torch.load(voc_path, map_location=torch.device('cpu'))
-    melgan.load_state_dict(voc_checkpoint['g_model'])
+    melgan.load_state_dict(voc_checkpoint['model_g'])
     melgan = melgan.to(device)
     melgan.eval()
 
