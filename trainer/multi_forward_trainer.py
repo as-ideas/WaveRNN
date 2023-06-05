@@ -1,5 +1,5 @@
 import time
-from typing import Dict, Any, Union
+from typing import Dict, Any, Union, Tuple
 
 import numpy as np
 import torch
@@ -8,7 +8,7 @@ from torch.optim import Adam
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-
+from distutils.version import LooseVersion
 from discriminator import MultiScaleDiscriminator
 from melgan import Generator
 from models.multi_fast_pitch import MultiFastPitch
@@ -22,6 +22,112 @@ from utils.dsp import DSP
 from utils.files import parse_schedule, unpickle_binary
 from utils.paths import Paths
 
+
+import tqdm
+from librosa.filters import mel as librosa_mel_fn
+import librosa
+import torch
+import numpy as np
+from librosa.util import normalize
+
+from torch.utils.data import Dataset, DataLoader
+
+
+def dynamic_range_compression(x, C=1, clip_val=1e-5):
+    return np.log(np.clip(x, a_min=clip_val, a_max=None) * C)
+
+
+def dynamic_range_decompression(x, C=1):
+    return np.exp(x) / C
+
+
+def dynamic_range_compression_torch(x, C=1, clip_val=1e-5):
+    return torch.log(torch.clamp(x, min=clip_val) * C)
+
+
+def dynamic_range_decompression_torch(x, C=1):
+    return torch.exp(x) / C
+
+
+def spectral_normalize_torch(magnitudes):
+    output = dynamic_range_compression_torch(magnitudes)
+    return output
+
+
+def spectral_de_normalize_torch(magnitudes):
+    output = dynamic_range_decompression_torch(magnitudes)
+    return output
+
+
+mel_basis = {}
+hann_window = {}
+
+
+def mel_spectrogram(y, n_fft, num_mels, sampling_rate, hop_size, win_size, fmin, fmax, center=False):
+    if torch.min(y) < -1.:
+        print('min value is ', torch.min(y))
+    if torch.max(y) > 1.:
+        print('max value is ', torch.max(y))
+
+    global mel_basis, hann_window
+    if fmax not in mel_basis:
+        mel = librosa_mel_fn(sampling_rate, n_fft, num_mels, fmin, fmax)
+        mel_basis[str(fmax)+'_'+str(y.device)] = torch.from_numpy(mel).float().to(y.device)
+        hann_window[str(y.device)] = torch.hann_window(win_size).to(y.device)
+
+    y = torch.nn.functional.pad(y.unsqueeze(1), (int((n_fft-hop_size)/2), int((n_fft-hop_size)/2)), mode='reflect')
+    y = y.squeeze(1)
+
+    spec = torch.stft(y, n_fft, hop_length=hop_size, win_length=win_size, window=hann_window[str(y.device)],
+                      center=center, pad_mode='reflect', normalized=False, onesided=True)
+
+    spec = torch.sqrt(spec.pow(2).sum(-1)+(1e-9))
+
+    spec = torch.matmul(mel_basis[str(fmax)+'_'+str(y.device)], spec)
+    spec = spectral_normalize_torch(spec)
+
+    return spec
+
+
+is_pytorch_17plus = LooseVersion(torch.__version__) >= LooseVersion("1.7")
+
+def stft(x: torch.Tensor,
+         n_fft: int,
+         hop_length: int,
+         win_length: int) -> torch.Tensor:
+    window = torch.hann_window(win_length, device=x.device)
+    if is_pytorch_17plus:
+        x_stft = torch.stft(
+            input=x, n_fft=n_fft, hop_length=hop_length,
+            win_length=win_length, window=window, return_complex=False)
+    else:
+        x_stft = torch.stft(
+            input=x, n_fft=n_fft, hop_length=hop_length,
+            win_length=win_length, window=window)
+
+    real = x_stft[..., 0]
+    imag = x_stft[..., 1]
+    return torch.sqrt(torch.clamp(real ** 2 + imag ** 2, min=1e-7)).transpose(2, 1)
+
+
+
+class MultiResStftLoss(torch.nn.Module):
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.n_ffts = [1024, 2048, 512]
+        self.hop_sizes = [120, 240, 50]
+        self.win_lengths = [600, 1200, 240]
+
+    def forward(self, x: torch.Tensor, y: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        norm_loss = 0.
+        spec_loss = 0.
+        for n_fft, hop_length, win_length in zip(self.n_ffts, self.hop_sizes, self.win_lengths):
+            x_stft = stft(x=x, n_fft=n_fft, hop_length=hop_length, win_length=win_length)
+            y_stft = stft(x=y, n_fft=n_fft, hop_length=hop_length, win_length=win_length)
+            norm_loss += F.l1_loss(torch.log(x_stft), torch.log(y_stft))
+            spec_loss += torch.norm(y_stft - x_stft, p="fro") / torch.norm(y_stft, p="fro")
+        return norm_loss / len(self.n_ffts), spec_loss / len(self.n_ffts)
 
 class MultiForwardTrainer:
 
@@ -75,7 +181,7 @@ class MultiForwardTrainer:
         averages = {'mel_loss': Averager(), 'dur_loss': Averager(), 'step_duration': Averager()}
         device = next(model.parameters()).device  # use same device as model parameters
 
-
+        multires_stft_loss = MultiResStftLoss().to(device)
         g_model = Generator(80).to(device)
         d_model = MultiScaleDiscriminator().to(device)
 
@@ -83,7 +189,7 @@ class MultiForwardTrainer:
         voc_checkpoint = torch.load(voc_path, map_location=torch.device('cpu'))
         g_model.load_state_dict(voc_checkpoint['model_g'])
         d_model.load_state_dict(voc_checkpoint['model_d'])
-        g_optim = Adam(g_model.parameters(), lr=1e-4,  betas=(0.5, 0.9))
+        #g_optim = Adam(g_model.parameters(), lr=1e-4,  betas=(0.5, 0.9))
         d_optim = Adam(d_model.parameters(), lr=1e-4,  betas=(0.5, 0.9))
         d_optim.load_state_dict(voc_checkpoint['optim_d'])
 
@@ -114,45 +220,46 @@ class MultiForwardTrainer:
                     mel_batch[b, :, :] = pred['mel_post'][b, :, mel_start[b]:mel_end[b]]
 
                 wav_fake = g_model(mel_batch)
-                wav_real = batch['wav'].unsqueeze(1)
 
-                d_loss = 0.0
-                g_loss = 0.0
-                d_fake = d_model(wav_fake.detach())
-                d_real = d_model(wav_real)
-                for (_, score_fake), (_, score_real) in zip(d_fake, d_real):
-                    d_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
-                    d_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
-                d_optim.zero_grad()
-                d_loss.backward()
-                d_optim.step()
+                #d_loss = 0.0
+                #g_loss = 0.0
+                #d_fake = d_model(wav_fake.detach())
+                #d_real = d_model(wav_real)
+                #for (_, score_fake), (_, score_real) in zip(d_fake, d_real):
+                #    d_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
+                #    d_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
+                #d_optim.zero_grad()
+                #d_loss.backward()
+                #d_optim.step()
 
                 # generator
-                d_fake = d_model(wav_fake)
-                for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
-                    g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
-                    for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
-                        g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
+                #d_fake = d_model(wav_fake)
+                #for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
+                #    g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
+                #    for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
+                #        g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
                 #print('g_loss', g_loss)
+
+
+                norm, spec = multires_stft_loss(wav_fake.squeeze(1), batch['wav'])
 
                 loss = m1_loss + m2_loss \
                        + self.train_cfg['dur_loss_factor'] * dur_loss \
                        + self.train_cfg['pitch_loss_factor'] * pitch_loss \
                        + self.train_cfg['energy_loss_factor'] * energy_loss \
                        + self.train_cfg['pitch_cond_loss_factor'] * pitch_cond_loss \
-                       + g_loss
+                       + norm + spec
 
+                #print(norm, spec)
                 pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
                 pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()
 
                 optimizer.zero_grad()
-                g_optim.zero_grad()
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(),
                                                self.train_cfg['clip_grad_norm'])
                 optimizer.step()
-                g_optim.step()
 
                 averages['mel_loss'].add(m1_loss.item() + m2_loss.item())
                 averages['dur_loss'].add(dur_loss.item())
@@ -174,8 +281,7 @@ class MultiForwardTrainer:
                 if step % self.train_cfg['plot_every'] == 0:
                     self.generate_plots(model, session, g_model)
 
-                self.writer.add_scalar('g_loss/train', g_loss, model.get_step())
-                self.writer.add_scalar('d_loss/train', d_loss, model.get_step())
+                self.writer.add_scalar('stft_loss/train', norm + spec, model.get_step())
                 self.writer.add_scalar('Mel_Loss/train', m1_loss + m2_loss, model.get_step())
                 self.writer.add_scalar('Pitch_Loss/train', pitch_loss, model.get_step())
                 self.writer.add_scalar('Energy_Loss/train', energy_loss, model.get_step())
