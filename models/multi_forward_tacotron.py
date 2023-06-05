@@ -312,6 +312,7 @@ class MultiForwardTacotron(nn.Module):
         x = x + energy_proj * self.energy_strength
 
         x = self.lr(x, dur_hat)
+        pre_out = x
 
         x, _ = self.lstm(x)
 
@@ -324,7 +325,7 @@ class MultiForwardTacotron(nn.Module):
 
         return {'mel': x, 'mel_post': x_post, 'dur': dur_hat,
                 'pitch': pitch_hat, 'energy': energy_hat,
-                'pitch_cond': pitch_cond_hat.unsqueeze(1)}
+                'pitch_cond': pitch_cond_hat.unsqueeze(1), 'pre_out': pre_out}
 
     def _pad(self, x: torch.Tensor, max_len: int) -> torch.Tensor:
         x = x[:, :, :max_len]

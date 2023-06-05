@@ -203,7 +203,6 @@ class StringDataset(Dataset):
 if __name__ == '__main__':
 
     tts_path = '/Users/cschaefe/stream_tts_models/bild_welt_masked_welt/model.pt'
-    voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
     speaker = 'welt'
     df = pd.read_csv('/Users/cschaefe/datasets/finetuning/metadata_processed.tsv', sep='\t', encoding='utf-8')
 
@@ -233,13 +232,9 @@ if __name__ == '__main__':
                                                   speed_factor=speed_factor,
                                                   pitch_factor=pitch_factor)
 
-    melgan = Generator(80)
-    voc_checkpoint = torch.load(voc_path, map_location=torch.device('cpu'))
-    melgan.load_state_dict(voc_checkpoint['model_g'])
-    melgan = melgan.to(device)
     model = model.to(device)
     model_base.eval()
-    melgan.eval()
+    model_base.postnet.train()
 
     print(f'\nInitialized tts model: {model}\n')
 
@@ -259,23 +254,9 @@ if __name__ == '__main__':
         batch = batch.to(device)
         with torch.no_grad():
             out_base = model_base.generate(batch, checkpoint['speaker_embeddings'][speaker].to(device), series_transformer=series_transformer)
-            audio = melgan(out_base['mel_post'])
-            audio = audio.squeeze(1)
-            audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
-                                        sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
-                                        win_size=1024)
-            diff = (torch.exp(audio_mel) - torch.exp(out_base['mel_post'])) ** 2
-            diff = diff.mean(1)
-            diff[diff < 0.005] = 0
-
-            ind = int(torch.argmax(diff))
-            val = float(diff[0, ind])
-
-            if val > 0:
-                left = max(0, ind-32)
-                right = min(left + 64, out_base['mel_post'].size(-1))
-                piece = out_base['mel_post'][:, :, left:right]
-                score = 100 * val
-                torch.save({'mel_post': piece}, f'/Users/cschaefe/datasets/finetuning/bild_welt_masked_mels/{index}_{score:#.4}.pt')
-                index += 1
+            torch.save({'mel_post': out_base['mel_post'],
+                        'mel': out_base['mel'],
+                        'pre_out': out_base['pre_out'],
+                        }, f'/Users/cschaefe/datasets/finetuning/bild_welt_masked_pre_mels/{index}_.pt')
+        index += 1
 
