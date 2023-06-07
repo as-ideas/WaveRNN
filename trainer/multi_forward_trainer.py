@@ -4,6 +4,7 @@ from typing import Dict, Any, Union, Tuple
 import numpy as np
 import torch
 import torch.nn.functional as F
+from scipy.signal import get_window
 from torch.optim import Adam
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
@@ -110,6 +111,33 @@ def stft(x: torch.Tensor,
     return torch.sqrt(torch.clamp(real ** 2 + imag ** 2, min=1e-7)).transpose(2, 1)
 
 
+class TorchSTFT(torch.nn.Module):
+    def __init__(self, filter_length=1024, hop_length=256, win_length=1024, window='hann'):
+        super().__init__()
+        self.filter_length = filter_length
+        self.hop_length = hop_length
+        self.win_length = win_length
+        self.window = torch.from_numpy(get_window(window, win_length, fftbins=True).astype(np.float32))
+
+    def transform(self, input_data):
+        forward_transform = torch.stft(
+            input_data,
+            self.filter_length, self.hop_length, self.win_length, window=self.window.to(input_data.device),
+            return_complex=True)
+
+        return torch.abs(forward_transform), torch.angle(forward_transform)
+
+    def inverse(self, magnitude, phase):
+        inverse_transform = torch.istft(
+            magnitude * torch.exp(phase * 1j),
+            self.filter_length, self.hop_length, self.win_length, window=self.window.to(magnitude.device))
+
+        return inverse_transform.unsqueeze(-2)  # unsqueeze to stay consistent with conv_transpose1d implementation
+
+    def forward(self, input_data):
+        self.magnitude, self.phase = self.transform(input_data)
+        reconstruction = self.inverse(self.magnitude, self.phase)
+        return
 
 class MultiResStftLoss(torch.nn.Module):
 
@@ -185,13 +213,15 @@ class MultiForwardTrainer:
         g_model = Generator(80).to(device)
         d_model = MultiScaleDiscriminator().to(device)
 
-        voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
+        voc_path = '/Users/cschaefe/stream_tts_models/melgan_welt_hifi_istft/model.pt'
         voc_checkpoint = torch.load(voc_path, map_location=torch.device('cpu'))
         g_model.load_state_dict(voc_checkpoint['model_g'])
         d_model.load_state_dict(voc_checkpoint['model_d'])
-        #g_optim = Adam(g_model.parameters(), lr=1e-4,  betas=(0.5, 0.9))
+        g_optim = Adam(g_model.parameters(), lr=1e-4,  betas=(0.5, 0.9))
         d_optim = Adam(d_model.parameters(), lr=1e-4,  betas=(0.5, 0.9))
         d_optim.load_state_dict(voc_checkpoint['optim_d'])
+
+        torch_stft = TorchSTFT(filter_length=16, hop_length=4, win_length=16).to(device)
 
         for e in range(1, epochs + 1):
             for i, batch in enumerate(session.train_set, 1):
@@ -219,28 +249,29 @@ class MultiForwardTrainer:
                 for b in range(mel_start.size(0)):
                     mel_batch[b, :, :] = pred['mel_post'][b, :, mel_start[b]:mel_end[b]]
 
-                wav_fake = g_model(mel_batch)
+                a, b = g_model(mel_batch)
+                wav_fake = torch_stft.inverse(a, b)
+                wav_real = batch['wav'].unsqueeze(1)
 
-                #d_loss = 0.0
-                #g_loss = 0.0
-                #d_fake = d_model(wav_fake.detach())
-                #d_real = d_model(wav_real)
-                #for (_, score_fake), (_, score_real) in zip(d_fake, d_real):
-                #    d_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
-                #    d_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
-                #d_optim.zero_grad()
-                #d_loss.backward()
-                #d_optim.step()
+                d_loss = 0.0
+                g_loss = 0.0
+                d_fake = d_model(wav_fake.detach())
+                d_real = d_model(wav_real)
+                for (_, score_fake), (_, score_real) in zip(d_fake, d_real):
+                    d_loss += torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
+                    d_loss += torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
+                d_optim.zero_grad()
+                d_loss.backward()
+                d_optim.step()
 
                 # generator
-                #d_fake = d_model(wav_fake)
-                #for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
-                #    g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
-                #    for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
-                #        g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
+                d_fake = d_model(wav_fake)
+                for (feat_fake, score_fake), (feat_real, _) in zip(d_fake, d_real):
+                    g_loss += torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
+                    for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
+                        g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
-                #print('g_loss', g_loss)
-
+                print('g_loss', g_loss)
 
                 norm, spec = multires_stft_loss(wav_fake.squeeze(1), batch['wav'])
 
@@ -255,11 +286,15 @@ class MultiForwardTrainer:
                 pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
                 pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()
 
-                optimizer.zero_grad()
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(model.parameters(),
-                                               self.train_cfg['clip_grad_norm'])
-                optimizer.step()
+                #optimizer.zero_grad()
+                #loss.backward()
+                #torch.nn.utils.clip_grad_norm_(model.parameters(),
+                                               #self.train_cfg['clip_grad_norm'])
+                #optimizer.step()
+
+                g_optim.zero_grad()
+                g_loss.backward()
+                g_optim.step()
 
                 averages['mel_loss'].add(m1_loss.item() + m2_loss.item())
                 averages['dur_loss'].add(dur_loss.item())
