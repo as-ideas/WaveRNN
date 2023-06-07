@@ -314,7 +314,7 @@ class MultiForwardTrainer:
                     torch.save({'model_g': g_model.state_dict()}, self.paths.forward_checkpoints / f'melgan_step{k}.k.pt')
 
                 if step % self.train_cfg['plot_every'] == 0:
-                    self.generate_plots(model, session, g_model)
+                    self.generate_plots(model, session, g_model, torch_stft)
 
                 self.writer.add_scalar('stft_loss/train', norm + spec, model.get_step())
                 self.writer.add_scalar('Mel_Loss/train', m1_loss + m2_loss, model.get_step())
@@ -372,7 +372,7 @@ class MultiForwardTrainer:
         return val_losses
 
     @ignore_exception
-    def generate_plots(self, model: Union[MultiForwardTacotron, MultiFastPitch], session: TTSSession, model_g) -> None:
+    def generate_plots(self, model: Union[MultiForwardTacotron, MultiFastPitch], session: TTSSession, model_g, torch_stft) -> None:
         model.eval()
         device = next(model.parameters()).device
         batch = session.val_sample
@@ -424,7 +424,8 @@ class MultiForwardTrainer:
             gen = model.generate(batch['x'][0:1, :batch['x_len'][0]], speaker_emb=speaker_emb)
             m2_hat = np_now(gen['mel_post'].squeeze())
 
-            wav_hat = model_g.inference(gen['mel_post'])
+            a, b = model_g.inference(gen['mel_post'])
+            a, b = torch_stft.inverse(a, b)
 
             m2_hat_fig = plot_mel(m2_hat)
 
