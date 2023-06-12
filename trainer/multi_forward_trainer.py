@@ -217,8 +217,8 @@ class MultiForwardTrainer:
         voc_checkpoint = torch.load(voc_path, map_location=torch.device('cpu'))
         g_model.load_state_dict(voc_checkpoint['model_g'])
         d_model.load_state_dict(voc_checkpoint['model_d'])
-        g_optim = Adam(g_model.parameters(), lr=1e-4,  betas=(0.5, 0.9))
-        d_optim = Adam(d_model.parameters(), lr=1e-4,  betas=(0.5, 0.9))
+        g_optim = Adam(g_model.parameters(), lr=1e-5,  betas=(0.5, 0.9))
+        d_optim = Adam(d_model.parameters(), lr=1e-5,  betas=(0.5, 0.9))
         d_optim.load_state_dict(voc_checkpoint['optim_d'])
 
         torch_stft = TorchSTFT(filter_length=16, hop_length=4, win_length=16).to(device)
@@ -425,7 +425,7 @@ class MultiForwardTrainer:
             m2_hat = np_now(gen['mel_post'].squeeze())
 
             a, b = model_g.inference(gen['mel_post'])
-            a, b = torch_stft.inverse(a, b)
+            wav_hat = torch_stft.inverse(a, b)
 
             m2_hat_fig = plot_mel(m2_hat)
 
