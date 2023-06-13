@@ -15,6 +15,35 @@ from scipy.signal import get_window
 
 window = torch.from_numpy(get_window('hann', 16, fftbins=True).astype(np.float32))
 
+class TorchSTFT(torch.nn.Module):
+    def __init__(self, filter_length=1024, hop_length=256, win_length=1024, window='hann'):
+        super().__init__()
+        self.filter_length = filter_length
+        self.hop_length = hop_length
+        self.win_length = win_length
+        self.window = torch.from_numpy(get_window(window, win_length, fftbins=True).astype(np.float32))
+
+    def transform(self, input_data):
+        forward_transform = torch.stft(
+            input_data,
+            self.filter_length, self.hop_length, self.win_length, window=self.window.to(input_data.device),
+            return_complex=True)
+
+        return torch.abs(forward_transform), torch.angle(forward_transform)
+
+    def inverse(self, magnitude, phase):
+        inverse_transform = torch.istft(
+            magnitude * torch.exp(phase * 1j),
+            self.filter_length, self.hop_length, self.win_length, window=self.window.to(magnitude.device))
+
+        return inverse_transform.unsqueeze(-2)  # unsqueeze to stay consistent with conv_transpose1d implementation
+
+    def forward(self, input_data):
+        self.magnitude, self.phase = self.transform(input_data)
+        reconstruction = self.inverse(self.magnitude, self.phase)
+        return
+
+torch_stft = TorchSTFT(filter_length=16, hop_length=4, win_length=16).to(device)
 
 def get_padding(kernel_size, dilation=1):
     return int((kernel_size*dilation - dilation)/2)
@@ -105,7 +134,7 @@ class Generator(nn.Module):
         x = self.conv_post(x)
         spec = torch.exp(x[:, :self.post_n_fft // 2 + 1, :])
         phase = torch.sin(x[:, self.post_n_fft // 2 + 1:, :])
-        return spec, phase
+        return torch_stft.inverse(spec, phase)
 
     def eval(self, inference=False):
         super(Generator, self).eval()
@@ -128,7 +157,6 @@ class Generator(nn.Module):
         with torch.no_grad():
             pad = torch.full((1, 80, pad_steps), -11.5129).to(mel.device)
             mel = torch.cat((mel, pad), dim=2)
-            s, p = self.forward(mel)
-        return s, p
+            return self.forward(mel)
 
 
