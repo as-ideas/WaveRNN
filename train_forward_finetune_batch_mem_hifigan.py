@@ -162,7 +162,7 @@ if __name__ == '__main__':
     plot_dataloader = DataLoader(plot_dataset, batch_size=1, collate_fn=collate_fn,
                                  sampler=None)
 
-    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    device =  torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     print('Using device:', device)
 
     # Instantiate Forward TTS Model
@@ -191,7 +191,6 @@ if __name__ == '__main__':
     voc_checkpoint = torch.load(voc_path, map_location=torch.device('cpu'))
     melgan.load_state_dict(voc_checkpoint['model_g'])
     melgan = melgan.to(device)
-    melgan.eval()
 
     step = 0
 
