@@ -201,6 +201,7 @@ if __name__ == '__main__':
             train_batch = train_batch.to(device)
             if step % 10 == 0:
                 model.eval()
+                model.postnet.rnn.train()
                 val_loss_exp = 0
                 val_loss_log = 0
 
@@ -251,7 +252,8 @@ if __name__ == '__main__':
             model.postnet.eval()
             model.postnet.rnn.train()
             model.post_proj.train()
-            base = model_base.generate(train_batch, checkpoint['speaker_embeddings']['welt'].to(device), series_transformer=series_transformer)
+            with torch.no_grad():
+                base = model_base.generate(train_batch, checkpoint['speaker_embeddings']['welt'].to(device), series_transformer=series_transformer)
             mel = base['mel']
             mel_post = base['mel_post']
             ada = model.postnet(mel)
