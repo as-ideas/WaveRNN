@@ -196,7 +196,8 @@ if __name__ == '__main__':
     step = 0
 
     for epoch in range(1000):
-        for train_batch in dataloader:
+        pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
+        for train_batch in pbar:
 
             if step % 10 == 0:
                 model.eval()
@@ -265,7 +266,8 @@ if __name__ == '__main__':
 
             loss_exp = torch.norm(torch.exp(audio_mel) - torch.exp(mel_post), p="fro") / torch.norm(torch.exp(mel_post), p="fro") * 10.
             loss_log = F.l1_loss(ada, mel_post)
-
+            pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
+                                      f'| loss exp {loss_exp:#.4} | loss log: {loss_log:#.4}', refresh=True)
             loss_tot = (loss_exp + loss_log)
             optimizer.zero_grad()
             loss_tot.backward()
