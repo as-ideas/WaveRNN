@@ -198,7 +198,7 @@ if __name__ == '__main__':
     for epoch in range(1000):
         pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
         for i, train_batch in pbar:
-
+            train_batch = train_batch.to(device)
             if step % 10 == 0:
                 model.eval()
                 val_loss_exp = 0
@@ -251,7 +251,6 @@ if __name__ == '__main__':
             model.postnet.eval()
             model.postnet.rnn.train()
             model.post_proj.train()
-
             base = model_base.generate(train_batch, checkpoint['speaker_embeddings']['welt'].to(device), series_transformer=series_transformer)
             mel = base['mel']
             mel_post = base['mel_post']
