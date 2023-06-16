@@ -197,7 +197,7 @@ if __name__ == '__main__':
 
     for epoch in range(1000):
         pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
-        for train_batch in pbar:
+        for i, train_batch in pbar:
 
             if step % 10 == 0:
                 model.eval()
