@@ -135,16 +135,18 @@ class Adapter(torch.nn.Module):
 
     def __init__(self):
         super(Adapter, self).__init__()
-        self.convs = nn.ModuleList([
-            nn.utils.weight_norm(torch.nn.Conv1d(80, 256, 5, padding=2)),
-            nn.utils.weight_norm(torch.nn.Conv1d(256, 256, 5, padding=2)),
-            nn.utils.weight_norm(torch.nn.Conv1d(256, 80, 5, padding=2))
-        ])
+
+        self.rnn = nn.GRU(80, 256, bidirectional=True)
+        self.lin = nn.Linear(512, 80)
 
     def forward(self, x):
-        for conv in self.convs:
-            x_r = conv(F.leaky_relu(x, negative_slope=0.2))
-            x = x + x_r
+        x_res = x
+        x = x.transpose(1, 2)
+        x, _ = self.rnn(x)
+        x = self.lin(x)
+        x = x.transpose(1, 2)
+        x = x_res + x
+        return x
 
 
 if __name__ == '__main__':
@@ -240,11 +242,9 @@ if __name__ == '__main__':
 
                 sw.add_scalar('mel_loss_exp/val', val_loss_exp / len(val_dataloader), global_step=step)
                 sw.add_scalar('mel_loss_log/val', val_loss_log / len(val_dataloader), global_step=step)
-                checkpoint['model'] = model.state_dict()
+                checkpoint['adapter'] = adapter.state_dict()
                 k_steps = (step // 10000) * 10
                 torch.save(checkpoint, f'{save_path}_{k_steps}k.pt')
-
-
 
                 for i, batch in enumerate(plot_dataloader):
                     batch = batch.to(device)
