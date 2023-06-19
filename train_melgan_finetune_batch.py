@@ -251,7 +251,12 @@ if __name__ == '__main__':
             audio = audio.squeeze(1)
 
             with torch.no_grad():
-                audio_real = melgan_base(batch['mel_post'])
+                enc_base = melgan_base.generator._modules['1'](batch['mel_post'])
+            enc = melgan.generator._modules['1'](batch['mel_post'])
+
+            loss_log = F.l1_loss(enc, enc_base)
+
+
 
             audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
                                         sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
@@ -267,6 +272,7 @@ if __name__ == '__main__':
             step += 1
 
             sw.add_scalar('mel_exp_loss/train', loss_exp, global_step=step)
+            sw.add_scalar('mel_log_loss/train', loss_log, global_step=step)
 
-            print(step, loss_exp)
+            print(step, loss_exp, loss_log)
 
