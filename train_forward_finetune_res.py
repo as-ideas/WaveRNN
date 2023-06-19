@@ -6,17 +6,18 @@ from pathlib import Path
 from random import Random
 from typing import Union
 
-import pandas as pd
 import ruamel.yaml
 import torch.nn.functional as F
 # Define the dataset
 import tqdm
 from librosa.filters import mel as librosa_mel_fn
 from torch import optim
+from torch.nn import Sequential
+from torch.optim import Adam
 from torch.utils.data import Dataset
 from torch.utils.data.dataloader import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-
+import torch.nn as nn
 from melgan import Generator
 from models.forward_tacotron import ForwardSeriesTransformer
 from models.multi_forward_tacotron import MultiForwardTacotron
@@ -129,27 +130,47 @@ class StringDataset(Dataset):
 
 
 
+
+class Adapter(torch.nn.Module):
+
+    def __init__(self):
+        super(Adapter, self).__init__()
+        self.convs = nn.ModuleList([
+            nn.utils.weight_norm(torch.nn.Conv1d(80, 256, 5, padding=2)),
+            nn.utils.weight_norm(torch.nn.Conv1d(256, 256, 5, padding=2)),
+            nn.utils.weight_norm(torch.nn.Conv1d(256, 80, 5, padding=2))
+        ])
+
+    def forward(self, x):
+        for conv in self.convs:
+            x_r = conv(F.leaky_relu(x, negative_slope=0.2))
+            x = x + x_r
+
+
 if __name__ == '__main__':
 
+    files = list(Path('/Users/cschaefe/datasets/finetuning/bild_welt_masked_pre_mels').glob('**/*.pt'))
 
-    #df = pd.read_csv('/Users/cschaefe/datasets/nlp/welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
-    df = pd.read_csv('/Users/cschaefe/datasets/nlp/welt_articles_phonemes.tsv', sep='\t', encoding='utf-8')
-    df.dropna(inplace=True)
-    strings = df['phonemes']
-    strings = [s for s in strings if len(s) > 10 and len(s) < 100]
-    random = Random(42)
-    random.shuffle(strings)
+    Random(42).shuffle(files)
+
+    n_val = 2
+    val_files = files[:n_val]
+    train_files = files[n_val:]
 
     mel_segment_len = 128
     mel_segment_len_2 = 64
 
-    tts_path = '/Users/cschaefe/stream_tts_models/bild_welt_masked_bild/model.pt'
-    voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/bild_voice/voc_model/model.pt'
-    sw = SummaryWriter('checkpoints/logs_finetune_batched_mel_bild')
-    save_path = 'checkpoints/finetuning/forward_taco_finebatch_mel_bild'
+    dataset = BaseDataset(train_files, mel_segment_len=mel_segment_len)
+    dataloader = DataLoader(dataset, batch_size=8, num_workers=0)
+    val_dataset = BaseDataset(val_files, mel_segment_len=None)
+    val_dataloader = DataLoader(val_dataset, batch_size=1, num_workers=0)
 
-    val_strings = ['anaː maʁiːa myːə: ɪç fɛɐʃteːə apzoluːt ʊnt yːbɐhaʊpt ɡaːɐ nɪçt, vaʁʊm əs diːzən dʒɛndɐ peɪ ɡæp nɔx ɡiːpt, nɪçt nuːɐ ɪn ʊnzəʁəm bəʁuːf.',
-                   'ɡant͡s ɔɪʁoːpa?',
+    tts_path = '/Users/cschaefe/stream_tts_models/bild_welt_masked_welt/model.pt'
+    voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
+    sw = SummaryWriter('checkpoints/logs_finetune_batched_ada')
+    save_path = 'checkpoints/finetuning/forward_taco_finebatch'
+
+    val_strings = ['ɡant͡s ɔɪʁoːpa?',
                    'çiːna bəkɛmp͡ft diː koʁoːna-pandemiː fɔn bəɡɪn an mɪt aɪnəm ʊltʁa-ʃtʁɛŋən nəʊ-kovɪt-ʁeʒiːm.',
                    'najaː, man t͡sɛɐdɛŋkt diː zaxn̩ zoː zeːɐ.',
                    'naɪn, fʁaʊ lampʁɛçt, diː meːdiən zɪnt nɪçt ʃʊlt.',
@@ -159,9 +180,6 @@ if __name__ == '__main__':
     plot_dataset = StringDataset(val_strings)
     plot_dataloader = DataLoader(plot_dataset, batch_size=1, collate_fn=collate_fn,
                                  sampler=None)
-    dataset = StringDataset(val_strings)
-    dataloader = DataLoader(dataset, batch_size=1, collate_fn=collate_fn,
-                            sampler=None)
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     print('Using device:', device)
@@ -172,7 +190,6 @@ if __name__ == '__main__':
     model_base = MultiForwardTacotron.from_checkpoint(tts_path).to(device)
     model_base.eval()
     model.eval()
-    optimizer = optim.Adam(list(model.postnet.rnn.parameters()) + list(model.post_proj.parameters()), lr=5e-5)
     speed_factor, pitch_factor = 1., 1.
     phoneme_min_duration = {}
     if (Path(tts_path).parent/'config.yaml').exists():
@@ -192,33 +209,55 @@ if __name__ == '__main__':
     melgan.load_state_dict(voc_checkpoint['model_g'])
     melgan = melgan.to(device)
     melgan.eval()
-
+    adapter = Adapter().to(device)
+    adapter.train()
+    optimizer = Adam(adapter.parameters(), lr=5e-5)
     step = 0
 
     for epoch in range(1000):
-        pbar = tqdm.tqdm(enumerate(dataloader, 1), total=len(dataloader))
-        for i, train_batch in pbar:
-            train_batch = train_batch.to(device)
+        for train_batch in dataloader:
+
             if step % 100 == 0:
                 model.eval()
-                model.postnet.rnn.train()
                 val_loss_exp = 0
                 val_loss_log = 0
+
+                for i, batch in tqdm.tqdm(enumerate(val_dataloader), total=len(val_dataloader)):
+                    with torch.no_grad():
+                        batch = {'mel': batch['mel'].to(device), 'mel_post': batch['mel_post'].to(device)}
+                        ada = adapter(batch['mel_post'])
+                        audio = melgan(ada)
+                        audio = audio.squeeze(1)
+
+                        audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
+                                                    sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
+                                                    win_size=1024)
+
+                        loss_exp = torch.norm(torch.exp(audio_mel) - torch.exp(batch['mel_post']), p="fro") / torch.norm(torch.exp(batch['mel_post']), p="fro") * 10.
+                        loss_log = F.l1_loss(ada, batch['mel_post'])
+                        val_loss_exp += loss_exp.item()
+                        val_loss_log += loss_log.item()
+
+                sw.add_scalar('mel_loss_exp/val', val_loss_exp / len(val_dataloader), global_step=step)
+                sw.add_scalar('mel_loss_log/val', val_loss_log / len(val_dataloader), global_step=step)
+                checkpoint['model'] = model.state_dict()
+                k_steps = (step // 10000) * 10
+                torch.save(checkpoint, f'{save_path}_{k_steps}k.pt')
+
+
 
                 for i, batch in enumerate(plot_dataloader):
                     batch = batch.to(device)
                     with torch.no_grad():
-                        base = model_base.generate(batch, checkpoint['speaker_embeddings']['bild'].to(device), series_transformer=series_transformer)
-                        mel = base['mel']
-                        mel_post = base['mel_post']
-                        ada = model.postnet(mel)
-                        ada = model.post_proj(ada).transpose(1, 2)
+                        ada_base = model.generate(batch, checkpoint['speaker_embeddings']['welt'].to(device), series_transformer=series_transformer)['mel_post']
+                        ada = adapter(ada_base)
+                        mel_base = model_base.generate(batch, checkpoint['speaker_embeddings']['welt'].to(device), series_transformer=series_transformer)['mel_post']
                         audio = melgan(ada)
                         audio = audio.squeeze(1)
                         audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
                                                     sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                                     win_size=1024)
-                        loss_time = (torch.exp(audio_mel) - torch.exp(mel_post)) ** 2
+                        loss_time = (torch.exp(audio_mel) - torch.exp(mel_base)) ** 2
                         loss_time = 10 * loss_time
                         loss_time = loss_time.mean(dim=1)[0]
                         time_fig = plot_pitch(loss_time.detach().cpu().numpy())
@@ -238,26 +277,15 @@ if __name__ == '__main__':
                         sw.add_figure(f'diff_tts_{i}', mel_diff_plot, global_step=step)
                         sw.add_figure(f'diff_exp_tts_{i}', mel_exp_diff_plot, global_step=step)
 
-                        loss_exp = torch.norm(torch.exp(audio_mel) - torch.exp(mel_post), p="fro") / torch.norm(torch.exp(mel_post), p="fro") * 10.
-                        loss_log = F.l1_loss(ada, mel_post)
-                        val_loss_exp += loss_exp.item()
-                        val_loss_log += loss_log.item()
+            batch = {'mel': train_batch['mel'].to(device), 'mel_post': train_batch['mel_post'].to(device)}
+            ada = adapter(batch['mel_post'])
 
-                sw.add_scalar('mel_loss_exp/val', val_loss_exp / len(plot_dataloader), global_step=step)
-                sw.add_scalar('mel_loss_log/val', val_loss_log / len(plot_dataloader), global_step=step)
-                checkpoint['model'] = model.state_dict()
-                k_steps = (step // 10000) * 10
-                torch.save(checkpoint, f'{save_path}_{k_steps}k.pt')
+            max_mel_start = ada.size(-1) - mel_segment_len_2
+            mel_start = random.randint(0, max_mel_start)
+            mel_end = mel_start + mel_segment_len_2
 
-            model.postnet.eval()
-            model.postnet.rnn.train()
-            model.post_proj.train()
-            with torch.no_grad():
-                base = model_base.generate(train_batch, checkpoint['speaker_embeddings']['bild'].to(device), series_transformer=series_transformer)
-            mel = base['mel']
-            mel_post = base['mel_post']
-            ada = model.postnet(mel)
-            ada = model.post_proj(ada).transpose(1, 2)
+            ada = ada[:, :, mel_start:mel_end]
+            batch['mel_post'] = batch['mel_post'][:, :, mel_start:mel_end]
 
             audio = melgan(ada)
             audio = audio.squeeze(1)
@@ -265,10 +293,9 @@ if __name__ == '__main__':
                                         sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                         win_size=1024)
 
-            loss_exp = torch.norm(torch.exp(audio_mel) - torch.exp(mel_post), p="fro") / torch.norm(torch.exp(mel_post), p="fro") * 10.
-            loss_log = F.l1_loss(ada, mel_post)
-            pbar.set_description(desc=f'Epoch: {epoch} | Step {step} '
-                                      f'| loss exp {loss_exp:#.4} | loss log: {loss_log:#.4}', refresh=True)
+            loss_exp = torch.norm(torch.exp(audio_mel) - torch.exp(batch['mel_post']), p="fro") / torch.norm(torch.exp(batch['mel_post']), p="fro") * 10.
+            loss_log = F.l1_loss(ada, batch['mel_post'])
+
             loss_tot = (loss_exp + loss_log)
             optimizer.zero_grad()
             loss_tot.backward()
