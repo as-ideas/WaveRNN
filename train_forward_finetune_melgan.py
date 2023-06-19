@@ -19,7 +19,6 @@ from torch.utils.tensorboard import SummaryWriter
 from melgan import Generator
 from models.forward_tacotron import ForwardSeriesTransformer
 from models.multi_forward_tacotron import MultiForwardTacotron
-from train_melgan_finetune_feat import MultiScaleDiscriminator
 from utils.display import *
 from utils.text.tokenizer import Tokenizer
 
@@ -131,7 +130,7 @@ class StringDataset(Dataset):
 
 if __name__ == '__main__':
 
-    files = list(Path('/Users/cschaefe/datasets/finetuning/bild_welt_masked_pre_mels').glob('**/*.pt'))
+    files = list(Path('/Users/cschaefe/datasets/finetuning/bild_welt_masked_mels_eval').glob('**/*.pt'))
 
     Random(42).shuffle(files)
 
@@ -139,14 +138,18 @@ if __name__ == '__main__':
     val_files = files[:n_val]
     train_files = files[n_val:]
 
-    dataset = BaseDataset(train_files)
-    dataloader = DataLoader(dataset, batch_size=16, num_workers=0)
+    mel_segment_len = 128
+    mel_segment_len_2 = 64
+
+    dataset = BaseDataset(train_files, mel_segment_len=mel_segment_len)
+    dataloader = DataLoader(dataset, batch_size=8, num_workers=0)
     val_dataset = BaseDataset(val_files, mel_segment_len=None)
     val_dataloader = DataLoader(val_dataset, batch_size=1, num_workers=0)
 
     tts_path = '/Users/cschaefe/stream_tts_models/bild_welt_masked_welt/model.pt'
     voc_path = '/Users/cschaefe/workspace/tts-synthv3/app/11111111/models/welt_voice/voc_model/model.pt'
-    sw = SummaryWriter('checkpoints/logs_melgan_finetune_batched_l1')
+    sw = SummaryWriter('checkpoints/logs_finetune_batched')
+    save_path = 'checkpoints/finetuning/forward_taco_finebatch'
 
     val_strings = ['ɡant͡s ɔɪʁoːpa?',
                    'çiːna bəkɛmp͡ft diː koʁoːna-pandemiː fɔn bəɡɪn an mɪt aɪnəm ʊltʁa-ʃtʁɛŋən nəʊ-kovɪt-ʁeʒiːm.',
@@ -165,8 +168,11 @@ if __name__ == '__main__':
     # Instantiate Forward TTS Model
     checkpoint = torch.load(tts_path, map_location=device)
     model = MultiForwardTacotron.from_checkpoint(tts_path).to(device)
+    model_base = MultiForwardTacotron.from_checkpoint(tts_path).to(device)
+    model_base.eval()
     model.eval()
     model.postnet.train()
+    optimizer = optim.Adam(list(model.postnet.parameters()) + list(model.post_proj.parameters()), lr=1e-5)
     speed_factor, pitch_factor = 1., 1.
     phoneme_min_duration = {}
     if (Path(tts_path).parent/'config.yaml').exists():
@@ -182,16 +188,10 @@ if __name__ == '__main__':
                                                   speed_factor=speed_factor,
                                                   pitch_factor=pitch_factor)
     melgan = Generator(80)
-    melgan_base = Generator(80)
     voc_checkpoint = torch.load(voc_path, map_location=torch.device('cpu'))
     melgan.load_state_dict(voc_checkpoint['model_g'])
-    melgan_base.load_state_dict(voc_checkpoint['model_g'])
     melgan = melgan.to(device)
-    melgan_base = melgan_base.to(device)
-    melgan.train()
-    melgan_base.eval()
-    melgan.generator._modules['1'].train()
-    optimizer = optim.Adam(melgan.generator._modules['1'].parameters(), lr=1e-5)
+    melgan.eval()
 
     step = 0
 
@@ -199,36 +199,48 @@ if __name__ == '__main__':
         for train_batch in dataloader:
 
             if step % 100 == 0:
-                melgan.eval()
+                model.eval()
                 val_loss_exp = 0
                 val_loss_log = 0
 
                 for i, batch in tqdm.tqdm(enumerate(val_dataloader), total=len(val_dataloader)):
                     with torch.no_grad():
                         batch = {'mel': batch['mel'].to(device), 'mel_post': batch['mel_post'].to(device)}
-                        audio = melgan(batch['mel_post'])
+                        ada = model.postnet(batch['mel'])
+                        ada = model.post_proj(ada).transpose(1, 2)
+                        audio = melgan(ada)
                         audio = audio.squeeze(1)
+
                         audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
                                                     sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                                     win_size=1024)
 
                         loss_exp = torch.norm(torch.exp(audio_mel) - torch.exp(batch['mel_post']), p="fro") / torch.norm(torch.exp(batch['mel_post']), p="fro") * 10.
+                        loss_log = F.l1_loss(ada, batch['mel_post'])
                         val_loss_exp += loss_exp.item()
+                        val_loss_log += loss_log.item()
 
                 sw.add_scalar('mel_loss_exp/val', val_loss_exp / len(val_dataloader), global_step=step)
+                sw.add_scalar('mel_loss_log/val', val_loss_log / len(val_dataloader), global_step=step)
                 checkpoint['model'] = model.state_dict()
                 k_steps = (step // 10000) * 10
-                torch.save({'model_g': melgan.state_dict()}, f'checkpoints/finetuning/melgan_finebatch_{k_steps}k.pt')
+                torch.save(checkpoint, f'{save_path}_{k_steps}k.pt')
 
                 for i, batch in enumerate(plot_dataloader):
                     batch = batch.to(device)
                     with torch.no_grad():
                         ada = model.generate(batch, checkpoint['speaker_embeddings']['welt'].to(device), series_transformer=series_transformer)['mel_post']
+                        mel_base = model_base.generate(batch, checkpoint['speaker_embeddings']['welt'].to(device), series_transformer=series_transformer)['mel_post']
                         audio = melgan(ada)
                         audio = audio.squeeze(1)
                         audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
                                                     sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                                     win_size=1024)
+                        loss_time = (torch.exp(audio_mel) - torch.exp(mel_base)) ** 2
+                        loss_time = 10 * loss_time
+                        loss_time = loss_time.mean(dim=1)[0]
+                        time_fig = plot_pitch(loss_time.detach().cpu().numpy())
+                        sw.add_figure(f'mel_loss_time_{i}/val', time_fig, global_step=step)
                         audio_inf = melgan.inference(ada)
                         mel_plot = plot_mel(audio_mel.squeeze().detach().cpu().numpy()[:100, :100])
                         mel_plot_target = plot_mel(ada.squeeze().detach().cpu().numpy()[:100, :100])
@@ -243,23 +255,30 @@ if __name__ == '__main__':
                         sw.add_figure(f'ada_tts_{i}', mel_plot_ada, global_step=step)
                         sw.add_figure(f'diff_tts_{i}', mel_diff_plot, global_step=step)
                         sw.add_figure(f'diff_exp_tts_{i}', mel_exp_diff_plot, global_step=step)
-                melgan.train()
+                model.postnet.train()
+                model.post_proj.train()
 
             batch = {'mel': train_batch['mel'].to(device), 'mel_post': train_batch['mel_post'].to(device)}
+            ada = model.postnet(batch['mel'])
+            ada = model.post_proj(ada).transpose(1, 2)
 
-            audio = melgan(batch['mel_post'])
+            max_mel_start = ada.size(-1) - mel_segment_len_2
+            mel_start = random.randint(0, max_mel_start)
+            mel_end = mel_start + mel_segment_len_2
+
+            ada = ada[:, :, mel_start:mel_end]
+            batch['mel_post'] = batch['mel_post'][:, :, mel_start:mel_end]
+
+            audio = melgan(ada)
             audio = audio.squeeze(1)
-
-            with torch.no_grad():
-                audio_real = melgan_base(batch['mel_post'])
-
             audio_mel = mel_spectrogram(audio, n_fft=1024, num_mels=80,
                                         sampling_rate=22050, hop_size=256, fmin=0, fmax=8000,
                                         win_size=1024)
 
             loss_exp = torch.norm(torch.exp(audio_mel) - torch.exp(batch['mel_post']), p="fro") / torch.norm(torch.exp(batch['mel_post']), p="fro") * 10.
+            loss_log = F.l1_loss(ada, batch['mel_post'])
 
-            loss_tot = loss_exp
+            loss_tot = (loss_exp + loss_log)
             optimizer.zero_grad()
             loss_tot.backward()
             optimizer.step()
@@ -267,6 +286,7 @@ if __name__ == '__main__':
             step += 1
 
             sw.add_scalar('mel_exp_loss/train', loss_exp, global_step=step)
+            sw.add_scalar('mel_log_loss/train', loss_log, global_step=step)
 
-            print(step, loss_exp)
+            print(step, loss_exp, loss_log)
 
