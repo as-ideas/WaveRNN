@@ -132,36 +132,25 @@ class MultiForwardTacotron(nn.Module):
         self.padding_value = padding_value
         self.embedding = nn.Embedding(num_chars, embed_dims)
         self.lr = LengthRegulator()
-        self.dur_pred = ConditionalSeriesPredictor(num_chars=num_chars,
-                                                   emb_dim=series_embed_dims,
-                                                   conv_dims=durpred_conv_dims,
-                                                   rnn_dims=durpred_rnn_dims,
-                                                   cond_emb_dims=pitch_cond_emb_dims,
-                                                   dropout=durpred_dropout)
-        self.pitch_cond_pred = SeriesPredictor(num_chars=num_chars,
-                                               emb_dim=series_embed_dims,
-                                               conv_dims=pitch_cond_conv_dims,
-                                               rnn_dims=pitch_cond_rnn_dims,
-                                               dropout=pitch_cond_dropout,
-                                               out_dim=pitch_cond_categorical_dims)
-        self.pitch_pred = ConditionalSeriesPredictor(num_chars=num_chars,
-                                                     emb_dim=series_embed_dims,
-                                                     conv_dims=pitch_conv_dims,
-                                                     rnn_dims=pitch_rnn_dims,
-                                                     cond_emb_dims=pitch_cond_emb_dims,
-                                                     dropout=pitch_dropout, )
-        self.energy_pred = SeriesPredictor(num_chars=num_chars,
-                                           emb_dim=series_embed_dims,
-                                           conv_dims=energy_conv_dims,
-                                           rnn_dims=energy_rnn_dims,
-                                           dropout=energy_dropout)
+        self.dur_pred = SeriesPredictor(num_chars=num_chars,
+                                        emb_dim=series_embed_dims,
+                                        conv_dims=durpred_conv_dims,
+                                        rnn_dims=durpred_rnn_dims,
+                                        dropout=durpred_dropout)
+        self.hub_pred = SeriesPredictor(num_chars=num_chars,
+                                        emb_dim=series_embed_dims,
+                                        conv_dims=pitch_cond_conv_dims,
+                                        rnn_dims=pitch_cond_rnn_dims,
+                                        dropout=pitch_cond_dropout,
+                                        out_dim=1024)
+
         self.prenet = CBHG(K=prenet_k,
                            in_channels=embed_dims,
                            channels=prenet_dims,
                            proj_channels=[prenet_dims, embed_dims],
                            num_highways=prenet_num_highways,
                            dropout=prenet_dropout)
-        self.lstm = nn.LSTM(2 * prenet_dims + speaker_emb_dims,
+        self.lstm = nn.LSTM(2 * prenet_dims + speaker_emb_dims + 1024,
                             rnn_dims,
                             batch_first=True,
                             bidirectional=True)
@@ -174,10 +163,6 @@ class MultiForwardTacotron(nn.Module):
                             num_highways=postnet_num_highways,
                             dropout=postnet_dropout)
         self.post_proj = nn.Linear(2 * postnet_dims, n_mels, bias=False)
-        self.pitch_strength = pitch_strength
-        self.energy_strength = energy_strength
-        self.pitch_proj = nn.Conv1d(1, 2 * prenet_dims + speaker_emb_dims, kernel_size=3, padding=1)
-        self.energy_proj = nn.Conv1d(1, 2 * prenet_dims + speaker_emb_dims, kernel_size=3, padding=1)
 
     def __repr__(self):
         num_params = sum([np.prod(p.size()) for p in self.parameters()])
@@ -189,33 +174,20 @@ class MultiForwardTacotron(nn.Module):
         dur = batch['dur']
         semb = batch['speaker_emb']
         mel_lens = batch['mel_len']
-        pitch = batch['pitch'].unsqueeze(1)
-        pitch_cond = batch['pitch_cond']
-        energy = batch['energy'].unsqueeze(1)
+        hub = batch['hub']
 
         if self.training:
             self.step += 1
 
-        pitch_cond_hat = self.pitch_cond_pred(x, semb).squeeze(-1)
-
-        dur_hat = self.dur_pred(x, pitch_cond, semb).squeeze(-1)
-        pitch_hat = self.pitch_pred(x, pitch_cond, semb).transpose(1, 2)
-        energy_hat = self.energy_pred(x, semb).transpose(1, 2)
+        dur_hat = self.dur_pred(x, semb).squeeze(-1)
+        hub_hat = self.hub_pred(x, semb)
 
         x = self.embedding(x)
         x = x.transpose(1, 2)
         x = self.prenet(x)
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
-        x = torch.cat([x, speaker_emb], dim=2)
-
-        pitch_proj = self.pitch_proj(pitch)
-        pitch_proj = pitch_proj.transpose(1, 2)
-        x = x + pitch_proj * self.pitch_strength
-
-        energy_proj = self.energy_proj(energy)
-        energy_proj = energy_proj.transpose(1, 2)
-        x = x + energy_proj * self.energy_strength
+        x = torch.cat([x, speaker_emb, hub], dim=2)
 
         x = self.lr(x, dur)
 
@@ -237,8 +209,7 @@ class MultiForwardTacotron(nn.Module):
         x = self._pad(x, mel.size(2))
 
         return {'mel': x, 'mel_post': x_post,
-                'dur': dur_hat, 'pitch': pitch_hat,
-                'energy': energy_hat, 'pitch_cond': pitch_cond_hat}
+                'dur': dur_hat, 'hub_hat': hub_hat}
 
     def generate(self,
                  x: torch.Tensor,
@@ -279,15 +250,9 @@ class MultiForwardTacotron(nn.Module):
         x = self.prenet(x)
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
-        x = torch.cat([x, speaker_emb], dim=2)
+        hub_hat = self.hub_pred(x, semb)
 
-        pitch_proj = self.pitch_proj(pitch_hat)
-        pitch_proj = pitch_proj.transpose(1, 2)
-        x = x + pitch_proj * self.pitch_strength
-
-        energy_proj = self.energy_proj(energy_hat)
-        energy_proj = energy_proj.transpose(1, 2)
-        x = x + energy_proj * self.energy_strength
+        x = torch.cat([x, speaker_emb, hub_hat], dim=2)
 
         x = self.lr(x, dur_hat)
 

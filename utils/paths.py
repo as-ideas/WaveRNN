@@ -14,6 +14,7 @@ class Paths:
         self.gta = self.data/'gta'
         self.att_pred = self.data/'att_pred'
         self.alg = self.data/'alg'
+        self.phon_hub = self.data/'phon_hubert'
         self.speaker_emb = self.data/'speaker_emb'
         self.mean_speaker_emb = self.data/'mean_speaker_emb'
         self.raw_pitch = self.data/'raw_pitch'

@@ -16,6 +16,7 @@ def map_to_array(batch):
     batch["speech"] = speech
     return batch
 
+
 wavs = list(Path('/Users/cschaefe/datasets/Snippets').glob('**/*.wav'))
 
 for wav_path in tqdm.tqdm(wavs, total=len(wavs)):

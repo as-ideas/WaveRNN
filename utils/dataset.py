@@ -6,6 +6,7 @@ from typing import List, Tuple, Iterator
 
 import torch
 from tabulate import tabulate
+from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import Sampler
 
@@ -140,10 +141,11 @@ class ForwardDataset(Dataset):
         speaker_emb = np.load(str(self.paths.speaker_emb/f'{item_id}.npy'))
         pitch_cond = np.ones(pitch.shape)
         pitch_cond[pitch != 0] = 2
+        hub = np.load(str(self.paths.phon_hub/f'{item_id}.npy'))
 
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
                 'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy,
-                'speaker_emb': speaker_emb, 'pitch_cond': pitch_cond, 'speaker_name': speaker_name}
+                'speaker_emb': speaker_emb, 'pitch_cond': pitch_cond, 'speaker_name': speaker_name, 'hub': hub}
 
     def __len__(self):
         return len(self.metadata)
@@ -254,11 +256,14 @@ class ForwardCollator:
         energy = _stack_to_tensor(energy).float()
         pitch_cond = [_pad1d(b['pitch_cond'][:max_x_len], max_x_len) for b in batch]
         pitch_cond = _stack_to_tensor(pitch_cond).long()
+        hub = [b['hub'][:max_x_len, :] for b in batch]
+        hub = pad_sequence(hub, batch_first=True)
         output.update({
             'pitch': pitch,
             'energy': energy,
             'dur': dur,
-            'pitch_cond': pitch_cond
+            'pitch_cond': pitch_cond,
+            'hub': hub
         })
         return output
 
