@@ -256,8 +256,8 @@ class ForwardCollator:
         energy = _stack_to_tensor(energy).float()
         pitch_cond = [_pad1d(b['pitch_cond'][:max_x_len], max_x_len) for b in batch]
         pitch_cond = _stack_to_tensor(pitch_cond).long()
-        hub = [b['hub'][:max_x_len, :] for b in batch]
-        hub = pad_sequence(hub, batch_first=True)
+        hub = [_pad2d(b['hub'], max_x_len) for b in batch]
+        hub = _stack_to_tensor(hub)
         output.update({
             'pitch': pitch,
             'energy': energy,
