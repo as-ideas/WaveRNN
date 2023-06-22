@@ -206,11 +206,6 @@ class MultiForwardTrainer:
 
             m2_hat_fig = plot_mel(m2_hat)
 
-            pitch_gen_fig = plot_pitch(np_now(gen['pitch'].squeeze()))
-            energy_gen_fig = plot_pitch(np_now(gen['energy'].squeeze()))
-
-            self.writer.add_figure(f'Pitch/generated/{speaker}', pitch_gen_fig, model.step)
-            self.writer.add_figure(f'Energy/generated/{speaker}', energy_gen_fig, model.step)
             self.writer.add_figure(f'Generated/postnet/{speaker}', m2_hat_fig, model.step)
 
             m2_hat_wav = self.dsp.griffinlim(m2_hat)
