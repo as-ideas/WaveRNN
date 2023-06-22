@@ -233,12 +233,12 @@ class MultiForwardTacotron(nn.Module):
                       x: torch.Tensor,
                       semb: torch.Tensor,
                       dur_hat: torch.Tensor) -> Dict[str, torch.Tensor]:
+        hub_hat = self.hub_pred(x, semb)
         x = self.embedding(x)
         x = x.transpose(1, 2)
         x = self.prenet(x)
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
-        hub_hat = self.hub_pred(x, semb)
 
         x = torch.cat([x, speaker_emb, hub_hat], dim=2)
 
