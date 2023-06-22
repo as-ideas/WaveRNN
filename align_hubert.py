@@ -27,7 +27,9 @@ for hub in tqdm.tqdm(hubert_files, total=len(hubert_files)):
             dur_hub[dur_ind] += hubert[0, hub_ind, :]
             total_dur_ind += 1
             #print(dur_ind, dur, total_dur_ind, hub_ind, hubert.size())
-        dur_hub[dur_ind] /= dur
+        if dur != 0:
+            #raise ValueError(hub)
+            dur_hub[dur_ind] /= dur
 
     dur_hub = dur_hub.transpose(0, 1).cpu().numpy()
     #print('npy shape: ', dur_hub.shape)

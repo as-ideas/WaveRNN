@@ -202,11 +202,22 @@ class MultiForwardTrainer:
         for speaker in speakers_to_plot:
             speaker_emb = self.speaker_embs[speaker].to(device)
             gen = model.generate(batch['x'][0:1, :batch['x_len'][0]], speaker_emb=speaker_emb)
+
             m2_hat = np_now(gen['mel_post'].squeeze())
-
             m2_hat_fig = plot_mel(m2_hat)
-
             self.writer.add_figure(f'Generated/postnet/{speaker}', m2_hat_fig, model.step)
+
+            m2_hat_wav = self.dsp.griffinlim(m2_hat)
+
+            self.writer.add_audio(
+                tag=f'Generated/postnet_wav/{speaker}', snd_tensor=m2_hat_wav,
+                global_step=model.step, sample_rate=self.dsp.sample_rate)
+
+            gen_hub = model.generate(batch['x'][0:1, :batch['x_len'][0]], speaker_emb=speaker_emb,
+                                     hub=batch['hub'][0:1, :, :batch['x_len'][0]])
+            m2_hat = np_now(gen_hub['mel_post'].squeeze())
+            m2_hat_fig = plot_mel(m2_hat)
+            self.writer.add_figure(f'Generated/postnet_hub/{speaker}', m2_hat_fig, model.step)
 
             m2_hat_wav = self.dsp.griffinlim(m2_hat)
 
