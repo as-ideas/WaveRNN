@@ -219,20 +219,11 @@ class MultiForwardTacotron(nn.Module):
                  energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, torch.Tensor]:
         self.eval()
         with torch.no_grad():
-            pitch_cond_hat = self.pitch_cond_pred(x, speaker_emb).squeeze(-1)
-            pitch_cond_hat = torch.argmax(pitch_cond_hat.squeeze(), dim=1).long().unsqueeze(0)
-            dur_hat = self.dur_pred(x, pitch_cond_hat, speaker_emb, alpha=alpha).squeeze(-1)
+            dur_hat = self.dur_pred(x, speaker_emb, alpha=alpha).squeeze(-1)
             if torch.sum(dur_hat.long()) <= 0:
                 torch.fill_(dur_hat, value=2.)
-            pitch_hat = self.pitch_pred(x, pitch_cond_hat, speaker_emb).transpose(1, 2)
-            pitch_hat = pitch_function(pitch_hat)
-            energy_hat = self.energy_pred(x, speaker_emb).transpose(1, 2)
-            energy_hat = energy_function(energy_hat)
             return self._generate_mel(x=x,
                                       dur_hat=dur_hat,
-                                      pitch_hat=pitch_hat,
-                                      energy_hat=energy_hat,
-                                      pitch_cond_hat=pitch_cond_hat,
                                       semb=speaker_emb)
 
     def get_step(self) -> int:
@@ -241,10 +232,7 @@ class MultiForwardTacotron(nn.Module):
     def _generate_mel(self,
                       x: torch.Tensor,
                       semb: torch.Tensor,
-                      dur_hat: torch.Tensor,
-                      pitch_hat: torch.Tensor,
-                      pitch_cond_hat: torch,
-                      energy_hat: torch.Tensor) -> Dict[str, torch.Tensor]:
+                      dur_hat: torch.Tensor) -> Dict[str, torch.Tensor]:
         x = self.embedding(x)
         x = x.transpose(1, 2)
         x = self.prenet(x)
@@ -265,9 +253,7 @@ class MultiForwardTacotron(nn.Module):
         x_post = self.post_proj(x_post)
         x_post = x_post.transpose(1, 2)
 
-        return {'mel': x, 'mel_post': x_post, 'dur': dur_hat,
-                'pitch': pitch_hat, 'energy': energy_hat,
-                'pitch_cond': pitch_cond_hat.unsqueeze(1)}
+        return {'mel': x, 'mel_post': x_post, 'dur': dur_hat, 'hub_hat': hub_hat}
 
     def _pad(self, x: torch.Tensor, max_len: int) -> torch.Tensor:
         x = x[:, :, :max_len]
