@@ -84,8 +84,7 @@ class MultiForwardTrainer:
 
                 loss = m1_loss + m2_loss \
                        + self.train_cfg['dur_loss_factor'] * dur_loss \
-                        + hub_loss
-
+                       + hub_loss
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -222,5 +221,5 @@ class MultiForwardTrainer:
             m2_hat_wav = self.dsp.griffinlim(m2_hat)
 
             self.writer.add_audio(
-                tag=f'Generated/postnet_wav/{speaker}', snd_tensor=m2_hat_wav,
+                tag=f'Generated/postnet_hub_wav/{speaker}', snd_tensor=m2_hat_wav,
                 global_step=model.step, sample_rate=self.dsp.sample_rate)
