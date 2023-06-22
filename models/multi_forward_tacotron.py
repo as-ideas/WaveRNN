@@ -187,7 +187,7 @@ class MultiForwardTacotron(nn.Module):
         x = self.prenet(x)
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
-        x = torch.cat([x, speaker_emb, hub], dim=2)
+        x = torch.cat([x, speaker_emb, hub.transpose(1, 2)], dim=2)
 
         x = self.lr(x, dur)
 

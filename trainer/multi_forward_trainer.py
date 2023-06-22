@@ -78,7 +78,7 @@ class MultiForwardTrainer:
 
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
-                hub_loss = self.l1_loss(pred['hub_post'], batch['hub'], batch['x_len'])
+                hub_loss = self.l1_loss(pred['hub_hat'], batch['hub'].transpose(1, 2), batch['x_len'])
 
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
 
@@ -147,7 +147,7 @@ class MultiForwardTrainer:
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
-                hub_loss = self.l1_loss(pred['hub_hat'], batch['hub'], batch['x_len'])
+                hub_loss = self.l1_loss(pred['hub_hat'], batch['hub'].transpose(1, 2), batch['x_len'])
                 val_losses['mel_loss'] += m1_loss.item() + m2_loss.item()
                 val_losses['dur_loss'] += dur_loss
                 val_losses['hub_loss'] += hub_loss
@@ -166,7 +166,7 @@ class MultiForwardTrainer:
         m2_hat = np_now(pred['mel_post'])[0, :, :]
         m_target = np_now(batch['mel'])[0, :, :]
         speaker = batch['speaker_name'][0]
-        hub_hat = np_now(pred['hub'])[0, :, :]
+        hub_hat = np_now(pred['hub_hat'])[0, :, :]
         hub_target = np_now(batch['hub'])[0, :, :]
 
         m1_hat_fig = plot_mel(m1_hat)
