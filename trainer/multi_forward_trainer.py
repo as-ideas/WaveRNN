@@ -86,15 +86,19 @@ class MultiForwardTrainer:
                 pitch_loss = self.l1_loss(pred['pitch'], pitch_target.unsqueeze(1), batch['x_len'])
                 energy_loss = self.l1_loss(pred['energy'], energy_target.unsqueeze(1), batch['x_len'])
                 pitch_cond_loss = self.ce_loss(pred['pitch_cond'].transpose(1, 2), batch['pitch_cond'])
+                dur_cond_loss = self.ce_loss(pred['dur_cond'].transpose(1, 2), batch['dur_cond'])
 
                 loss = m1_loss + m2_loss \
                        + self.train_cfg['dur_loss_factor'] * dur_loss \
                        + self.train_cfg['pitch_loss_factor'] * pitch_loss \
                        + self.train_cfg['energy_loss_factor'] * energy_loss \
+                       + self.train_cfg['pitch_cond_loss_factor'] * dur_cond_loss \
                        + self.train_cfg['pitch_cond_loss_factor'] * pitch_cond_loss
 
                 pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
                 pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()
+                dur_cond_true_pos = (torch.argmax(pred['dur_cond'], dim=-1) == batch['dur_cond'])
+                dur_cond_acc = dur_cond_true_pos[batch['dur_cond'] != 0].sum() / (batch['dur_cond'] != 0).sum()
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -127,6 +131,8 @@ class MultiForwardTrainer:
                 self.writer.add_scalar('Duration_Loss/train', dur_loss, model.get_step())
                 self.writer.add_scalar('Pitch_Cond_Loss/train', pitch_cond_loss, model.get_step())
                 self.writer.add_scalar('Pitch_Cond_Accuracy/train', pitch_cond_acc, model.get_step())
+                self.writer.add_scalar('Dur_Cond_Loss/train', dur_cond_loss, model.get_step())
+                self.writer.add_scalar('Dur_Cond_Accuracy/train', dur_cond_acc, model.get_step())
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
                 self.writer.add_scalar('Params/learning_rate', session.lr, model.get_step())
 
@@ -139,6 +145,8 @@ class MultiForwardTrainer:
             self.writer.add_scalar('Energy_Loss/val', val_out['energy_loss'], model.get_step())
             self.writer.add_scalar('Pitch_Cond_Loss/val', val_out['pitch_cond_loss'], model.get_step())
             self.writer.add_scalar('Pitch_Cond_Accuracy/val', val_out['pitch_cond_acc'], model.get_step())
+            self.writer.add_scalar('Dur__Cond_Loss/val', val_out['dur__cond_loss'], model.get_step())
+            self.writer.add_scalar('Dur__Cond_Accuracy/val', val_out['dur__cond_acc'], model.get_step())
             save_checkpoint(model=model, optim=optimizer, config=self.config,
                             path=self.paths.forward_checkpoints / 'latest_model.pt',
                             meta={'speaker_embeddings': self.speaker_embs})
@@ -151,7 +159,7 @@ class MultiForwardTrainer:
         model.eval()
         val_losses = {
             'mel_loss': 0, 'dur_loss': 0, 'pitch_loss': 0,
-            'energy_loss': 0, 'pitch_cond_loss': 0, 'pitch_cond_acc': 0
+            'energy_loss': 0, 'pitch_cond_loss': 0, 'pitch_cond_acc': 0, 'dur_cond_acc': 0
         }
         device = next(model.parameters()).device
         for i, batch in enumerate(val_set, 1):
@@ -166,12 +174,17 @@ class MultiForwardTrainer:
                 pitch_cond_loss = self.ce_loss(pred['pitch_cond'].transpose(1, 2), batch['pitch_cond'])
                 pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
                 pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()
+                dur_cond_loss = self.ce_loss(pred['dur_cond'].transpose(1, 2), batch['dur_cond'])
+                dur_cond_true_pos = (torch.argmax(pred['dur_cond'], dim=-1) == batch['dur_cond'])
+                dur_cond_acc = dur_cond_true_pos[batch['dur_cond'] != 0].sum() / (batch['dur_cond'] != 0).sum()
                 val_losses['pitch_loss'] += pitch_loss
                 val_losses['energy_loss'] += energy_loss
                 val_losses['mel_loss'] += m1_loss.item() + m2_loss.item()
                 val_losses['dur_loss'] += dur_loss
                 val_losses['pitch_cond_loss'] += pitch_cond_loss
                 val_losses['pitch_cond_acc'] += pitch_cond_acc
+                val_losses['dur_cond_loss'] += dur_cond_loss
+                val_losses['dur_cond_acc'] += dur_cond_acc
         val_losses = {k: v / len(val_set) for k, v in val_losses.items()}
         return val_losses
 
