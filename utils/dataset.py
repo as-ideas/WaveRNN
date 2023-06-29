@@ -17,6 +17,16 @@ from utils.text.tokenizer import Tokenizer
 SHUFFLE_SEED = 42
 
 
+def running_median(arr):
+    result = np.zeros_like(arr, dtype=float)
+
+    for i in range(0, len(arr)):
+        window_slice = arr[i: i + 7]
+        result[i] = np.median(window_slice)
+
+    return result
+
+
 @dataclass
 class DurationStats:
     att_sharpness_score: float
@@ -135,6 +145,10 @@ class ForwardDataset(Dataset):
         mel = np.load(str(self.paths.mel/f'{item_id}.npy'))
         mel_len = mel.shape[-1]
         dur = np.load(str(self.paths.alg/f'{item_id}.npy'))
+
+        dur_med = running_median(dur)
+        dur_med[dur_med > 8] = 8
+
         pitch = np.load(str(self.paths.phon_pitch/f'{item_id}.npy'))
         energy = np.load(str(self.paths.phon_energy/f'{item_id}.npy'))
         speaker_emb = np.load(str(self.paths.speaker_emb/f'{item_id}.npy'))
@@ -143,7 +157,8 @@ class ForwardDataset(Dataset):
 
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
                 'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy,
-                'speaker_emb': speaker_emb, 'pitch_cond': pitch_cond, 'speaker_name': speaker_name}
+                'speaker_emb': speaker_emb, 'pitch_cond': pitch_cond, 'speaker_name': speaker_name,
+                'dur_med': dur_med}
 
     def __len__(self):
         return len(self.metadata)
@@ -248,6 +263,8 @@ class ForwardCollator:
         max_x_len = max(x_len)
         dur = [_pad1d(b['dur'][:max_x_len], max_x_len) for b in batch]
         dur = _stack_to_tensor(dur).float()
+        dur_med = [_pad1d(b['dur_med'][:max_x_len], max_x_len) for b in batch]
+        dur_med = _stack_to_tensor(dur_med).float()
         pitch = [_pad1d(b['pitch'][:max_x_len], max_x_len) for b in batch]
         pitch = _stack_to_tensor(pitch).float()
         energy = [_pad1d(b['energy'][:max_x_len], max_x_len) for b in batch]
@@ -258,6 +275,7 @@ class ForwardCollator:
             'pitch': pitch,
             'energy': energy,
             'dur': dur,
+            'dur_med': dur_med,
             'pitch_cond': pitch_cond
         })
         return output
