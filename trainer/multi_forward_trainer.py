@@ -145,8 +145,8 @@ class MultiForwardTrainer:
             self.writer.add_scalar('Energy_Loss/val', val_out['energy_loss'], model.get_step())
             self.writer.add_scalar('Pitch_Cond_Loss/val', val_out['pitch_cond_loss'], model.get_step())
             self.writer.add_scalar('Pitch_Cond_Accuracy/val', val_out['pitch_cond_acc'], model.get_step())
-            self.writer.add_scalar('Dur__Cond_Loss/val', val_out['dur__cond_loss'], model.get_step())
-            self.writer.add_scalar('Dur__Cond_Accuracy/val', val_out['dur__cond_acc'], model.get_step())
+            self.writer.add_scalar('Dur_Cond_Loss/val', val_out['dur_cond_loss'], model.get_step())
+            self.writer.add_scalar('Dur_Cond_Accuracy/val', val_out['dur_cond_acc'], model.get_step())
             save_checkpoint(model=model, optim=optimizer, config=self.config,
                             path=self.paths.forward_checkpoints / 'latest_model.pt',
                             meta={'speaker_embeddings': self.speaker_embs})
@@ -159,7 +159,7 @@ class MultiForwardTrainer:
         model.eval()
         val_losses = {
             'mel_loss': 0, 'dur_loss': 0, 'pitch_loss': 0,
-            'energy_loss': 0, 'pitch_cond_loss': 0, 'pitch_cond_acc': 0, 'dur_cond_acc': 0
+            'energy_loss': 0, 'pitch_cond_loss': 0, 'pitch_cond_acc': 0, 'dur_cond_acc': 0, 'dur_cond_loss': 0
         }
         device = next(model.parameters()).device
         for i, batch in enumerate(val_set, 1):
