@@ -56,23 +56,24 @@ class DurStat:
 
 class DurationNormalizer:
 
-    def __init__(self, dur_path: Path, text_path: Path):
+    def __init__(self, speaker_path: Path, dur_path: Path, text_path: Path):
         self.dur_path = dur_path
         self.text_dict = unpickle_binary(text_path)
+        self.speaker_dict = unpickle_binary(speaker_path)
 
         print('Collect speakers')
         dur_files = list(dur_path.glob('**/*.npy'))
         speakers = set()
         for dur_file in tqdm.tqdm(dur_files, total=len(dur_files)):
             id = dur_file.stem
-            speaker_id = id.split('_')[0]
+            speaker_id = self.speaker_dict[id]
             speakers.add(speaker_id)
 
         print('Calc dur stats')
         self.dur_stats = {speaker: DurStat(speaker) for speaker in speakers}
         for dur_file in tqdm.tqdm(dur_files, total=len(dur_files)):
             id = dur_file.stem
-            speaker_id = id.split('_')[0]
+            speaker_id = self.speaker_dict[id]
             dur = np.load(str(self.dur_path / f'{id}.npy'))
             text = self.text_dict[id]
             self.dur_stats[speaker_id].update(text, dur)
@@ -95,15 +96,17 @@ if __name__ == '__main__':
 
     dur_path = Path('/Users/cschaefe/datasets/multispeaker_welt_bild/alg')
     text_path = Path('/Users/cschaefe/datasets/multispeaker_welt_bild/text_dict.pkl')
+    speaker_path = Path('/Users/cschaefe/datasets/multispeaker_welt_bild/speaker_dict.pkl')
     text_dict = unpickle_binary(text_path)
+    speaker_dict = unpickle_binary(speaker_path)
 
-    duration_normalizer = DurationNormalizer(dur_path, text_path)
+    duration_normalizer = DurationNormalizer(speaker_path, dur_path, text_path)
 
     for id, text in text_dict.items():
 
         print(id)
-        durs = dur_path / f'{id}.npy'
-        speaker_id = id.split('_')[0]
+        durs = np.load(str(dur_path / f'{id}.npy'))
+        speaker_id =speaker_dict[id]
         dur_norm = duration_normalizer.normalize(speaker_id, durs, text)
         dur_denorm = duration_normalizer.denormalize(speaker_id, dur_norm, text)
         print('orig:', durs)
