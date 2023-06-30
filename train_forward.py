@@ -18,7 +18,7 @@ from utils.checkpoints import restore_checkpoint, init_tts_model
 from utils.dataset import get_forward_dataloaders
 from utils.display import *
 from utils.dsp import DSP
-from utils.files import read_config
+from utils.files import read_config, unpickle_binary
 from utils.paths import Paths
 
 
@@ -72,6 +72,7 @@ if __name__ == '__main__':
 
     # Instantiate Forward TTS Model
     model = init_tts_model(config).to(device)
+    duration_normalizer = unpickle_binary(paths.data / 'duration_normalizer.pkl')
     print(f'\nInitialized tts model: {model}\n')
     optimizer = optim.Adam(model.parameters())
     restore_checkpoint(model=model, optim=optimizer,

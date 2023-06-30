@@ -12,6 +12,7 @@ from torch.utils.data.sampler import Sampler
 from utils.dsp import *
 from utils.files import unpickle_binary
 from utils.paths import Paths
+from utils.text.symbols import phonemes_set
 from utils.text.tokenizer import Tokenizer
 
 SHUFFLE_SEED = 42
@@ -126,6 +127,7 @@ class ForwardDataset(Dataset):
         self.text_dict = text_dict
         self.speaker_dict = speaker_dict
         self.tokenizer = tokenizer
+        self.duration_normalizer = unpickle_binary(paths.data / 'duration_normalizer.pkl')
 
     def __getitem__(self, index: int) -> Dict[str, torch.tensor]:
         item_id = self.metadata[index]
@@ -135,6 +137,7 @@ class ForwardDataset(Dataset):
         mel = np.load(str(self.paths.mel/f'{item_id}.npy'))
         mel_len = mel.shape[-1]
         dur = np.load(str(self.paths.alg/f'{item_id}.npy'))
+        dur_norm = self.duration_normalizer.normalize(speaker_name, dur, text)
         pitch = np.load(str(self.paths.phon_pitch/f'{item_id}.npy'))
         energy = np.load(str(self.paths.phon_energy/f'{item_id}.npy'))
         speaker_emb = np.load(str(self.paths.speaker_emb/f'{item_id}.npy'))
@@ -142,7 +145,7 @@ class ForwardDataset(Dataset):
         pitch_cond[pitch != 0] = 2
 
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
-                'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy,
+                'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy, 'dur_norm': dur_norm,
                 'speaker_emb': speaker_emb, 'pitch_cond': pitch_cond, 'speaker_name': speaker_name}
 
     def __len__(self):
@@ -248,6 +251,8 @@ class ForwardCollator:
         max_x_len = max(x_len)
         dur = [_pad1d(b['dur'][:max_x_len], max_x_len) for b in batch]
         dur = _stack_to_tensor(dur).float()
+        dur_norm = [_pad1d(b['dur_norm'][:max_x_len], max_x_len) for b in batch]
+        dur_norm = _stack_to_tensor(dur_norm).float()
         pitch = [_pad1d(b['pitch'][:max_x_len], max_x_len) for b in batch]
         pitch = _stack_to_tensor(pitch).float()
         energy = [_pad1d(b['energy'][:max_x_len], max_x_len) for b in batch]
@@ -258,6 +263,7 @@ class ForwardCollator:
             'pitch': pitch,
             'energy': energy,
             'dur': dur,
+            'dur_norm': dur_norm,
             'pitch_cond': pitch_cond
         })
         return output

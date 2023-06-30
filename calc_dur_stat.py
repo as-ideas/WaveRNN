@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import tqdm
 
-from utils.files import unpickle_binary
+from utils.files import unpickle_binary, pickle_binary
 from utils.text.symbols import phonemes, phonemes_set
 from utils.text.tokenizer import Tokenizer
 
@@ -94,13 +94,15 @@ class DurationNormalizer:
 
 if __name__ == '__main__':
 
-    dur_path = Path('/Users/cschaefe/datasets/multispeaker_welt_bild/alg')
-    text_path = Path('/Users/cschaefe/datasets/multispeaker_welt_bild/text_dict.pkl')
-    speaker_path = Path('/Users/cschaefe/datasets/multispeaker_welt_bild/speaker_dict.pkl')
+    data_path = Path('/Users/cschaefe/datasets/multispeaker_welt_bild')
+    dur_path = data_path / 'alg'
+    text_path = data_path / 'text_dict.pkl'
+    speaker_path = data_path / 'speaker_dict.pkl'
     text_dict = unpickle_binary(text_path)
     speaker_dict = unpickle_binary(speaker_path)
 
     duration_normalizer = DurationNormalizer(speaker_path, dur_path, text_path)
+    pickle_binary(duration_normalizer, data_path / 'duration_normalizer.pkl')
 
     for id, text in text_dict.items():
 
@@ -112,3 +114,4 @@ if __name__ == '__main__':
         print('orig:', durs)
         print('norm:', dur_norm)
         print('denorm:', dur_denorm)
+

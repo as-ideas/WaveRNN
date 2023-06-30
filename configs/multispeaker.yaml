@@ -1,6 +1,6 @@
 
 tts_model_id: 'multispeaker_tts'
-data_path: 'data_multispeaker'                                        # output data path
+data_path: '/Users/cschaefe/datasets/multispeaker_welt_bild'                                        # output data path
 
 tts_model: 'multi_forward_tacotron'   # choices: [multi_forward_tacotron, multi_fast_pitch]
 
@@ -111,7 +111,7 @@ multi_forward_tacotron:
     pitch_conv_dims: 256
     pitch_rnn_dims: 256
     pitch_dropout: 0.5
-    pitch_strength: 1.              # set to 0 if you want no pitch conditioning
+    pitch_strength: 1.              # set to 0 if you want no pitch conditionin
 
     energy_conv_dims: 256
     energy_rnn_dims: 64

@@ -7,8 +7,11 @@ import torch.nn.functional as F
 from torch.nn import Embedding
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
+from calc_dur_stat import DurationNormalizer
 from models.common_layers import CBHG, LengthRegulator, BatchNormConv
+from utils.files import unpickle_binary
 from utils.text.symbols import phonemes
+from utils.text.tokenizer import Tokenizer
 
 
 class SeriesPredictor(nn.Module):
@@ -243,6 +246,8 @@ class MultiForwardTacotron(nn.Module):
     def generate(self,
                  x: torch.Tensor,
                  speaker_emb: torch.Tensor,
+                 duration_normalizer: DurationNormalizer,
+                 speaker: str,
                  alpha=1.0,
                  pitch_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x,
                  energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, torch.Tensor]:
@@ -251,6 +256,10 @@ class MultiForwardTacotron(nn.Module):
             pitch_cond_hat = self.pitch_cond_pred(x, speaker_emb).squeeze(-1)
             pitch_cond_hat = torch.argmax(pitch_cond_hat.squeeze(), dim=1).long().unsqueeze(0)
             dur_hat = self.dur_pred(x, pitch_cond_hat, speaker_emb, alpha=alpha).squeeze(-1)
+            text = Tokenizer().decode([int(t) for t in x.squeeze()])
+            dur_hat = duration_normalizer.denormalize(speaker, dur_hat.squeeze().detach().cpu().numpy(), text)
+            dur_hat = torch.from_numpy(dur_hat).unsqueeze(0)
+
             if torch.sum(dur_hat.long()) <= 0:
                 torch.fill_(dur_hat, value=2.)
             pitch_hat = self.pitch_pred(x, pitch_cond_hat, speaker_emb).transpose(1, 2)

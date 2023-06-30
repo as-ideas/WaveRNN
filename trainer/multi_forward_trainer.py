@@ -34,6 +34,7 @@ class MultiForwardTrainer:
         self.ce_loss = torch.nn.CrossEntropyLoss(ignore_index=0)
         self.speakers = sorted(list(set(unpickle_binary(paths.data / 'speaker_dict.pkl').values())))
         self.speaker_embs = {}
+        self.duration_normalizer = unpickle_binary(paths.data / 'duration_normalizer.pkl')
         for speaker in self.speakers:
             speaker_emb = np.load(paths.mean_speaker_emb / f'{speaker}.npy')
             speaker_emb = torch.from_numpy(speaker_emb).float().unsqueeze(0)
@@ -82,7 +83,7 @@ class MultiForwardTrainer:
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
-                dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
+                dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur_norm'].unsqueeze(1), batch['x_len'])
                 pitch_loss = self.l1_loss(pred['pitch'], pitch_target.unsqueeze(1), batch['x_len'])
                 energy_loss = self.l1_loss(pred['energy'], energy_target.unsqueeze(1), batch['x_len'])
                 pitch_cond_loss = self.ce_loss(pred['pitch_cond'].transpose(1, 2), batch['pitch_cond'])
@@ -160,7 +161,7 @@ class MultiForwardTrainer:
                 pred = model(batch)
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
-                dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
+                dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur_norm'].unsqueeze(1), batch['x_len'])
                 pitch_loss = self.l1_loss(pred['pitch'], batch['pitch'].unsqueeze(1), batch['x_len'])
                 energy_loss = self.l1_loss(pred['energy'], batch['energy'].unsqueeze(1), batch['x_len'])
                 pitch_cond_loss = self.ce_loss(pred['pitch_cond'].transpose(1, 2), batch['pitch_cond'])
@@ -224,7 +225,10 @@ class MultiForwardTrainer:
 
         for speaker in speakers_to_plot:
             speaker_emb = self.speaker_embs[speaker].to(device)
-            gen = model.generate(batch['x'][0:1, :batch['x_len'][0]], speaker_emb=speaker_emb)
+            gen = model.generate(x=batch['x'][0:1, :batch['x_len'][0]],
+                                 speaker_emb=speaker_emb,
+                                 speaker=speaker,
+                                 duration_normalizer=self.duration_normalizer)
             m2_hat = np_now(gen['mel_post'].squeeze())
 
             m2_hat_fig = plot_mel(m2_hat)
