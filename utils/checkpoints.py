@@ -21,8 +21,8 @@ def save_checkpoint(model: torch.nn.Module,
                   'config': config}
     if meta is not None:
         checkpoint.update(meta)
-    if duration_normalizer is not None:
-        checkpoint.update({'duration_normalizer': duration_normalizer})
+    #if duration_normalizer is not None:
+    #    checkpoint.update({'duration_normalizer': duration_normalizer})
     torch.save(checkpoint, str(path))
 
 
