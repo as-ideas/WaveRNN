@@ -47,6 +47,7 @@ class DurStat:
             else:
                 mean, std = all_mean, all_std
             self.phon_stat[k] = (mean, std)
+        del self.phon_dur
 
     def normalize(self, dur: np.array, text: str) -> np.array:
         text = ''.join([t for t in text if t in phonemes_set])
