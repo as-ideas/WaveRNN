@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from models.multi_fast_pitch import MultiFastPitch
-from models.multi_forward_tacotron import MultiForwardTacotron
+from models.multi_forward_tacotron import MultiForwardTacotron, DurationNormalizer
 from trainer.common import Averager, TTSSession, MaskedL1, to_device, np_now
 from utils.checkpoints import save_checkpoint
 from utils.dataset import get_forward_dataloaders
@@ -34,7 +34,7 @@ class MultiForwardTrainer:
         self.ce_loss = torch.nn.CrossEntropyLoss(ignore_index=0)
         self.speakers = sorted(list(set(unpickle_binary(paths.data / 'speaker_dict.pkl').values())))
         self.speaker_embs = {}
-        self.duration_normalizer = unpickle_binary(paths.data / 'duration_normalizer.pkl')
+        self.duration_normalizer: DurationNormalizer = unpickle_binary(paths.data / 'duration_normalizer.pkl')
         for speaker in self.speakers:
             speaker_emb = np.load(paths.mean_speaker_emb / f'{speaker}.npy')
             speaker_emb = torch.from_numpy(speaker_emb).float().unsqueeze(0)
@@ -115,7 +115,7 @@ class MultiForwardTrainer:
                       f'| Dur Loss: {averages["dur_loss"].get():#.4} | {speed:#.2} steps/s | Step: {k}k | '
 
                 if step % self.train_cfg['checkpoint_every'] == 0:
-                    save_checkpoint(model=model, optim=optimizer, config=self.config,
+                    save_checkpoint(model=model, optim=optimizer, config=self.config, duration_normalizer=self.duration_normalizer,
                                     path=self.paths.forward_checkpoints / f'forward_step{k}k.pt',
                                     meta={'speaker_embeddings': self.speaker_embs})
 
@@ -140,7 +140,7 @@ class MultiForwardTrainer:
             self.writer.add_scalar('Energy_Loss/val', val_out['energy_loss'], model.get_step())
             self.writer.add_scalar('Pitch_Cond_Loss/val', val_out['pitch_cond_loss'], model.get_step())
             self.writer.add_scalar('Pitch_Cond_Accuracy/val', val_out['pitch_cond_acc'], model.get_step())
-            save_checkpoint(model=model, optim=optimizer, config=self.config,
+            save_checkpoint(model=model, optim=optimizer, config=self.config, duration_normalizer=self.duration_normalizer,
                             path=self.paths.forward_checkpoints / 'latest_model.pt',
                             meta={'speaker_embeddings': self.speaker_embs})
 

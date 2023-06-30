@@ -72,7 +72,9 @@ if __name__ == '__main__':
 
     # Instantiate Forward TTS Model
     model = init_tts_model(config).to(device)
-    duration_normalizer = unpickle_binary(paths.data / 'duration_normalizer.pkl')
+    #duration_normalizer = unpickle_binary(paths.data / 'duration_normalizer.pkl')
+
+    #exit()
     print(f'\nInitialized tts model: {model}\n')
     optimizer = optim.Adam(model.parameters())
     restore_checkpoint(model=model, optim=optimizer,

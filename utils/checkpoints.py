@@ -6,7 +6,7 @@ import torch.optim.optimizer
 from models.fast_pitch import FastPitch
 from models.forward_tacotron import ForwardTacotron
 from models.multi_fast_pitch import MultiFastPitch
-from models.multi_forward_tacotron import MultiForwardTacotron
+from models.multi_forward_tacotron import MultiForwardTacotron, DurationNormalizer
 from models.tacotron import Tacotron
 
 
@@ -14,12 +14,15 @@ def save_checkpoint(model: torch.nn.Module,
                     optim: torch.optim.Optimizer,
                     config: Dict[str, Any],
                     path: Path,
-                    meta: Dict[str, Any] = None) -> None:
+                    meta: Dict[str, Any] = None,
+                    duration_normalizer: DurationNormalizer = None) -> None:
     checkpoint = {'model': model.state_dict(),
                   'optim': optim.state_dict(),
                   'config': config}
     if meta is not None:
         checkpoint.update(meta)
+    if duration_normalizer is not None:
+        checkpoint.update({'duration_normalizer': duration_normalizer})
     torch.save(checkpoint, str(path))
 
 
