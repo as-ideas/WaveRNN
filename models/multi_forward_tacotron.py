@@ -30,9 +30,13 @@ class DurStat:
 
     def finalize(self):
         for k, v in self.phon_dur.items():
-            if len(v) > 5:
+            if len(v) > 10:
                 cat = np.array(v)
                 mean, std = np.mean(cat), np.std(cat)
+                if not 0 < mean < 20:
+                    mean = 4
+                if not 0 < std < 50:
+                    std = 1
             else:
                 mean, std = 4, 1
             self.phon_stat[k] = (mean, std)
