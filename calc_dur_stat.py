@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import tqdm
 
-from models.multi_forward_tacotron import DurationNormalizer
+from duration_normalizer import DurationNormalizer
 from utils.files import unpickle_binary, pickle_binary
 from utils.text.symbols import phonemes, phonemes_set
 from utils.text.tokenizer import Tokenizer

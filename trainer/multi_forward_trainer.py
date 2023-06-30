@@ -7,8 +7,9 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
+from duration_normalizer import DurationNormalizer
 from models.multi_fast_pitch import MultiFastPitch
-from models.multi_forward_tacotron import MultiForwardTacotron, DurationNormalizer
+from models.multi_forward_tacotron import MultiForwardTacotron
 from trainer.common import Averager, TTSSession, MaskedL1, to_device, np_now
 from utils.checkpoints import save_checkpoint
 from utils.dataset import get_forward_dataloaders
