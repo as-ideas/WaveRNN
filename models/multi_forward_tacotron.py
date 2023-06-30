@@ -29,18 +29,24 @@ class DurStat:
             self.phon_dur[p].append(d)
 
     def finalize(self):
+        all_durs = []
+        for k, v in self.phon_dur.items():
+            all_durs.extend(v)
+        cat = np.array(all_durs)
+        all_mean, all_std = np.mean(cat), np.std(cat)
+        print('all mean std', self.speaker_id, all_mean, all_std)
+
         for k, v in self.phon_dur.items():
             if len(v) > 10:
                 cat = np.array(v)
                 mean, std = np.mean(cat), np.std(cat)
                 if not 0 < mean < 20:
-                    mean = 4
+                    mean = all_mean
                 if not 0 < std < 50:
-                    std = 1
+                    std = all_std
             else:
-                mean, std = 4, 1
+                mean, std = all_mean, all_std
             self.phon_stat[k] = (mean, std)
-            print(self.speaker_id, k, mean, std)
 
     def normalize(self, dur: np.array, text: str) -> np.array:
         text = ''.join([t for t in text if t in phonemes_set])
@@ -87,7 +93,8 @@ class DurationNormalizer:
             text = self.text_dict[id]
             self.dur_stats[speaker_id].update(text, dur)
 
-        for k, v in self.dur_stats.items():
+        print('Finalize dur stats')
+        for k, v in tqdm.tqdm(self.dur_stats.items(), total=len(self.dur_stats)):
             v.finalize()
 
     def normalize(self, speaker_id: str, dur: np.array, text: str) -> np.array:
