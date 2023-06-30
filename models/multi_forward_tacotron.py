@@ -352,7 +352,7 @@ class MultiForwardTacotron(nn.Module):
             dur_hat = self.dur_pred(x, pitch_cond_hat, speaker_emb, alpha=alpha).squeeze(-1)
             text = Tokenizer().decode([int(t) for t in x.squeeze()])
             dur_hat = duration_normalizer.denormalize(speaker, dur_hat.squeeze().detach().cpu().numpy(), text)
-            dur_hat = torch.from_numpy(dur_hat).unsqueeze(0)
+            dur_hat = torch.from_numpy(dur_hat).unsqueeze(0).to(x.device)
 
             if torch.sum(dur_hat.long()) <= 0:
                 torch.fill_(dur_hat, value=2.)

@@ -23,10 +23,11 @@ if __name__ == '__main__':
     duration_normalizer = DurationNormalizer(speaker_path, dur_path, text_path)
     pickle_binary(duration_normalizer, data_path / 'duration_normalizer.pkl')
     durn = unpickle_binary(data_path / 'duration_normalizer.pkl')
-    exit()
+
     for id, text in text_dict.items():
 
         print(id)
+        print(text)
         durs = np.load(str(dur_path / f'{id}.npy'))
         speaker_id =speaker_dict[id]
         dur_norm = duration_normalizer.normalize(speaker_id, durs, text)
