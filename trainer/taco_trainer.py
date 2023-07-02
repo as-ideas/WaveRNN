@@ -82,8 +82,8 @@ class TacoTrainer:
               optimizer: Optimizer) -> None:
         tts_schedule = self.train_cfg['schedule']
         tts_schedule = parse_schedule(tts_schedule)
-        aligner = Aligner(num_chars=len(phonemes)).to(next(model.parameters()).device)
-        aligner_optim = Adam(aligner.parameters(), lr=1e-4)
+        #aligner = Aligner(num_chars=len(phonemes)).to(next(model.parameters()).device)
+        aligner_optim = Adam(model.aligner.parameters(), lr=1e-4)
 
         for i, session_params in enumerate(tts_schedule, 1):
             r, lr, max_step, bs = session_params
@@ -95,7 +95,7 @@ class TacoTrainer:
                 session = TTSSession(
                     index=i, r=r, lr=lr, max_step=max_step,
                     bs=bs, train_set=train_set, val_set=val_set)
-                self.train_session(model, optimizer, aligner, aligner_optim, session=session)
+                self.train_session(model, optimizer, model.aligner, aligner_optim, session=session)
 
     def train_session(self,
                       model: Tacotron,
@@ -120,7 +120,6 @@ class TacoTrainer:
         duration_avg = Averager()
         device = next(model.parameters()).device  # use same device as model parameters
 
-
         self.forward_loss = self.forward_loss.to(device)
         for e in range(1, epochs + 1):
             for i, batch in tqdm.tqdm(enumerate(session.train_set, 1), total=len(session.train_set)):
@@ -138,9 +137,7 @@ class TacoTrainer:
 
                     start = time.time()
                     model.train()
-                    m1_hat, m2_hat, attention, att_u = model(batch['x'], batch['mel'], att_aligner.detach().softmax(-1))
-                    #att_diff_loss = F.l1_loss(attention, att_aligner.detach())
-
+                    m1_hat, m2_hat, attention = model(batch['x'], batch['mel'])
 
                     m1_loss = F.l1_loss(m1_hat, batch['mel'])
                     m2_loss = F.l1_loss(m2_hat, batch['mel'])

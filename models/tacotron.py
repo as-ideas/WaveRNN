@@ -108,49 +108,37 @@ class LSA(nn.Module):
     def __init__(self, attn_dim, kernel_size=31, filters=32):
         super().__init__()
         self.conv = nn.Conv1d(2, filters, padding=(kernel_size - 1) // 2, kernel_size=kernel_size, bias=False)
-        self.conv_2 = nn.Conv1d(2, filters, padding=(kernel_size - 1) // 2, kernel_size=kernel_size, bias=False)
         self.L = nn.Linear(filters, attn_dim, bias=True)
-        self.L2 = nn.Linear(filters, attn_dim, bias=True)
         self.W = nn.Linear(attn_dim, attn_dim, bias=True)
         self.v = nn.Linear(attn_dim, 1, bias=False)
         self.cumulative = None
-        self.cumulative_2 = None
         self.attention = None
 
     def init_attention(self, encoder_seq_proj):
         device = next(self.parameters()).device  # use same device as parameters
         b, t, c = encoder_seq_proj.size()
         self.cumulative = torch.zeros(b, t, device=device)
-        self.cumulative_2 = torch.zeros(b, t, device=device)
         self.attention = torch.zeros(b, t, device=device)
-        self.attention_2 = torch.zeros(b, t, device=device)
 
-    def forward(self, encoder_seq_proj, query, t, att_t):
+    def forward(self, encoder_seq_proj, query, t):
 
         if t == 0: self.init_attention(encoder_seq_proj)
 
         processed_query = self.W(query).unsqueeze(1)
 
-        location = torch.cat([self.cumulative.unsqueeze(1), self.attention.unsqueeze(1)
-                              #self.cumulative_2.unsqueeze(1), self.attention_2.unsqueeze(1),
-                              ], dim=1)
-        location_2 = torch.cat([self.cumulative_2.unsqueeze(1), self.attention_2.unsqueeze(1)], dim=1)
+        location = torch.cat([self.cumulative.unsqueeze(1), self.attention.unsqueeze(1)], dim=1)
         processed_loc = self.L(self.conv(location).transpose(1, 2))
-        processed_loc_2 = self.L2(self.conv(location_2).transpose(1, 2))
 
-        u = self.v(torch.tanh(processed_query + encoder_seq_proj + processed_loc + processed_loc_2))
+        u = self.v(torch.tanh(processed_query + encoder_seq_proj + processed_loc))
         u = u.squeeze(-1)
 
         # Smooth Attention
         #scores = torch.sigmoid(u) / torch.sigmoid(u).sum(dim=1, keepdim=True)
         scores = F.softmax(u, dim=1)
         self.attention = scores
-        self.attention_2 = att_t
         self.cumulative += self.attention
-        self.cumulative_2 += self.attention_2
 
-
-        return scores.unsqueeze(-1).transpose(1, 2), u.unsqueeze(-1).transpose(1, 2)
+        return scores.unsqueeze(-1).transpose(1, 2)
 
 
 class Decoder(nn.Module):
@@ -176,7 +164,7 @@ class Decoder(nn.Module):
         return prev * mask + current * (1 - mask)
 
     def forward(self, encoder_seq, encoder_seq_proj, prenet_in,
-                hidden_states, cell_states, context_vec, t, att_in_t):
+                hidden_states, cell_states, context_vec, t):
 
         # Need this for reshaping mels
         batch_size = encoder_seq.size(0)
@@ -193,7 +181,7 @@ class Decoder(nn.Module):
         attn_hidden = self.attn_rnn(attn_rnn_in.squeeze(1), attn_hidden)
 
         # Compute the attention scores
-        scores, u = self.attn_net(encoder_seq_proj, attn_hidden, t, att_in_t)
+        scores = self.attn_net(encoder_seq_proj, attn_hidden, t)
 
         # Dot product to create the context vector
         context_vec = scores @ encoder_seq
@@ -225,7 +213,7 @@ class Decoder(nn.Module):
         hidden_states = (attn_hidden, rnn1_hidden, rnn2_hidden)
         cell_states = (rnn1_cell, rnn2_cell)
 
-        return mels, scores, hidden_states, cell_states, context_vec, u
+        return mels, scores, hidden_states, cell_states, context_vec
 
 
 class Tacotron(nn.Module):
@@ -245,16 +233,12 @@ class Tacotron(nn.Module):
                  stop_threshold: float) -> None:
         super().__init__()
         self.n_mels = n_mels
-        self.att_conv = Sequential(
-            nn.Conv2d(1, 16, (7, 7), padding=(3, 3)),
-            nn.LeakyReLU(0.2),
-            nn.Conv2d(16, 1, (3, 3), padding=(1, 1))
-        )
         self.lstm_dims = lstm_dims
         self.decoder_dims = decoder_dims
         self.encoder = Encoder(embed_dims, num_chars, encoder_dims,
                                encoder_k, num_highways, dropout)
-        self.encoder_proj = nn.Linear(decoder_dims, decoder_dims, bias=False)
+        self.encoder_proj = nn.Linear(decoder_dims + 32, decoder_dims, bias=False)
+        self.mel_proj = nn.Linear(80+32, 80)
         self.decoder = Decoder(n_mels, decoder_dims, lstm_dims)
         self.postnet = CBHG(postnet_k, n_mels, postnet_dims, [256, 80], num_highways)
         self.post_proj = nn.Linear(postnet_dims * 2, n_mels, bias=False)
@@ -264,6 +248,8 @@ class Tacotron(nn.Module):
         self.register_buffer('step', torch.zeros(1, dtype=torch.long))
         self.register_buffer('stop_threshold', torch.tensor(stop_threshold, dtype=torch.float32))
 
+        self.aligner = Aligner(num_chars=num_chars)
+
     @property
     def r(self) -> int:
         return self.decoder.r.item()
@@ -272,13 +258,18 @@ class Tacotron(nn.Module):
     def r(self, value: int) -> None:
         self.decoder.r = self.decoder.r.new_tensor(value, requires_grad=False)
 
-    def forward(self, x: torch.tensor, m: torch.tensor, att_in: torch.Tensor) -> torch.tensor:
+    def forward(self, x: torch.tensor, m: torch.tensor) -> torch.tensor:
         device = next(self.parameters()).device  # use same device as parameters
 
         if self.training:
             self.step += 1
 
         batch_size, _, steps  = m.size()
+
+        with torch.no_grad():
+            x_al = self.aligner.embedding(x)
+            encoder_aligner = self.aligner.text_encoder(x_al.transpose(1, 2)).transpose(1, 2)
+            mel_aligner = self.aligner.mel_encoder(m)
 
         # Initialise all hidden states and pack into tuple
         attn_hidden = torch.zeros(batch_size, self.decoder_dims, device=device)
@@ -300,22 +291,26 @@ class Tacotron(nn.Module):
         # Project the encoder outputs to avoid
         # unnecessary matmuls in the decoder loop
         encoder_seq = self.encoder(x)
-        encoder_seq_proj = self.encoder_proj(encoder_seq)
+
+
+        encoder_seq_in = torch.cat([encoder_seq, encoder_aligner], dim=-1)
+
+        encoder_seq_proj = self.encoder_proj(encoder_seq_in)
 
         # Need a couple of lists for outputs
-        mel_outputs, attn_scores, attn_u = [], [], []
+        mel_outputs, attn_scores = [], []
 
-        #att_in = self.att_conv(att_in.unsqueeze(1)).squeeze(1)
+        m_in = torch.cat([m, mel_aligner], dim=1)
+        m_in = self.mel_proj(m_in.transpose(1, 2)).transpose(1, 2)#torch.cat([m, mel_aligner], dim=1)
 
         # Run the decoder loop
         for t in range(0, steps, self.r):
-            prenet_in = m[:, :, t - 1] if t > 0 else go_frame
-            mel_frames, scores, hidden_states, cell_states, context_vec, u = \
+            prenet_in = m_in[:, :, t - 1] if t > 0 else go_frame
+            mel_frames, scores, hidden_states, cell_states, context_vec = \
                 self.decoder(encoder_seq, encoder_seq_proj, prenet_in,
-                             hidden_states, cell_states, context_vec, t, att_in[:, t, :])
+                             hidden_states, cell_states, context_vec, t)
             mel_outputs.append(mel_frames)
             attn_scores.append(scores)
-            attn_u.append(u)
 
         # Concat the mel outputs into sequence
         mel_outputs = torch.cat(mel_outputs, dim=2)
@@ -327,10 +322,9 @@ class Tacotron(nn.Module):
 
         # For easy visualisation
         attn_scores = torch.cat(attn_scores, 1)
-        attn_u = torch.cat(attn_u, 1)
         # attn_scores = attn_scores.cpu().data.numpy()
 
-        return mel_outputs, linear, attn_scores, attn_u
+        return mel_outputs, linear, attn_scores
 
     def generate(self, x: torch.tensor, steps=2000) -> Tuple[torch.tensor, torch.tensor, torch.tensor]:
         self.eval()
@@ -363,12 +357,10 @@ class Tacotron(nn.Module):
         # Need a couple of lists for outputs
         mel_outputs, attn_scores = [], []
 
-
-
         # Run the decoder loop
         for t in range(0, steps, self.r):
             prenet_in = mel_outputs[-1][:, :, -1] if t > 0 else go_frame
-            mel_frames, scores, hidden_states, cell_states, context_vec, u = \
+            mel_frames, scores, hidden_states, cell_states, context_vec = \
             self.decoder(encoder_seq, encoder_seq_proj, prenet_in,
                          hidden_states, cell_states, context_vec, t)
             mel_outputs.append(mel_frames)
