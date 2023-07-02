@@ -12,7 +12,7 @@ from models.aligner import Aligner
 from models.tacotron import Tacotron
 from trainer.common import Averager, TTSSession, to_device, np_now
 from utils.checkpoints import save_checkpoint
-from utils.dataset import get_tts_datasets
+from utils.dataset import get_taco_dataloaders
 from utils.decorators import ignore_exception
 from utils.display import stream, simple_table, plot_mel, plot_attention
 from utils.dsp import DSP
@@ -139,9 +139,9 @@ class TacoTrainer:
         for i, session_params in enumerate(tts_schedule, 1):
             r, lr, max_step, bs = session_params
             if model.get_step() < max_step:
-                train_set, val_set = get_tts_datasets(
-                    path=self.paths.data, batch_size=bs, r=r, model_type='tacotron',
-                    max_mel_len=self.train_cfg['max_mel_len'], filter_attention=False
+                train_set, val_set = get_taco_dataloaders(
+                    paths=self.paths, batch_size=bs, r=r,
+                    **self.train_cfg['filter']
                 )
                 session = TTSSession(
                     index=i, r=r, lr=lr, max_step=max_step,
@@ -173,7 +173,7 @@ class TacoTrainer:
                 batch = to_device(batch, device=device)
                 start = time.time()
                 model.train()
-                attn = model(batch['x'].detach(), batch['mel'].detach())
+                attn = model(batch['x'].detach(), batch['mel'].detach(), batch['speaker_emb'])
 
                 #loss = self.loss_fn_orig(attn, text_lens=batch['x_len'], mel_lens=batch['mel_len'])
                 loss = self.loss_fn(attn, text_lens=batch['x_len'], mel_lens=batch['mel_len'])
@@ -224,7 +224,7 @@ class TacoTrainer:
         batch = session.val_sample
         batch = to_device(batch, device=device)
         with torch.no_grad():
-            att = model(batch['x'], batch['mel']).softmax(-1)
+            att = model(batch['x'], batch['mel'], batch['speaker_emb']).softmax(-1)
         att = np_now(att)[0]
 
         att_fig = plot_attention(att)

@@ -18,7 +18,7 @@ class Aligner(nn.Module):
         self.embedding = Embedding(num_embeddings=num_chars, embedding_dim=512)
 
         self.text_encoder = nn.Sequential(
-            nn.Conv1d(in_channels=512, out_channels=512, kernel_size=3, padding=1),
+            nn.Conv1d(in_channels=512 + 256, out_channels=512, kernel_size=3, padding=1),
             nn.Conv1d(in_channels=512, out_channels=64, kernel_size=3, padding=1)
         )
         self.mel_encoder = nn.Sequential(
@@ -27,24 +27,23 @@ class Aligner(nn.Module):
             nn.Conv1d(in_channels=512, out_channels=64, kernel_size=3, padding=1)
         )
 
-        self.gru_1 = GRU(64, 64, bidirectional=True)
-        self.gru_2 = GRU(64, 64, bidirectional=True)
-
-
-    def forward(self, x: torch.Tensor, m: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, m: torch.Tensor, semb: torch.Tensor) -> torch.Tensor:
         if self.training:
             self.step += 1
         x = self.embedding(x)
+
         x = x.transpose(1, 2)
+
+        speaker_emb = semb[:, :, None]
+        speaker_emb = speaker_emb.repeat(1, 1, x.shape[2])
+        x = torch.cat([x, speaker_emb], dim=1)
+
         x = self.text_encoder(x)
 
         m = self.mel_encoder(m)
 
         x = x.transpose(1, 2)
         m = m.transpose(1, 2)
-
-        x, _ = self.gru_1(x)
-        m, _ = self.gru_1(m)
 
         diff = x[:, None, :, :] - m[:, :, None, :]
         dist = -torch.linalg.norm(diff, ord=2, dim=-1)

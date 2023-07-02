@@ -1,9 +1,8 @@
 
-voc_model_id: 'ljspeech_voc'
-tts_model_id: 'bild_aligner_gru_tts'
-data_path: 'data/'                                        # output data path
+tts_model_id: 'multispeaker_tts'
+data_path: '/Users/cschaefe/datasets/multispeaker_welt_bild'                                        # output data path
 
-tts_model: 'forward_tacotron'                              # choices: [forward_tacotron, fast_pitch]
+tts_model: 'multi_forward_tacotron'   # choices: [multi_forward_tacotron, multi_fast_pitch]
 
 
 dsp:
@@ -15,35 +14,49 @@ dsp:
   win_length: 1024
   fmin: 0
   fmax: 8000
-
   peak_norm: False                      # Normalise to the peak of each wav file
-  trim_start_end_silence: False          # Whether to trim leading and trailing silence
+  trim_start_end_silence: True          # Whether to trim leading and trailing silence
   trim_silence_top_db: 60               # Threshold in decibels below reference to consider silence for for trimming
-                                        # start and end silences with librosa (no trimming if really high)
-  pitch_max_freq: 600                   # Maximum value for pitch frequency to remove outliers (Common pitch range is
-                                        # about 60-300)
-  trim_long_silences: False             # Whether to reduce long silence using WebRTC Voice Activity Detector
+  # start and end silences with librosa (no trimming if really high)
+
+  trim_long_silences: True             # Whether to reduce long silence using WebRTC Voice Activity Detector
   vad_window_length: 30                 # In milliseconds
   vad_moving_average_width: 8
-  vad_max_silence_length: 2
+  vad_max_silence_length: 12
   vad_sample_rate: 16000
-
-  # vocoder
-  voc_mode: 'RAW'                    # choices: [RAW, MOL] - MOL needs longer training and yields better quality
-  bits: 9                            # bit depth of signal
-  mu_law: True                       # Recommended to suppress noise if using raw bits in hp.voc_mode below
 
 
 preprocessing:
 
+  metafile_format: 'ljspeech_multi'     # Choices [ljspeech_multi, vctk, pandas]
+    # ljspeech_multi expects a .csv file with rows: 'file_id|speaker_id|text"
+    # pandas expects a .tsv with columns: ['file_id', 'speaker_id', 'text']
+  # expects VCTK version 0.92 (set audio_format to '_mic1.flac')
+  audio_format: '.wav'                  # Audio extension, usually .wav (different for VCTK)
   seed: 42
-  n_val: 200
-  language: 'de'
-  cleaner_name: 'no_cleaners'   # choices: ['english_cleaners', 'no_cleaners'], expands numbers and abbreviations.
-  use_phonemes: False                 # whether to phonemize the text
-                                     # if set to False, you have to provide the phonemized text yourself
+  n_val: 2000
+  language: 'en'
+  cleaner_name: 'english_cleaners'      # choices: ['english_cleaners', 'no_cleaners'], expands numbers and abbreviations.
+  use_phonemes: True                    # whether to phonemize the text
+  # if set to False, you have to provide the phonemized text yourself
   min_text_len: 2
-  extract_durations_with_dijkstra: True    # slower but much more robust than simply counting attention peaks
+  pitch_min_freq: 30                    # Minimum value for pitch frequency to remove outliers (Common pitch range is
+  # about 60-300)
+  pitch_max_freq: 600                   # Maximum value for pitch frequency to remove outliers (Common pitch range is
+  # about 60-300)¡
+  pitch_extractor: pyworld              # choice of pitch extraction library, choices: [librosa, pyworld]
+  pitch_frame_length: 2048              # Frame length for extracting pitch with librosa
+
+
+duration_extraction:
+
+  silence_threshold: -11             # normalized mel value below which the voice is considered silent
+    # minimum mel value = -11.512925465 for zeros in the wav array (=log(1e-5),
+  # where 1e-5 is a cutoff value)
+  silence_prob_shift: 0.25           # increase probability for silent characters in periods of silence
+  # for better durations during non voiced periods
+  max_batch_size: 32                 # max allowed for binned dataloader used for tacotron inference
+  num_workers: 12                    # number of processes for costly dijkstra duration extraction
 
 
 tacotron:
@@ -53,6 +66,8 @@ tacotron:
     encoder_dims: 128
     decoder_dims: 256
     postnet_dims: 128
+    speaker_emb_dim: 256             # dimension of speaker embedding,
+    # set to 0 for no speaker conditioning, to 256 for speaker conditioning
     encoder_k: 16
     lstm_dims: 512
     postnet_k: 8
@@ -62,26 +77,39 @@ tacotron:
 
   training:
     schedule:
-      - 1,  1e-4,  5000,  32      # progressive training schedule
+      - 8,  1e-3,  30_000,  32      # progressive training schedule
+      - 4,   1e-4,  40_000,  16     # (r, lr, step, batch_size)
+      - 2,   1e-4,  50_000,  8
+      - 1,   1e-4,  65_000,  8
 
-    max_mel_len: 1250                # if you have a couple of extremely long spectrograms you might want to use this
+
     clip_grad_norm: 1.0              # clips the gradient norm to prevent explosion - set to None if not needed
     checkpoint_every: 10000          # checkpoints the model every x steps
-    plot_every: 200                 # generates samples and plots every x steps
+    plot_every: 1000                 # generates samples and plots every x steps
+    num_workers: 2                   # number of workers for dataloader
+
+    filter:
+      max_mel_len: 1250                    # filter files with mel len larger than given
+      filter_duration_stats: False          # whether to filter according to the duration stats below
+      min_attention_sharpness: 0.5         # filter files with bad attention sharpness score, if 0 then no filter
+      min_attention_alignment: 0.95        # filter files with bad attention alignment score, if 0 then no filter
+      max_duration: 40                     # filter files with durations larger than given
+      max_consecutive_ones: 6              # filter files where durations contain more consecutive ones than given
 
 
-forward_tacotron:
+multi_forward_tacotron:
 
   model:
+    speaker_emb_dims: 256
     embed_dims: 256                 # embedding dimension for main model
-    series_embed_dims: 64           # embedding dimension for series predictor
+    series_embed_dims: 128           # embedding dimension for series predictor
 
     durpred_conv_dims: 256
-    durpred_rnn_dims: 64
+    durpred_rnn_dims: 128
     durpred_dropout: 0.5
 
     pitch_conv_dims: 256
-    pitch_rnn_dims: 128
+    pitch_rnn_dims: 256
     pitch_dropout: 0.5
     pitch_strength: 1.              # set to 0 if you want no pitch conditioning
 
@@ -89,6 +117,13 @@ forward_tacotron:
     energy_rnn_dims: 64
     energy_dropout: 0.5
     energy_strength: 1.             # set to 0 if you want no energy conditioning
+
+    pitch_cond_conv_dims: 256       # predictor for pitch prior (predicts unvoiced phonemes with zero pitch)
+    pitch_cond_rnn_dims: 128
+    pitch_cond_dropout: 0.5
+    pitch_cond_emb_dims: 4          # conditional embedding on pitch softmax prediction (zero vs non-zero pitch)
+    pitch_cond_categorical_dims: 3  # dimension of categorical output of pitch conditioning, should be set to 3
+    # (zero=padding, one=zero pitch, two=nonzero pitch)
 
     prenet_dims: 256
     prenet_k: 16
@@ -104,27 +139,34 @@ forward_tacotron:
 
   training:
     schedule:
-      - 5e-5,  150_000,  32       # progressive training schedule
-      - 1e-5,  300_000,  32       # lr, step, batch_size
+      - 5e-5,  500_000,  32       # progressive training schedule
+      - 1e-5,  600_000,  32       # lr, step, batch_size
     dur_loss_factor: 0.1
     pitch_loss_factor: 0.1
     energy_loss_factor: 0.1
-    pitch_zoneout: 0.             # zoneout may regularize conditioning on pitch
-    energy_zoneout: 0.            # zoneout may regularize conditioning on energy
+    pitch_cond_loss_factor: 0.1
 
-    max_mel_len: 1250
     clip_grad_norm: 1.0           # clips the gradient norm to prevent explosion - set to None if not needed
-    checkpoint_every: 10_000      # checkpoints the model every x steps
-    plot_every: 1000              # generates samples and plots every x steps
+    checkpoint_every: 50_000      # checkpoints the model every x steps
+    plot_every: 5000              # generates samples and plots every x steps
+    plot_n_speakers: 3            # max number of speakers to generate plots for
+    plot_speakers:                # speakers to generate plots for (additionally to plot_n_speakers)
+      - default_speaker
 
-    filter_attention: True               # whether to filter data with bad attention scores
-    min_attention_sharpness: 0.5         # filter data with bad attention sharpness score, if 0 then no filter
-    min_attention_alignment: 0.95        # filter data with bad attention alignment score, if 0 then no filter
+    filter:
+      max_mel_len: 1250                    # filter files with mel len larger than given
+      filter_duration_stats: True          # whether to filter according to the duration stats below
+      min_attention_sharpness: 0.5         # filter files with bad attention sharpness score, if 0 then no filter
+      min_attention_alignment: 0.95        # filter files with bad attention alignment score, if 0 then no filter
+      max_duration: 40                     # filter files with durations larger than given
+      max_consecutive_ones: 6              # filter files where durations contain more consecutive ones than given
 
 
-fast_pitch:
+multi_fast_pitch:
 
   model:
+    speaker_emb_dims: 256
+
     durpred_d_model: 128
     durpred_n_heads: 2
     durpred_layers: 4
@@ -145,6 +187,14 @@ fast_pitch:
     energy_dropout: 0.5
     energy_strength: 1.0
 
+    pitch_cond_d_model: 128
+    pitch_cond_n_heads: 2
+    pitch_cond_layers: 4
+    pitch_cond_d_fft: 128
+    pitch_cond_dropout: 0.5
+    pitch_cond_output_dims: 3  # dimension of categorical output of pitch conditioning, should be set to 3
+    # (zero=padding, one=zero pitch, two=nonzero pitch)
+
     d_model: 256
     conv1_kernel: 9
     conv2_kernel: 1
@@ -163,11 +213,12 @@ fast_pitch:
   training:
     schedule:
       - 1e-5,  5_000,  32         # progressive training schedule
-      - 5e-5,  100_000,  32       # lr, step, batch_size
+      - 5e-5,  300_000,  32       # lr, step, batch_size
       - 2e-5,  300_000,  32
     dur_loss_factor: 0.1
     pitch_loss_factor: 0.1
     energy_loss_factor: 0.1
+    pitch_cond_loss_factor: 0.1
     pitch_zoneout: 0.             # zoneout may regularize conditioning on pitch
     energy_zoneout: 0.            # zoneout may regularize conditioning on energy
 
@@ -175,40 +226,14 @@ fast_pitch:
     clip_grad_norm: 1.0           # clips the gradient norm to prevent explosion - set to None if not needed
     checkpoint_every: 10_000      # checkpoints the model every x steps
     plot_every: 1000
+    plot_n_speakers: 3            # max number of speakers to generate plots for
+    plot_speakers:                # speakers to generate plots for (additionally to plot_n_speakers)
+      - default_speaker
 
-    filter_attention: True               # whether to filter data with bad attention scores
-    min_attention_sharpness: 0.5         # filter data with bad attention sharpness score, if 0 then no filter
-    min_attention_alignment: 0.95        # filter data with bad attention alignment score, if 0 then no filter
-
-
-vocoder:
-
-  model:
-    mode: 'RAW'                     # choices ['RAW', 'MOL']
-                                    # 'RAW' = softmax on raw bits,  'MOL' = sample from mixture of logistics
-    upsample_factors: [4, 8, 8]     # NB - this needs to correctly factorise hop_length
-    rnn_dims: 512
-    fc_dims: 512
-    compute_dims: 128
-    res_out_dims: 128
-    res_blocks: 10
-    pad: 2                         # this will pad the input so that the resnet can 'see' wider than input length
-
-  training:
-    schedule:
-      - 1e-4,  300_000,  32        # progressive training schedule
-      - 1e-5,  600_000,  32        # lr, step, batch_size
-
-    checkpoint_every: 25_000
-    gen_samples_every: 5000        # how often to generate samples for cherry-picking models
-    num_gen_samples: 3             # number of samples to generate for cherry-picking models
-    keep_top_k: 3                  # how many top performing models to keep
-    seq_len: 1280                  # must be a multiple of hop_length
-    clip_grad_norm: 4              # set to None if no gradient clipping needed
-    max_mel_len: 20000
-
-    # Generating / Synthesizing
-    gen_batched: True              # very fast (realtime+) single utterance batched generation
-    target: 11_000                 # target number of samples to be generated in each batch entry
-    overlap: 550                   # number of samples for crossfading between batches
-
+    filter:
+      max_mel_len: 1250                    # filter files with mel len larger than given
+      filter_duration_stats: True          # whether to filter according to the duration stats below
+      min_attention_sharpness: 0.5         # filter files with bad attention sharpness score, if 0 then no filter
+      min_attention_alignment: 0.95        # filter files with bad attention alignment score, if 0 then no filter
+      max_duration: 40                     # filter files with durations larger than given
+      max_consecutive_ones: 6              # filter files where durations contain more consecutive ones than given

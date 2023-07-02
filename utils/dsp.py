@@ -1,4 +1,3 @@
-import math
 import struct
 from pathlib import Path
 from typing import Dict, Any, Union
@@ -22,15 +21,12 @@ class DSP:
                  peak_norm: bool,
                  trim_start_end_silence: bool,
                  trim_silence_top_db:  int,
-                 pitch_max_freq: int,
                  trim_long_silences: bool,
                  vad_sample_rate: int,
                  vad_window_length: float,
                  vad_moving_average_width: float,
                  vad_max_silence_length: int,
-                 bits: int,
-                 mu_law: bool,
-                 voc_mode: str,
+                 **kwargs,  # for backward compatibility
                  ) -> None:
 
         self.n_mels = num_mels
@@ -45,16 +41,11 @@ class DSP:
         self.should_trim_start_end_silence = trim_start_end_silence
         self.should_trim_long_silences = trim_long_silences
         self.trim_silence_top_db = trim_silence_top_db
-        self.pitch_max_freq = pitch_max_freq
 
         self.vad_sample_rate = vad_sample_rate
         self.vad_window_length = vad_window_length
         self.vad_moving_average_width = vad_moving_average_width
         self.vad_max_silence_length = vad_max_silence_length
-
-        self.bits = bits
-        self.mu_law = mu_law
-        self.voc_mode = voc_mode
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> 'DSP':
@@ -134,63 +125,4 @@ class DSP:
         audio_mask = np.round(audio_mask).astype(np.bool)
         audio_mask[:] = binary_dilation(audio_mask[:], np.ones(self.vad_max_silence_length + 1))
         audio_mask = np.repeat(audio_mask, samples_per_window)
-        sil_mask = (1 - audio_mask).astype(np.bool)
-
-        size = len(sil_mask[sil_mask!=0])
-        x = np.linspace(0, len(wav), len(wav))
-        x = np.sin(x).astype(np.float32) * 0.
-        #x = np.sin(x).astype(np.float32)
-        wav[sil_mask] = x[sil_mask]
-        print(wav[sil_mask])
-        print(x[sil_mask])
-        print(x)
-        return wav
-
-    def get_voice_mask(self, wav: np.array) -> np.array:
-        int16_max = (2 ** 15) - 1
-        samples_per_window = (self.vad_window_length * self.vad_sample_rate) // 1000
-        wav = wav[:len(wav) - (len(wav) % samples_per_window)]
-        pcm_wave = struct.pack("%dh" % len(wav), *(np.round(wav * int16_max)).astype(np.int16))
-        voice_flags = []
-        vad = webrtcvad.Vad(mode=3)
-        for window_start in range(0, len(wav), samples_per_window):
-            window_end = window_start + samples_per_window
-            voice_flags.append(vad.is_speech(pcm_wave[window_start * 2:window_end * 2],
-                                             sample_rate=self.vad_sample_rate))
-        voice_flags = np.array(voice_flags)
-        def moving_average(array, width):
-            array_padded = np.concatenate((np.zeros((width - 1) // 2), array, np.zeros(width // 2)))
-            ret = np.cumsum(array_padded, dtype=float)
-            ret[width:] = ret[width:] - ret[:-width]
-            return ret[width - 1:] / width
-        audio_mask = moving_average(voice_flags, self.vad_moving_average_width)
-        audio_mask = np.round(audio_mask).astype(np.bool)
-        audio_mask[:] = binary_dilation(audio_mask[:], np.ones(self.vad_max_silence_length + 1))
-        audio_mask = np.repeat(audio_mask, samples_per_window)
-        return audio_mask
-
-
-    @staticmethod
-    def label_2_float(x: np.array, bits: float) -> np.array:
-        return 2 * x / (2**bits - 1.) - 1.
-
-    @staticmethod
-    def float_2_label(x: np.array, bits: float) -> np.array:
-        assert abs(x).max() <= 1.0
-        x = (x + 1.) * (2**bits - 1) / 2
-        return x.clip(0, 2**bits - 1)
-
-    @staticmethod
-    def encode_mu_law(x: np.array, mu: float) -> np.array:
-        mu = mu - 1
-        fx = np.sign(x) * np.log(1 + mu * np.abs(x)) / np.log(1 + mu)
-        return np.floor((fx + 1) / 2 * mu + 0.5)
-
-    @staticmethod
-    def decode_mu_law(y: np.array, mu: float, from_labels=True) -> np.array:
-        if from_labels:
-            y = DSP.label_2_float(y, math.log2(mu))
-        mu = mu - 1
-        x = np.sign(y) / mu * ((1 + mu) ** np.abs(y) - 1)
-        return x
-
+        return wav[audio_mask]
