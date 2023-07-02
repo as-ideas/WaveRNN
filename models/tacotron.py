@@ -238,6 +238,7 @@ class Tacotron(nn.Module):
         self.encoder = Encoder(embed_dims, num_chars, encoder_dims,
                                encoder_k, num_highways, dropout)
         self.encoder_proj = nn.Linear(decoder_dims + 32, decoder_dims, bias=False)
+        self.encoder_seq_proj = nn.Linear(decoder_dims + 32, decoder_dims, bias=False)
         self.mel_proj = nn.Linear(80+32, 80)
         self.decoder = Decoder(n_mels, decoder_dims, lstm_dims)
         self.postnet = CBHG(postnet_k, n_mels, postnet_dims, [256, 80], num_highways)
@@ -264,7 +265,7 @@ class Tacotron(nn.Module):
         if self.training:
             self.step += 1
 
-        batch_size, _, steps  = m.size()
+        batch_size, _, steps = m.size()
 
         with torch.no_grad():
             x_al = self.aligner.embedding(x)
@@ -294,7 +295,7 @@ class Tacotron(nn.Module):
 
 
         encoder_seq_in = torch.cat([encoder_seq, encoder_aligner], dim=-1)
-
+        encoder_seq = self.encoder_seq_proj(encoder_seq_in)
         encoder_seq_proj = self.encoder_proj(encoder_seq_in)
 
         # Need a couple of lists for outputs
