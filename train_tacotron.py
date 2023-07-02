@@ -205,10 +205,10 @@ if __name__ == '__main__':
     else:
         trainer = TacoTrainer(paths, config=config, dsp=dsp)
         trainer.train(model, optimizer)
-        print('Training finished, now creating Attention Alignments and Pitch Values...')
-        train_set, val_set = get_taco_dataloaders(paths, 1, model.r, max_mel_len=None)
-        create_align_features(model=model,  config=config, paths=paths)
-        print('\n\nYou can now train ForwardTacotron - use python train_forward.py\n')
+        print('Training finished.')
+        #train_set, val_set = get_taco_dataloaders(paths, 1, model.r, max_mel_len=None)
+        #create_align_features(model=model,  config=config, paths=paths)
+        #print('\n\nYou can now train ForwardTacotron - use python train_forward.py\n')
 
 
 
