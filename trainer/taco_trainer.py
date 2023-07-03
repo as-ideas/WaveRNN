@@ -17,6 +17,49 @@ from utils.dsp import DSP
 from utils.files import parse_schedule
 from utils.metrics import attention_score
 from utils.paths import Paths
+from utils.text.symbols import phonemes
+
+
+class ForwardSumLoss(torch.nn.Module):
+
+    def __init__(self, blank_logprob=-1):
+        super(ForwardSumLoss, self).__init__()
+        self.log_softmax = torch.nn.LogSoftmax(dim=3)
+        self.blank_logprob = blank_logprob
+        self.CTCLoss = torch.nn.CTCLoss(zero_infinity=True)
+
+    def forward(self, attn_logprob, text_lens, mel_lens):
+        """
+        Args:
+        attn_logprob: batch x 1 x max(mel_lens) x max(text_lens)
+        batched tensor of attention log
+        probabilities, padded to length
+        of longest sequence in each dimension
+        text_lens: batch-D vector of length of
+        each text sequence
+        mel_lens: batch-D vector of length of
+        each mel sequence
+        """
+        # The CTC loss module assumes the existence of a blank token
+        # that can be optionally inserted anywhere in the sequence for
+        # a fixed probability.
+        # A row must be added to the attention matrix to account for this
+        attn_logprob_pd = F.pad(input=attn_logprob,
+                                pad=(1, 0, 0, 0, 0, 0),
+                                value=self.blank_logprob)
+
+
+        bs = attn_logprob.size(0)
+        T = attn_logprob.size(-1)
+        target_seq = torch.arange(1, T+1).expand(bs, T)
+        attn_logprob_pd = attn_logprob_pd.permute(1, 0, 2)
+        attn_logprob_pd = attn_logprob_pd.log_softmax(-1)
+
+        cost = self.CTCLoss(attn_logprob_pd,
+                            target_seq,
+                            input_lengths=mel_lens,
+                            target_lengths=text_lens)
+        return cost
 
 
 class TacoTrainer:
@@ -30,6 +73,7 @@ class TacoTrainer:
         self.config = config
         self.train_cfg = config['tacotron']['training']
         self.writer = SummaryWriter(log_dir=paths.taco_log, comment='v1')
+        self.forward_loss = ForwardSumLoss()
 
     def train(self,
               model: Tacotron,
@@ -71,11 +115,15 @@ class TacoTrainer:
                 batch = to_device(batch, device=device)
                 start = time.time()
                 model.train()
-                m1_hat, m2_hat, attention = model(batch)
+
+                out = model(batch)
+                m1_hat, m2_hat, attention, att_aligner = out['mel'], out['mel_post'], out['att'], out['att_aligner']
+
+                ctc_loss = self.forward_loss(att_aligner, text_lens=batch['x_len'], mel_lens=batch['mel_len'])
 
                 m1_loss = F.l1_loss(m1_hat, batch['mel'])
                 m2_loss = F.l1_loss(m2_hat, batch['mel'])
-                loss = m1_loss + m2_loss
+                loss = m1_loss + m2_loss + 0.1 * ctc_loss
                 optimizer.zero_grad()
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(),
@@ -101,6 +149,7 @@ class TacoTrainer:
                 att_score = torch.mean(att_score)
                 self.writer.add_scalar('Attention_Score/train', att_score, model.get_step())
                 self.writer.add_scalar('Mel_Loss/train', loss, model.get_step())
+                self.writer.add_scalar('CTC_Loss/train', ctc_loss, model.get_step())
                 self.writer.add_scalar('Params/reduction_factor', session.r, model.get_step())
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
                 self.writer.add_scalar('Params/learning_rate', session.lr, model.get_step())
@@ -125,7 +174,8 @@ class TacoTrainer:
         for i, batch in enumerate(val_set, 1):
             batch = to_device(batch, device=device)
             with torch.no_grad():
-                m1_hat, m2_hat, attention = model(batch)
+                out = model(batch)
+                m1_hat, m2_hat, attention = out['mel'], out['mel_post'], out['att']
                 m1_loss = F.l1_loss(m1_hat, batch['mel'])
                 m2_loss = F.l1_loss(m2_hat, batch['mel'])
                 val_loss += m1_loss.item() + m2_loss.item()
@@ -140,19 +190,23 @@ class TacoTrainer:
         device = next(model.parameters()).device
         batch = session.val_sample
         batch = to_device(batch, device=device)
-        m1_hat, m2_hat, att = model(batch)
+        out = model(batch)
+        m1_hat, m2_hat, att, att_aligner = out['mel'], out['mel_post'], out['att'], out['att_aligner']
         att = np_now(att)[0]
+        att_aligner = np_now(att_aligner.softmax(-1))[0]
         m1_hat = np_now(m1_hat)[0, :, :]
         m2_hat = np_now(m2_hat)[0, :, :]
         m_target = np_now(batch['mel'])[0, :, :]
         speaker = batch['speaker_name'][0]
 
         att_fig = plot_attention(att)
+        att_aligner_fig = plot_attention(att_aligner)
         m1_hat_fig = plot_mel(m1_hat)
         m2_hat_fig = plot_mel(m2_hat)
         m_target_fig = plot_mel(m_target)
 
         self.writer.add_figure(f'Ground_Truth_Aligned/attention/{speaker}', att_fig, model.step)
+        self.writer.add_figure(f'Ground_Truth_Aligned/attention_aligner/{speaker}', att_aligner_fig, model.step)
         self.writer.add_figure(f'Ground_Truth_Aligned/target/{speaker}', m_target_fig, model.step)
         self.writer.add_figure(f'Ground_Truth_Aligned/linear/{speaker}', m1_hat_fig, model.step)
         self.writer.add_figure(f'Ground_Truth_Aligned/postnet/{speaker}', m2_hat_fig, model.step)
@@ -165,23 +219,4 @@ class TacoTrainer:
             global_step=model.step, sample_rate=self.dsp.sample_rate)
         self.writer.add_audio(
             tag=f'Ground_Truth_Aligned/postnet_wav/{speaker}', snd_tensor=m2_hat_wav,
-            global_step=model.step, sample_rate=self.dsp.sample_rate)
-
-        m1_hat, m2_hat, att = model.generate(batch['x'][0:1], steps=batch['mel_len'][0] + 20)
-        att_fig = plot_attention(att)
-        m1_hat_fig = plot_mel(m1_hat)
-        m2_hat_fig = plot_mel(m2_hat)
-
-        self.writer.add_figure(f'Generated/attention/{speaker}', att_fig, model.step)
-        self.writer.add_figure(f'Generated/target/{speaker}', m_target_fig, model.step)
-        self.writer.add_figure(f'Generated/linear/{speaker}', m1_hat_fig, model.step)
-        self.writer.add_figure(f'Generated/postnet/{speaker}', m2_hat_fig, model.step)
-
-        m2_hat_wav = self.dsp.griffinlim(m2_hat)
-
-        self.writer.add_audio(
-            tag=f'Generated/target_wav/{speaker}', snd_tensor=target_wav,
-            global_step=model.step, sample_rate=self.dsp.sample_rate)
-        self.writer.add_audio(
-            tag=f'Generated/postnet_wav/{speaker}', snd_tensor=m2_hat_wav,
             global_step=model.step, sample_rate=self.dsp.sample_rate)

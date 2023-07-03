@@ -1,6 +1,6 @@
 
-tts_model_id: 'multispeaker_tts'
-data_path: 'data_multispeaker'                                        # output data path
+tts_model_id: 'att_tts'
+data_path: '/Users/cschaefe/datasets/multispeaker_welt_bild'                                        # output data path
 
 tts_model: 'multi_forward_tacotron'   # choices: [multi_forward_tacotron, multi_fast_pitch]
 
@@ -77,7 +77,7 @@ tacotron:
 
   training:
     schedule:
-      - 8,  1e-3,  30_000,  32      # progressive training schedule
+      - 8,  1e-3,  30_000,  8      # progressive training schedule
       - 4,   1e-4,  40_000,  16     # (r, lr, step, batch_size)
       - 2,   1e-4,  50_000,  8
       - 1,   1e-4,  65_000,  8
@@ -85,7 +85,7 @@ tacotron:
 
     clip_grad_norm: 1.0              # clips the gradient norm to prevent explosion - set to None if not needed
     checkpoint_every: 10000          # checkpoints the model every x steps
-    plot_every: 1000                 # generates samples and plots every x steps
+    plot_every: 100                 # generates samples and plots every x steps
     num_workers: 2                   # number of workers for dataloader
 
     filter:
