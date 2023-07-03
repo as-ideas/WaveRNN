@@ -20,13 +20,13 @@ class Aligner(nn.Module):
 
         self.text_encoder = nn.Sequential(
             nn.Conv1d(in_channels=256 + 256, out_channels=256, kernel_size=3, padding=1),
-            nn.Conv1d(in_channels=256, out_channels=32, kernel_size=3, padding=1)
+            nn.Conv1d(in_channels=256, out_channels=32, kernel_size=1)
         )
 
         self.mel_encoder = nn.Sequential(
             nn.Conv1d(in_channels=80, out_channels=256, kernel_size=3, padding=1),
             nn.Conv1d(in_channels=256, out_channels=256, kernel_size=3, padding=1),
-            nn.Conv1d(in_channels=256, out_channels=32, kernel_size=3, padding=1)
+            nn.Conv1d(in_channels=256, out_channels=32, kernel_size=1)
         )
 
     def forward(self, x: torch.Tensor, m: torch.Tensor, semb: torch.Tensor) -> dict:
