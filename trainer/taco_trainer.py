@@ -123,7 +123,8 @@ class TacoTrainer:
 
                 m1_loss = F.l1_loss(m1_hat, batch['mel'])
                 m2_loss = F.l1_loss(m2_hat, batch['mel'])
-                loss = m1_loss + m2_loss + ctc_loss
+                mel_loss = m1_loss + m2_loss
+                loss = mel_loss + ctc_loss
                 optimizer.zero_grad()
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(),
@@ -148,7 +149,7 @@ class TacoTrainer:
                 _, att_score = attention_score(attention, batch['mel_len'])
                 att_score = torch.mean(att_score)
                 self.writer.add_scalar('Attention_Score/train', att_score, model.get_step())
-                self.writer.add_scalar('Mel_Loss/train', loss, model.get_step())
+                self.writer.add_scalar('Mel_Loss/train', mel_loss, model.get_step())
                 self.writer.add_scalar('CTC_Loss/train', ctc_loss, model.get_step())
                 self.writer.add_scalar('Params/reduction_factor', session.r, model.get_step())
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
