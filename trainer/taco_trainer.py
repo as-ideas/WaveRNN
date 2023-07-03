@@ -119,7 +119,7 @@ class TacoTrainer:
         loss_avg = Averager()
         duration_avg = Averager()
         device = next(model.parameters()).device  # use same device as model parameters
-
+        att_loss = 0
         self.forward_loss = self.forward_loss.to(device)
         for e in range(1, epochs + 1):
             for i, batch in tqdm.tqdm(enumerate(session.train_set, 1), total=len(session.train_set)):
@@ -133,15 +133,18 @@ class TacoTrainer:
                                                    self.train_cfg['clip_grad_norm'])
                     aligner_optim.step()
 
-                if aligner.get_step() > 2000:
+                if aligner.get_step() > 2:
 
                     start = time.time()
                     model.train()
                     m1_hat, m2_hat, attention = model(batch['x'], batch['mel'])
 
+                    att_diff = att_aligner.detach().softmax(-1) - attention
+                    att_loss = (att_diff ** 2).mean()
+
                     m1_loss = F.l1_loss(m1_hat, batch['mel'])
                     m2_loss = F.l1_loss(m2_hat, batch['mel'])
-                    loss = m1_loss + m2_loss
+                    loss = m1_loss + m2_loss + att_loss
                     optimizer.zero_grad()
                     loss.backward()
                     torch.nn.utils.clip_grad_norm_(model.parameters(),
@@ -171,6 +174,7 @@ class TacoTrainer:
                         self.generate_plots(model, aligner, session)
 
                 self.writer.add_scalar('CTCLoss/train', ctc_loss, aligner.get_step())
+                self.writer.add_scalar('AttLoss/train', att_loss, aligner.get_step())
                 self.writer.add_scalar('Params/reduction_factor', session.r, aligner.get_step())
                 self.writer.add_scalar('Params/batch_size', session.bs, aligner.get_step())
                 self.writer.add_scalar('Params/learning_rate', session.lr, aligner.get_step())

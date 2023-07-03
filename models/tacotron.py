@@ -180,6 +180,9 @@ class Decoder(nn.Module):
         attn_rnn_in = torch.cat([context_vec, prenet_out], dim=-1)
         attn_hidden = self.attn_rnn(attn_rnn_in.squeeze(1), attn_hidden)
 
+
+
+
         # Compute the attention scores
         scores = self.attn_net(encoder_seq_proj, attn_hidden, t)
 
@@ -237,9 +240,7 @@ class Tacotron(nn.Module):
         self.decoder_dims = decoder_dims
         self.encoder = Encoder(embed_dims, num_chars, encoder_dims,
                                encoder_k, num_highways, dropout)
-        self.encoder_proj = nn.Linear(decoder_dims + 32, decoder_dims, bias=False)
-        self.encoder_seq_proj = nn.Linear(decoder_dims + 32, decoder_dims, bias=False)
-        self.mel_proj = nn.Linear(80+32, 80)
+        self.encoder_proj = nn.Linear(decoder_dims, decoder_dims, bias=False)
         self.decoder = Decoder(n_mels, decoder_dims, lstm_dims)
         self.postnet = CBHG(postnet_k, n_mels, postnet_dims, [256, 80], num_highways)
         self.post_proj = nn.Linear(postnet_dims * 2, n_mels, bias=False)
@@ -267,11 +268,6 @@ class Tacotron(nn.Module):
 
         batch_size, _, steps = m.size()
 
-        with torch.no_grad():
-            x_al = self.aligner.embedding(x)
-            encoder_aligner = self.aligner.text_encoder(x_al.transpose(1, 2)).transpose(1, 2)
-            mel_aligner = self.aligner.mel_encoder(m)
-
         # Initialise all hidden states and pack into tuple
         attn_hidden = torch.zeros(batch_size, self.decoder_dims, device=device)
         rnn1_hidden = torch.zeros(batch_size, self.lstm_dims, device=device)
@@ -292,21 +288,14 @@ class Tacotron(nn.Module):
         # Project the encoder outputs to avoid
         # unnecessary matmuls in the decoder loop
         encoder_seq = self.encoder(x)
-
-
-        encoder_seq_in = torch.cat([encoder_seq, encoder_aligner], dim=-1)
-        encoder_seq = self.encoder_seq_proj(encoder_seq_in)
-        encoder_seq_proj = self.encoder_proj(encoder_seq_in)
+        encoder_seq_proj = self.encoder_proj(encoder_seq)
 
         # Need a couple of lists for outputs
         mel_outputs, attn_scores = [], []
 
-        m_in = torch.cat([m, mel_aligner], dim=1)
-        m_in = self.mel_proj(m_in.transpose(1, 2)).transpose(1, 2)#torch.cat([m, mel_aligner], dim=1)
-
         # Run the decoder loop
         for t in range(0, steps, self.r):
-            prenet_in = m_in[:, :, t - 1] if t > 0 else go_frame
+            prenet_in = m[:, :, t - 1] if t > 0 else go_frame
             mel_frames, scores, hidden_states, cell_states, context_vec = \
                 self.decoder(encoder_seq, encoder_seq_proj, prenet_in,
                              hidden_states, cell_states, context_vec, t)
