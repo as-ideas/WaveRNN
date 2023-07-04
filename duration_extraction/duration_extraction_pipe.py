@@ -112,7 +112,8 @@ class DurationExtractionPipeline:
             batch = to_device(batch, device=device)
             with torch.no_grad():
                 out = model(batch)
-            attention_batch = out['att']
+            attention_batch = 0.5*(out['att'] + out['att_aligner'])
+
             _, att_score = attention_score(attention_batch, batch['mel_len'], r=1)
             sum_att_score += att_score.sum()
             B = batch['x_len'].size(0)
