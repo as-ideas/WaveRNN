@@ -122,9 +122,9 @@ class TacoTrainer:
 
                 ctc_loss = self.forward_loss(att_aligner, text_lens=batch['x_len'], mel_lens=batch['mel_len'])
 
-                dia_mat = torch.zeros(attention.size()).to(device).detach()
-                T = attention.size(1)
-                N = attention.size(2)
+                dia_mat = torch.zeros(att_aligner.size()).to(device).detach()
+                T = att_aligner.size(1)
+                N = att_aligner.size(2)
                 g = 0.2
                 for t in range(T):
                     for n in range(N):

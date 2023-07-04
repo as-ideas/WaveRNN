@@ -12,7 +12,6 @@ from utils.text.symbols import phonemes
 
 class Aligner(nn.Module):
 
-
     def __init__(self, num_chars):
         super().__init__()
         self.register_buffer('step', torch.zeros(1, dtype=torch.long))
