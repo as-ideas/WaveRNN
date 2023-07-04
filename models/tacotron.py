@@ -19,14 +19,21 @@ class Aligner(nn.Module):
 
         self.text_encoder = nn.Sequential(
             nn.Conv1d(in_channels=256 + 256, out_channels=256, kernel_size=3, padding=1),
-            nn.Conv1d(in_channels=256, out_channels=32, kernel_size=1)
         )
-
         self.mel_encoder = nn.Sequential(
             nn.Conv1d(in_channels=80, out_channels=256, kernel_size=3, padding=1),
             nn.Conv1d(in_channels=256, out_channels=256, kernel_size=3, padding=1),
-            nn.Conv1d(in_channels=256, out_channels=32, kernel_size=1)
         )
+
+        self.text_gru = nn.GRU(256, 64, bidirectional=True)
+        self.mel_gru = nn.GRU(256, 64, bidirectional=True)
+
+        self.text_lin = nn.Linear(256, 32)
+        self.mel_lin = nn.Linear(256, 32)
+
+        self.text_pos = nn.Conv1d(1, 256, 1)
+        self.mel_pos = nn.Conv1d(1, 256, 1)
+
 
     def forward(self, x: torch.Tensor, m: torch.Tensor, semb: torch.Tensor) -> dict:
         if self.training:
@@ -35,16 +42,30 @@ class Aligner(nn.Module):
 
         x = x.transpose(1, 2)
 
+        x_len = x.size(-1)
+        mel_len = m.size(-1)
+
+        x_pos = torch.linspace(0, 1, steps=x_len).to(x.device)[None, None, :]
+        m_pos = torch.linspace(0, 1, steps=mel_len).to(x.device)[None, None, :]
+
         speaker_emb = semb[:, :, None]
         speaker_emb = speaker_emb.repeat(1, 1, x.shape[2])
         x = torch.cat([x, speaker_emb], dim=1)
 
         x = self.text_encoder(x)
+        x_pos = self.text_pos(x_pos)
+        x = x + x_pos
 
         m = self.mel_encoder(m)
+        m_pos = self.mel_pos(m_pos)
+        m = m + m_pos
 
         x = x.transpose(1, 2)
+
+        x = self.text_lin(x)
+
         m = m.transpose(1, 2)
+        m = self.mel_lin(m)
 
         diff = x[:, None, :, :] - m[:, :, None, :]
         dist = -torch.linalg.norm(diff, ord=2, dim=-1)

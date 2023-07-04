@@ -117,9 +117,11 @@ class TacoTrainer:
                 start = time.time()
                 model.train()
 
-                out = model(batch)
-                m1_hat, m2_hat, attention, att_aligner = out['mel'], out['mel_post'], out['att'], out['att_aligner']
+                out = model.aligner(batch['x'], batch['mel'], batch['speaker_emb'])
+                model.step += 1
 
+                #m1_hat, m2_hat, attention, att_aligner = out['mel'], out['mel_post'], out['att'], out['att_aligner']
+                att_aligner = out['att']
                 ctc_loss = self.forward_loss(att_aligner, text_lens=batch['x_len'], mel_lens=batch['mel_len'])
 
                 dia_mat = torch.zeros(att_aligner.size()).to(device).detach()
@@ -130,12 +132,11 @@ class TacoTrainer:
                     for n in range(N):
                         dia_mat[:, t, n] = math.exp(-(n / N - t / T) ** 2 / (2 * g ** 2))
 
-                dia_loss = ((1 - dia_mat) * att_aligner.softmax(-1)).mean() * 1000.
-
-                m1_loss = F.l1_loss(m1_hat, batch['mel'])
-                m2_loss = F.l1_loss(m2_hat, batch['mel'])
-                mel_loss = m1_loss + m2_loss + dia_loss
-                loss = mel_loss + ctc_loss
+                dia_loss = ((1 - dia_mat) * att_aligner.softmax(-1)).mean() * 0.
+                #m1_loss = F.l1_loss(m1_hat, batch['mel'])
+                #m2_loss = F.l1_loss(m2_hat, batch['mel'])
+                #mel_loss = m1_loss + m2_loss + dia_loss
+                loss = ctc_loss + dia_loss# mel_loss + ctc_loss
                 optimizer.zero_grad()
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(),
@@ -157,10 +158,10 @@ class TacoTrainer:
                 if step % self.train_cfg['plot_every'] == 0:
                     self.generate_plots(model, session)
 
-                _, att_score = attention_score(attention, batch['mel_len'])
+                _, att_score = attention_score(att_aligner.softmax(-1), batch['mel_len'])
                 att_score = torch.mean(att_score)
                 self.writer.add_scalar('Attention_Score/train', att_score, model.get_step())
-                self.writer.add_scalar('Mel_Loss/train', mel_loss, model.get_step())
+                #self.writer.add_scalar('Mel_Loss/train', mel_loss, model.get_step())
                 self.writer.add_scalar('CTC_Loss/train', ctc_loss, model.get_step())
                 self.writer.add_scalar('Dia_Loss/train', dia_loss, model.get_step())
                 self.writer.add_scalar('Params/reduction_factor', session.r, model.get_step())
