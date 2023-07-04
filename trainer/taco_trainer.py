@@ -202,12 +202,16 @@ class TacoTrainer:
 
         att_fig = plot_attention(att)
         att_aligner_fig = plot_attention(att_aligner)
+        att_aligner_sum_fig = plot_attention(0.5*att_aligner + 0.5*att)
+
+
         m1_hat_fig = plot_mel(m1_hat)
         m2_hat_fig = plot_mel(m2_hat)
         m_target_fig = plot_mel(m_target)
 
         self.writer.add_figure(f'Ground_Truth_Aligned/attention/{speaker}', att_fig, model.step)
         self.writer.add_figure(f'Ground_Truth_Aligned/attention_aligner/{speaker}', att_aligner_fig, model.step)
+        self.writer.add_figure(f'Ground_Truth_Aligned/attention_sum/{speaker}', att_aligner_sum_fig, model.step)
         self.writer.add_figure(f'Ground_Truth_Aligned/target/{speaker}', m_target_fig, model.step)
         self.writer.add_figure(f'Ground_Truth_Aligned/linear/{speaker}', m1_hat_fig, model.step)
         self.writer.add_figure(f'Ground_Truth_Aligned/postnet/{speaker}', m2_hat_fig, model.step)
