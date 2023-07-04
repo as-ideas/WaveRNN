@@ -202,7 +202,9 @@ class TacoTrainer:
 
         att_fig = plot_attention(att)
         att_aligner_fig = plot_attention(att_aligner)
-        att_aligner_sum_fig = plot_attention(0.5*att_aligner + 0.5*att)
+
+        att_aligner_down = att_aligner[::model.r, :]
+        att_aligner_sum_fig = plot_attention(0.5*att_aligner_down[:att.shape[0], :] + 0.5*att)
 
 
         m1_hat_fig = plot_mel(m1_hat)
