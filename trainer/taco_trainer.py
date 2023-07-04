@@ -1,3 +1,4 @@
+import math
 import time
 
 import torch
@@ -73,9 +74,19 @@ class TacoTrainer:
                 model.train()
                 m1_hat, m2_hat, attention = model(batch)
 
+                dia_mat = torch.zeros(attention.size()).to(device).detach()
+                T = attention.size(1)
+                N = attention.size(2)
+                g = 0.2
+                for t in range(T):
+                    for n in range(N):
+                        dia_mat[:, t, n] = math.exp(-(n / N - t / T) ** 2 / (2 * g ** 2))
+
+                dia_loss = (1 - dia_mat) * attention
+
                 m1_loss = F.l1_loss(m1_hat, batch['mel'])
                 m2_loss = F.l1_loss(m2_hat, batch['mel'])
-                loss = m1_loss + m2_loss
+                loss = m1_loss + m2_loss + 1000. * dia_loss.mean()
                 optimizer.zero_grad()
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(),
@@ -101,6 +112,7 @@ class TacoTrainer:
                 att_score = torch.mean(att_score)
                 self.writer.add_scalar('Attention_Score/train', att_score, model.get_step())
                 self.writer.add_scalar('Mel_Loss/train', loss, model.get_step())
+                self.writer.add_scalar('Dia_Loss/train', dia_loss, model.get_step())
                 self.writer.add_scalar('Params/reduction_factor', session.r, model.get_step())
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
                 self.writer.add_scalar('Params/learning_rate', session.lr, model.get_step())
@@ -146,6 +158,8 @@ class TacoTrainer:
         m2_hat = np_now(m2_hat)[0, :, :]
         m_target = np_now(batch['mel'])[0, :, :]
         speaker = batch['speaker_name'][0]
+
+
 
         att_fig = plot_attention(att)
         m1_hat_fig = plot_mel(m1_hat)
