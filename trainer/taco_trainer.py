@@ -82,11 +82,11 @@ class TacoTrainer:
                     for n in range(N):
                         dia_mat[:, t, n] = math.exp(-(n / N - t / T) ** 2 / (2 * g ** 2))
 
-                dia_loss = (1 - dia_mat) * attention
+                dia_loss = ((1 - dia_mat) * attention).mean() * 1000.
 
                 m1_loss = F.l1_loss(m1_hat, batch['mel'])
                 m2_loss = F.l1_loss(m2_hat, batch['mel'])
-                loss = m1_loss + m2_loss + 1000. * dia_loss.mean()
+                loss = m1_loss + m2_loss + dia_loss
                 optimizer.zero_grad()
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(),
