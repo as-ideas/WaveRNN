@@ -217,7 +217,8 @@ class TacoTrainer:
         device = next(model.parameters()).device
         batch = session.val_sample
         batch = to_device(batch, device=device)
-        out = model(batch)
+        with torch.no_grad():
+            out = model(batch)
         m1_hat, m2_hat, att, att_aligner = out['mel'], out['mel_post'], out['att'], out['att_aligner']
         att = np_now(att)[0]
         att_aligner = np_now(att_aligner.softmax(-1))[0]
@@ -244,12 +245,14 @@ class TacoTrainer:
         self.writer.add_figure(f'Ground_Truth_Aligned/linear/{speaker}', m1_hat_fig, model.step)
         self.writer.add_figure(f'Ground_Truth_Aligned/postnet/{speaker}', m2_hat_fig, model.step)
 
-        m2_hat_wav = self.dsp.griffinlim(m2_hat)
-        target_wav = self.dsp.griffinlim(m_target)
+        model.decoder.prenet.train()
+        batch = session.val_sample
+        batch = to_device(batch, device=device)
+        with torch.no_grad():
+            out = model(batch)
+        m1_hat, m2_hat, att, att_aligner = out['mel'], out['mel_post'], out['att'], out['att_aligner']
+        att = np_now(att)[0]
+        speaker = batch['speaker_name'][0]
 
-        self.writer.add_audio(
-            tag=f'Ground_Truth_Aligned/target_wav/{speaker}', snd_tensor=target_wav,
-            global_step=model.step, sample_rate=self.dsp.sample_rate)
-        self.writer.add_audio(
-            tag=f'Ground_Truth_Aligned/postnet_wav/{speaker}', snd_tensor=m2_hat_wav,
-            global_step=model.step, sample_rate=self.dsp.sample_rate)
+        att_fig = plot_attention(att)
+        self.writer.add_figure(f'Ground_Truth_Aligned/attention_t/{speaker}', att_fig, model.step)
