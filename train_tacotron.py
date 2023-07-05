@@ -117,7 +117,7 @@ def create_align_features(model: Tacotron,
     assert model.r == 1, f'Reduction factor of tacotron must be 1 for creating alignment features! ' \
                          f'Reduction factor was: {model.r}'
     model.eval()
-    #model.decoder.prenet.train()
+    model.decoder.prenet.train()
 
     dur_extr_conf = config['duration_extraction']
 
