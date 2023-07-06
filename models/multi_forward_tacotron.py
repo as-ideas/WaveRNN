@@ -14,7 +14,7 @@ from utils.text.symbols import phonemes
 class AutoregSeriesPredictor(nn.Module):
 
     def __init__(self, num_chars, emb_dim=64, conv_dims=256,
-                 rnn_dims=64, dropout=0.5, semb_dims=256, out_dims=1):
+                 rnn_dims=64, dropout=0.5, semb_dims=256, out_dims=1, round=False):
         super().__init__()
         self.embedding = Embedding(num_chars, emb_dim)
         self.convs = torch.nn.ModuleList([
@@ -29,6 +29,7 @@ class AutoregSeriesPredictor(nn.Module):
         self.lin = nn.Linear(rnn_dims, out_dims)
         self.rnn_dims = rnn_dims
         self.dropout = dropout
+        self.round = round
 
     def forward(self,
                 x: torch.Tensor,
@@ -91,6 +92,8 @@ class AutoregSeriesPredictor(nn.Module):
                 h = rnn(x_dec_in, h)
                 x_out = x_res[0, i:i+1, :] + h
                 sample = self.lin(x_out)
+                if self.round:
+                    sample = torch.round(sample)
                 output.append(sample)
                 o = sample
 
