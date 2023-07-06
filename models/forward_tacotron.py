@@ -125,6 +125,10 @@ class ForwardTacotron(nn.Module):
 
         if self.training:
             self.step += 1
+        b, x_len = x.size()
+        zeros = torch.zeros((b, 1), device=device)
+        dur_in = torch.cat([zeros, dur[:, :-1]], dim=1)
+        pitch_in = torch.cat([zeros, pitch[:, :-1]], dim=1)
 
         dur_hat = self.dur_pred(x).squeeze(-1)
         pitch_hat = self.pitch_pred(x).transpose(1, 2)
