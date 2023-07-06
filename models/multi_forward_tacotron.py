@@ -92,6 +92,7 @@ class AutoregSeriesPredictor(nn.Module):
                 x_out = x_res[0, i:i+1, :] + h
                 sample = self.lin(x_out)
                 output.append(sample)
+                o = sample
 
         output = torch.stack(output)
         return output
@@ -352,8 +353,8 @@ class MultiForwardTacotron(nn.Module):
             energy_hat = self.energy_pred(x, speaker_emb).transpose(1, 2)
             energy_hat = energy_function(energy_hat)
 
-            print('dur', dur_hat.tolist())
-            print('pitch', pitch_hat.tolist())
+            print('dur', dur_hat.squeeze())
+            print('pitch', pitch_hat.squeeze())
 
             return self._generate_mel(x=x,
                                       dur_hat=dur_hat,
