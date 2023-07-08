@@ -454,6 +454,7 @@ def _get_filtered_datasets(paths: Paths,
         speaker_counts_orig = Counter([speaker_dict[item_id] for item_id, _ in train_data + val_data if item_id in speaker_dict])
         train_data = data_filter(train_data)
         val_data = data_filter(val_data)
+        val_data = sorted(val_data, key=lambda x: -x[1])
         speaker_counts_filtered = Counter([speaker_dict[item_id] for item_id, _ in train_data + val_data if item_id in speaker_dict])
 
         table = [(speaker,
