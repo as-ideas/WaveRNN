@@ -223,8 +223,11 @@ class MultiForwardTrainer:
             global_step=model.step, sample_rate=self.dsp.sample_rate)
 
         for speaker in speakers_to_plot:
+
+            pos = batch['pos'][0:1, :batch['x_len'][0]]
+
             speaker_emb = self.speaker_embs[speaker].to(device)
-            gen = model.generate(batch['x'][0:1, :batch['x_len'][0]], speaker_emb=speaker_emb)
+            gen = model.generate(batch['x'][0:1, :batch['x_len'][0]], pos, speaker_emb=speaker_emb)
             m2_hat = np_now(gen['mel_post'].squeeze())
 
             m2_hat_fig = plot_mel(m2_hat)
@@ -240,4 +243,28 @@ class MultiForwardTrainer:
 
             self.writer.add_audio(
                 tag=f'Generated/postnet_wav/{speaker}', snd_tensor=m2_hat_wav,
+                global_step=model.step, sample_rate=self.dsp.sample_rate)
+
+        for speaker in speakers_to_plot:
+
+            pos = batch['pos'][0:1, :batch['x_len'][0]]
+            pos = pos[:, ::-1]
+
+            speaker_emb = self.speaker_embs[speaker].to(device)
+            gen = model.generate(batch['x'][0:1, :batch['x_len'][0]], pos, speaker_emb=speaker_emb)
+            m2_hat = np_now(gen['mel_post'].squeeze())
+
+            m2_hat_fig = plot_mel(m2_hat)
+
+            pitch_gen_fig = plot_pitch(np_now(gen['pitch'].squeeze()))
+            energy_gen_fig = plot_pitch(np_now(gen['energy'].squeeze()))
+
+            self.writer.add_figure(f'Pitch/generated_invpos/{speaker}', pitch_gen_fig, model.step)
+            self.writer.add_figure(f'Energy/generated_invpos/{speaker}', energy_gen_fig, model.step)
+            self.writer.add_figure(f'Generated/postnet_invpos/{speaker}', m2_hat_fig, model.step)
+
+            m2_hat_wav = self.dsp.griffinlim(m2_hat)
+
+            self.writer.add_audio(
+                tag=f'Generated/postnet_wav_randperm/{speaker}', snd_tensor=m2_hat_wav,
                 global_step=model.step, sample_rate=self.dsp.sample_rate)

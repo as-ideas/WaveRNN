@@ -23,8 +23,9 @@ class SeriesPredictor(nn.Module):
                  out_dim: int = 1):
         super().__init__()
         self.embedding = Embedding(num_chars, emb_dim)
+        self.embedding_pos = Embedding(30, 8)
         self.convs = torch.nn.ModuleList([
-            BatchNormConv(emb_dim + speaker_emb_dims, conv_dims, 5, relu=True),
+            BatchNormConv(emb_dim + speaker_emb_dims + 8, conv_dims, 5, relu=True),
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
         ])
@@ -34,12 +35,14 @@ class SeriesPredictor(nn.Module):
 
     def forward(self,
                 x: torch.Tensor,
+                pos: torch.Tensor,
                 semb: torch.Tensor,
                 alpha: float = 1.0) -> torch.Tensor:
         x = self.embedding(x)
+        x_pos = self.embedding_pos(pos)
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
-        x = torch.cat([x, speaker_emb], dim=2)
+        x = torch.cat([x, speaker_emb, x_pos], dim=2)
         x = x.transpose(1, 2)
         for conv in self.convs:
             x = conv(x)
@@ -63,9 +66,10 @@ class ConditionalSeriesPredictor(nn.Module):
                  speaker_emb_dims: int = 256):
         super().__init__()
         self.embedding = Embedding(num_chars, emb_dim)
+        self.embedding_pos = Embedding(30, 8)
         self.pitch_cond_embedding = Embedding(cond_emb_size, cond_emb_dims)
         self.convs = torch.nn.ModuleList([
-            BatchNormConv(emb_dim + cond_emb_dims + speaker_emb_dims, conv_dims, 5, relu=True),
+            BatchNormConv(emb_dim + cond_emb_dims + speaker_emb_dims + 8, conv_dims, 5, relu=True),
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
         ])
@@ -75,14 +79,16 @@ class ConditionalSeriesPredictor(nn.Module):
 
     def forward(self,
                 x: torch.Tensor,
+                pos: torch.Tensor,
                 x_cond: torch.Tensor,
                 speaker_emb: torch.Tensor,
                 alpha: float = 1.0) -> torch.Tensor:
         x = self.embedding(x)
+        x_pos = self.embedding_pos(pos)
         x_cond = self.pitch_cond_embedding(x_cond)
         speaker_emb = speaker_emb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
-        x = torch.cat([x, x_cond, speaker_emb], dim=2)
+        x = torch.cat([x, x_cond, speaker_emb, x_pos], dim=2)
         x = x.transpose(1, 2)
         for conv in self.convs:
             x = conv(x)
@@ -187,6 +193,7 @@ class MultiForwardTacotron(nn.Module):
         x = batch['x']
         mel = batch['mel']
         dur = batch['dur']
+        pos = batch['pos']
         semb = batch['speaker_emb']
         mel_lens = batch['mel_len']
         pitch = batch['pitch'].unsqueeze(1)
@@ -196,11 +203,11 @@ class MultiForwardTacotron(nn.Module):
         if self.training:
             self.step += 1
 
-        pitch_cond_hat = self.pitch_cond_pred(x, semb).squeeze(-1)
+        pitch_cond_hat = self.pitch_cond_pred(x, pos, semb).squeeze(-1)
 
-        dur_hat = self.dur_pred(x, pitch_cond, semb).squeeze(-1)
-        pitch_hat = self.pitch_pred(x, pitch_cond, semb).transpose(1, 2)
-        energy_hat = self.energy_pred(x, semb).transpose(1, 2)
+        dur_hat = self.dur_pred(x, pos, pitch_cond, semb).squeeze(-1)
+        pitch_hat = self.pitch_pred(x, pos, pitch_cond, semb).transpose(1, 2)
+        energy_hat = self.energy_pred(x, pos, semb).transpose(1, 2)
 
         x = self.embedding(x)
         x = x.transpose(1, 2)
@@ -242,20 +249,21 @@ class MultiForwardTacotron(nn.Module):
 
     def generate(self,
                  x: torch.Tensor,
+                 pos: torch.Tensor,
                  speaker_emb: torch.Tensor,
                  alpha=1.0,
                  pitch_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x,
                  energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, torch.Tensor]:
         self.eval()
         with torch.no_grad():
-            pitch_cond_hat = self.pitch_cond_pred(x, speaker_emb).squeeze(-1)
+            pitch_cond_hat = self.pitch_cond_pred(x, pos, speaker_emb).squeeze(-1)
             pitch_cond_hat = torch.argmax(pitch_cond_hat.squeeze(), dim=1).long().unsqueeze(0)
             dur_hat = self.dur_pred(x, pitch_cond_hat, speaker_emb, alpha=alpha).squeeze(-1)
             if torch.sum(dur_hat.long()) <= 0:
                 torch.fill_(dur_hat, value=2.)
-            pitch_hat = self.pitch_pred(x, pitch_cond_hat, speaker_emb).transpose(1, 2)
+            pitch_hat = self.pitch_pred(x, pos, pitch_cond_hat, speaker_emb).transpose(1, 2)
             pitch_hat = pitch_function(pitch_hat)
-            energy_hat = self.energy_pred(x, speaker_emb).transpose(1, 2)
+            energy_hat = self.energy_pred(x, pos, speaker_emb).transpose(1, 2)
             energy_hat = energy_function(energy_hat)
             return self._generate_mel(x=x,
                                       dur_hat=dur_hat,

@@ -17,6 +17,7 @@ class Paths:
         self.speaker_emb = self.data/'speaker_emb'
         self.mean_speaker_emb = self.data/'mean_speaker_emb'
         self.raw_pitch = self.data/'raw_pitch'
+        self.phon_pos = self.data/'phon_pos'
         self.phon_pitch = self.data/'phon_pitch'
         self.phon_energy = self.data/'phon_energy'
         self.model_output = self.base / 'model_output'

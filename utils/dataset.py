@@ -135,6 +135,7 @@ class ForwardDataset(Dataset):
         mel = np.load(str(self.paths.mel/f'{item_id}.npy'))
         mel_len = mel.shape[-1]
         dur = np.load(str(self.paths.alg/f'{item_id}.npy'))
+        pos = np.load(str(self.paths.phon_pos/f'{item_id}.npy'))
         pitch = np.load(str(self.paths.phon_pitch/f'{item_id}.npy'))
         energy = np.load(str(self.paths.phon_energy/f'{item_id}.npy'))
         speaker_emb = np.load(str(self.paths.speaker_emb/f'{item_id}.npy'))
@@ -142,7 +143,7 @@ class ForwardDataset(Dataset):
         pitch_cond[pitch != 0] = 2
 
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
-                'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy,
+                'mel_len': mel_len, 'dur': dur,'pos': pos, 'pitch': pitch, 'energy': energy,
                 'speaker_emb': speaker_emb, 'pitch_cond': pitch_cond, 'speaker_name': speaker_name}
 
     def __len__(self):
@@ -248,6 +249,8 @@ class ForwardCollator:
         max_x_len = max(x_len)
         dur = [_pad1d(b['dur'][:max_x_len], max_x_len) for b in batch]
         dur = _stack_to_tensor(dur).float()
+        pos = [_pad1d(b['pos'][:max_x_len], max_x_len) for b in batch]
+        pos = _stack_to_tensor(pos).float()
         pitch = [_pad1d(b['pitch'][:max_x_len], max_x_len) for b in batch]
         pitch = _stack_to_tensor(pitch).float()
         energy = [_pad1d(b['energy'][:max_x_len], max_x_len) for b in batch]
@@ -258,6 +261,7 @@ class ForwardCollator:
             'pitch': pitch,
             'energy': energy,
             'dur': dur,
+            'pos': pos,
             'pitch_cond': pitch_cond
         })
         return output
@@ -370,6 +374,9 @@ def get_forward_dataloaders(paths: Paths,
                                                   max_duration=max_duration)
 
     text_dict = unpickle_binary(paths.text_dict)
+
+    train_data = [t for t in train_data if t[0] in text_dict]
+    val_data = [t for t in val_data if t[0] in text_dict]
     speaker_dict = unpickle_binary(paths.speaker_dict)
     speaker_dict = {item_id: speaker for item_id, speaker in speaker_dict.items() if item_id in speaker_dict}
 
@@ -409,6 +416,9 @@ def get_binned_taco_dataloader(paths: Paths, max_batch_size: int = 8) -> BinnedT
     train_data = unpickle_binary(paths.train_dataset)
     val_data = unpickle_binary(paths.val_dataset)
     dataset = train_data + val_data
+    text_dict = unpickle_binary(paths.text_dict)
+
+    dataset = [t for t in train_data if t[0] in text_dict]
     return BinnedTacoDataLoader(paths=paths, dataset=dataset, max_batch_size=max_batch_size)
 
 
@@ -423,6 +433,10 @@ def _get_filtered_datasets(paths: Paths,
     train_data = unpickle_binary(paths.train_dataset)
     val_data = unpickle_binary(paths.val_dataset)
     speaker_dict = unpickle_binary(paths.speaker_dict)
+
+    alg_list = [f.stem for f in paths.alg.glob('**.*.npy')]
+    train_data = [t for t in train_data if t[0] in alg_list]
+    val_data = [t for t in val_data if t[0] in alg_list]
 
     train_data = _filter_max_len(train_data, max_mel_len)
     val_data = _filter_max_len(val_data, max_mel_len)

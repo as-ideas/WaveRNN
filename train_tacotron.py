@@ -44,7 +44,7 @@ def extract_pitch_energy(save_path_pitch: Path,
     speaker_dict = unpickle_binary(paths.speaker_dict)
 
 
-    speaker_names = set([v for v in speaker_dict.values() if len(v) > 1])
+    speaker_names = ['bild']#set([v for v in speaker_dict.values() if len(v) > 1 and v.st])
     mean, var = 0, 0
 
     train_data = unpickle_binary(paths.train_dataset)
@@ -184,7 +184,7 @@ if __name__ == '__main__':
         print('\n\nYou can now train WaveRNN on GTA features - use python train_wavernn.py --gta\n')
     elif args.force_align:
         print('Creating Attention Alignments and Pitch Values...')
-        train_set, val_set = get_taco_dataloaders(paths, 1, model.r, max_mel_len=None)
+        train_set, val_set = get_taco_dataloaders(paths, 1, model.r, **train_cfg['filter'])
         create_align_features(model=model, config=config,  paths=paths)
         print('\n\nYou can now train ForwardTacotron - use python train_forward.py\n')
     else:
