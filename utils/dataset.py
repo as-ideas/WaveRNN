@@ -250,7 +250,7 @@ class ForwardCollator:
         dur = [_pad1d(b['dur'][:max_x_len], max_x_len) for b in batch]
         dur = _stack_to_tensor(dur).float()
         pos = [_pad1d(b['pos'][:max_x_len], max_x_len) for b in batch]
-        pos = _stack_to_tensor(pos).float()
+        pos = _stack_to_tensor(pos).long()
         pitch = [_pad1d(b['pitch'][:max_x_len], max_x_len) for b in batch]
         pitch = _stack_to_tensor(pitch).float()
         energy = [_pad1d(b['energy'][:max_x_len], max_x_len) for b in batch]
@@ -434,9 +434,11 @@ def _get_filtered_datasets(paths: Paths,
     val_data = unpickle_binary(paths.val_dataset)
     speaker_dict = unpickle_binary(paths.speaker_dict)
 
-    alg_list = [f.stem for f in paths.alg.glob('**.*.npy')]
+    alg_list = [f.stem for f in paths.alg.glob('*.npy')]
     train_data = [t for t in train_data if t[0] in alg_list]
-    val_data = [t for t in val_data if t[0] in alg_list]
+
+    val_data = train_data[:200]
+    train_data = train_data[200:]
 
     train_data = _filter_max_len(train_data, max_mel_len)
     val_data = _filter_max_len(val_data, max_mel_len)
@@ -494,3 +496,4 @@ def _batchify(input: List[Any], batch_size: int) -> List[List[Any]]:
         batch = input[i:min(i + batch_size, input_len)]
         output.append(batch)
     return output
+

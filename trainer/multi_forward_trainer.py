@@ -225,7 +225,7 @@ class MultiForwardTrainer:
         for speaker in speakers_to_plot:
 
             pos = batch['pos'][0:1, :batch['x_len'][0]]
-
+            print('pos orig', pos)
             speaker_emb = self.speaker_embs[speaker].to(device)
             gen = model.generate(batch['x'][0:1, :batch['x_len'][0]], pos, speaker_emb=speaker_emb)
             m2_hat = np_now(gen['mel_post'].squeeze())
@@ -249,6 +249,7 @@ class MultiForwardTrainer:
 
             pos = batch['pos'][0:1, :batch['x_len'][0]]
             pos = pos[:, ::-1]
+            print('pos inversed', pos)
 
             speaker_emb = self.speaker_embs[speaker].to(device)
             gen = model.generate(batch['x'][0:1, :batch['x_len'][0]], pos, speaker_emb=speaker_emb)

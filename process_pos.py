@@ -18,7 +18,6 @@ if __name__ == '__main__':
     text_dict = {}
     pos_dict = {}
 
-    """
     for id, phons, pos in zip(df['file_id'], df['text_phonemized'], df['pos']):
         phons = phons.split()
         pos = pos.split('|')
@@ -30,6 +29,7 @@ if __name__ == '__main__':
 
         phons = ' '.join(phons)
         pos_ids = pos_ids[:len(phons)]
+        pos_ids = np.array(pos_ids)
 
         text_dict[id] = phons
 
@@ -37,8 +37,7 @@ if __name__ == '__main__':
         print(phons)
         print(pos_ids)
 
-        np.save(f'/Users/cschaefe/datasets/nlp/pos/phon_pos/{id}.npy', phons)
+        np.save(f'/Users/cschaefe/datasets/nlp/pos/phon_pos/{id}.npy', pos_ids)
     pickle_binary(text_dict, '/Users/cschaefe/datasets/nlp/pos/text_dict_bild_pos.pkl')
-    """
     pickle_binary(pos_num, '/Users/cschaefe/datasets/nlp/pos/pos_dict.pkl')
 
