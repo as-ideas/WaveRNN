@@ -248,7 +248,7 @@ class MultiForwardTrainer:
         for speaker in speakers_to_plot:
 
             pos = batch['pos'][0:1, :batch['x_len'][0]]
-            pos = pos[:, ::-1]
+            pos = torch.flip(pos, dims=[1])
             print('pos inversed', pos)
 
             speaker_emb = self.speaker_embs[speaker].to(device)
