@@ -71,7 +71,7 @@ class MultiForwardTrainer:
         device = next(model.parameters()).device  # use same device as model parameters
 
         pre_step = 0
-        for e in range(1, 10):
+        for e in range(1, 20):
             for i, batch in tqdm.tqdm(enumerate(session.train_set, 1), total=len(session.train_set)):
                 batch = to_device(batch, device)
                 ada_hat, _ = model.ada_net(batch['x'], batch['speaker_emb'])
