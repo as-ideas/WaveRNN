@@ -147,7 +147,7 @@ class ForwardDataset(Dataset):
             t2 = t1 + int(dur[t])
             ada[:, t] = np.mean(mel[:, t1:t2], axis=1)
             t1 = t2
-
+        ada[ada != ada] = 0
 
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
                 'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy,

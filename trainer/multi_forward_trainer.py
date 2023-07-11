@@ -84,6 +84,9 @@ class MultiForwardTrainer:
                 self.writer.add_scalar('Ada_Loss/train',l1_loss, pre_step)
                 pre_step += 1
 
+
+
+
         for e in range(1, epochs + 1):
             for i, batch in enumerate(session.train_set, 1):
                 batch = to_device(batch, device=device)
