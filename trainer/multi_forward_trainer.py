@@ -73,7 +73,7 @@ class MultiForwardTrainer:
         pre_step = 0
         for e in range(1, epochs + 1):
             for i, batch in tqdm.tqdm(enumerate(session.train_set, 1), total=len(session.train_set)):
-
+                batch = to_device(batch)
                 ada_hat, _ = model.ada_net(batch['x'], batch['speaker_emb'])
                 l1_loss = self.l1_loss(ada_hat.transpose(1, 2), batch['ada'], batch['x_len'])
 
