@@ -3,6 +3,7 @@ from typing import Dict, Any, Union
 
 import numpy as np
 import torch
+import tqdm
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
@@ -68,6 +69,21 @@ class MultiForwardTrainer:
 
         averages = {'mel_loss': Averager(), 'dur_loss': Averager(), 'step_duration': Averager()}
         device = next(model.parameters()).device  # use same device as model parameters
+
+        pre_step = 0
+        for e in range(1, epochs + 1):
+            for i, batch in tqdm.tqdm(enumerate(session.train_set, 1), total=len(session.train_set)):
+
+                ada_hat, _ = model.ada_net(batch['x'], batch['speaker_emb'])
+                l1_loss = self.l1_loss(ada_hat.transpose(1, 2), batch['ada'], batch['x_len'])
+
+                optimizer.zero_grad()
+                l1_loss.backward()
+                optimizer.step()
+                print(e, i, l1_loss)
+                self.writer.add_scalar('Ada_Loss/train',l1_loss, pre_step)
+                pre_step += 1
+
         for e in range(1, epochs + 1):
             for i, batch in enumerate(session.train_set, 1):
                 batch = to_device(batch, device=device)
