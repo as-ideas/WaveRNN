@@ -140,10 +140,18 @@ class ForwardDataset(Dataset):
         speaker_emb = np.load(str(self.paths.speaker_emb/f'{item_id}.npy'))
         pitch_cond = np.ones(pitch.shape)
         pitch_cond[pitch != 0] = 2
+        T = len(x)
+        ada = np.zeros((80, T))
+        t1 = 0
+        for t in range(T):
+            t2 = t1 + int(dur[t])
+            ada[:, t] = np.mean(mel[:, t1:t2], axis=1)
+            t1 = t2
+
 
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
                 'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy,
-                'speaker_emb': speaker_emb, 'pitch_cond': pitch_cond, 'speaker_name': speaker_name}
+                'speaker_emb': speaker_emb, 'pitch_cond': pitch_cond, 'speaker_name': speaker_name, 'ada': ada}
 
     def __len__(self):
         return len(self.metadata)
@@ -224,6 +232,7 @@ class TacoCollator:
             max_spec_len += self.r - max_spec_len % self.r
         mel = [_pad2d(b['mel'], max_spec_len) for b in batch]
         mel = _stack_to_tensor(mel)
+
         item_id = [b['item_id'] for b in batch]
         speaker_name = [b['speaker_name'] for b in batch]
         mel_lens = [b['mel_len'] for b in batch]
@@ -254,11 +263,15 @@ class ForwardCollator:
         energy = _stack_to_tensor(energy).float()
         pitch_cond = [_pad1d(b['pitch_cond'][:max_x_len], max_x_len) for b in batch]
         pitch_cond = _stack_to_tensor(pitch_cond).long()
+        ada = [_pad2d(b['ada'], max_x_len) for b in batch]
+        ada = _stack_to_tensor(ada)
+
         output.update({
             'pitch': pitch,
             'energy': energy,
             'dur': dur,
-            'pitch_cond': pitch_cond
+            'pitch_cond': pitch_cond,
+            'ada': ada
         })
         return output
 
