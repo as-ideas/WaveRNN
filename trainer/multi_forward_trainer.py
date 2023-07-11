@@ -4,6 +4,7 @@ from typing import Dict, Any, Union
 import numpy as np
 import torch
 import tqdm
+from torch.optim import Adam
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
@@ -67,6 +68,9 @@ class MultiForwardTrainer:
         for g in optimizer.param_groups:
             g['lr'] = session.lr
 
+
+        optim_pre = Adam(model.ada_net.parameters(), lr=1e-4)
+
         averages = {'mel_loss': Averager(), 'dur_loss': Averager(), 'step_duration': Averager()}
         device = next(model.parameters()).device  # use same device as model parameters
 
@@ -77,9 +81,9 @@ class MultiForwardTrainer:
                 ada_hat, _ = model.ada_net(batch['x'], batch['speaker_emb'])
                 l1_loss = self.l1_loss(ada_hat.transpose(1, 2), batch['ada'], batch['x_len'])
 
-                optimizer.zero_grad()
+                optim_pre.zero_grad()
                 l1_loss.backward()
-                optimizer.step()
+                optim_pre.step()
                 print(e, i, l1_loss)
                 self.writer.add_scalar('Ada_Loss/train',l1_loss, pre_step)
                 pre_step += 1
