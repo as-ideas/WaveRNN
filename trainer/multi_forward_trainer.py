@@ -69,7 +69,7 @@ class MultiForwardTrainer:
             g['lr'] = session.lr
 
 
-        optim_pre = Adam(model.ada_net.parameters(), lr=1e-4)
+        optim_pre = Adam(model.ada_net.parameters(), lr=2e-5)
 
         averages = {'mel_loss': Averager(), 'dur_loss': Averager(), 'step_duration': Averager()}
         device = next(model.parameters()).device  # use same device as model parameters
