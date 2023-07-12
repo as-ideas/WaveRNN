@@ -63,5 +63,5 @@ if __name__ == '__main__':
         dur_wave = cwt(dur_padded)
         dur_wave = np.abs(dur_wave[0])[:, :len(dur)]
 
-        np.save(paths.pitch_cwt, pitch_wave)
-        np.save(paths.alg_cwt, dur_wave)
+        np.save(paths.pitch_cwt / f'{id}.npy', pitch_wave)
+        np.save(paths.alg_cwt / f'{id}.npy', dur_wave)

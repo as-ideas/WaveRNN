@@ -136,8 +136,8 @@ class ForwardDataset(Dataset):
         mel_len = mel.shape[-1]
         dur = np.load(str(self.paths.alg/f'{item_id}.npy'))
         #cwt = np.load(str(self.paths.cwt/f'{item_id}.npy'))
-        pitch_cwt = np.zeros((237, len(x)))
-        dur_cwt = np.zeros((237, len(x)))
+        pitch_cwt = np.load(str(self.paths.pitch_cwt/f'{item_id}.npy'))
+        dur_cwt = np.load(str(self.paths.alg_cwt/f'{item_id}.npy'))
         pitch = np.load(str(self.paths.phon_pitch/f'{item_id}.npy'))
         energy = np.load(str(self.paths.phon_energy/f'{item_id}.npy'))
         speaker_emb = np.load(str(self.paths.speaker_emb/f'{item_id}.npy'))
@@ -436,6 +436,10 @@ def _get_filtered_datasets(paths: Paths,
 
     train_data = _filter_max_len(train_data, max_mel_len)
     val_data = _filter_max_len(val_data, max_mel_len)
+
+    text_dict = unpickle_binary(paths.text_dict)
+    train_data = [t for t in train_data if len(text_dict[t[0]]) < 299]
+    val_data = [t for t in val_data if len(text_dict[t[0]]) < 299]
 
     if filter_duration_stats:
         duration_stats = unpickle_binary(paths.duration_stats)

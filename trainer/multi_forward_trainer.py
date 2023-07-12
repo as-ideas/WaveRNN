@@ -82,7 +82,8 @@ class MultiForwardTrainer:
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
-                cwt_loss = self.l1_loss(pred['cwt'].transpose(1, 2), batch['cwt'], batch['x_len'])
+                pitch_cwt_loss = self.l1_loss(pred['pitch_cwt'].transpose(1, 2), batch['pitch_cwt'], batch['x_len'])
+                dur_cwt_loss = self.l1_loss(pred['dur_cwt'].transpose(1, 2), batch['dur_cwt'], batch['x_len'])
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
                 pitch_loss = self.l1_loss(pred['pitch'], pitch_target.unsqueeze(1), batch['x_len'])
                 energy_loss = self.l1_loss(pred['energy'], energy_target.unsqueeze(1), batch['x_len'])
@@ -93,7 +94,7 @@ class MultiForwardTrainer:
                        + self.train_cfg['pitch_loss_factor'] * pitch_loss \
                        + self.train_cfg['energy_loss_factor'] * energy_loss \
                        + self.train_cfg['pitch_cond_loss_factor'] * pitch_cond_loss \
-                + cwt_loss
+                + pitch_cwt_loss + dur_cwt_loss
 
                 pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
                 pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()
@@ -123,7 +124,8 @@ class MultiForwardTrainer:
                 if step % self.train_cfg['plot_every'] == 0:
                     self.generate_plots(model, session)
 
-                self.writer.add_scalar('Cwt_Loss/train', cwt_loss, model.get_step())
+                self.writer.add_scalar('Pitch_Cwt_Loss/train', pitch_cwt_loss, model.get_step())
+                self.writer.add_scalar('Dur_Cwt_Loss/train', dur_cwt_loss, model.get_step())
                 self.writer.add_scalar('Mel_Loss/train', m1_loss + m2_loss, model.get_step())
                 self.writer.add_scalar('Pitch_Loss/train', pitch_loss, model.get_step())
                 self.writer.add_scalar('Energy_Loss/train', energy_loss, model.get_step())
