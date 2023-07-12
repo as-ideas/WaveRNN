@@ -138,7 +138,8 @@ class MultiForwardTrainer:
                 stream(msg)
 
             val_out = self.evaluate(model, session.val_set)
-            self.writer.add_scalar('Cwt_Loss/val', val_out['cwt_loss'], model.get_step())
+            self.writer.add_scalar('Pitch_Cwt_Loss/val', val_out['pitch_cwt_loss'], model.get_step())
+            self.writer.add_scalar('Dur_Cwt_Loss/val', val_out['dur_cwt_loss'], model.get_step())
             self.writer.add_scalar('Mel_Loss/val', val_out['mel_loss'], model.get_step())
             self.writer.add_scalar('Duration_Loss/val', val_out['dur_loss'], model.get_step())
             self.writer.add_scalar('Pitch_Loss/val', val_out['pitch_loss'], model.get_step())
@@ -157,14 +158,15 @@ class MultiForwardTrainer:
         model.eval()
         val_losses = {
             'mel_loss': 0, 'dur_loss': 0, 'pitch_loss': 0,
-            'energy_loss': 0, 'pitch_cond_loss': 0, 'pitch_cond_acc': 0, 'cwt_loss': 0
+            'energy_loss': 0, 'pitch_cond_loss': 0, 'pitch_cond_acc': 0, 'pitch_cwt_loss': 0, 'dur_cwt_loss': 0
         }
         device = next(model.parameters()).device
         for i, batch in enumerate(val_set, 1):
             batch = to_device(batch, device=device)
             with torch.no_grad():
                 pred = model(batch)
-                cwt_loss = self.l1_loss(pred['cwt'].transpose(1, 2), batch['cwt'], batch['x_len'])
+                pitch_cwt_loss = self.l1_loss(pred['pitch_cwt'].transpose(1, 2), batch['pitch_cwt'], batch['x_len'])
+                dur_cwt_loss = self.l1_loss(pred['dur_cwt'].transpose(1, 2), batch['dur_cwt'], batch['x_len'])
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
@@ -179,7 +181,8 @@ class MultiForwardTrainer:
                 val_losses['dur_loss'] += dur_loss
                 val_losses['pitch_cond_loss'] += pitch_cond_loss
                 val_losses['pitch_cond_acc'] += pitch_cond_acc
-                val_losses['cwt_loss'] += cwt_loss
+                val_losses['pitch_cwt_loss'] += pitch_cwt_loss
+                val_losses['dur_cwt_loss'] += dur_cwt_loss
         val_losses = {k: v / len(val_set) for k, v in val_losses.items()}
         return val_losses
 
