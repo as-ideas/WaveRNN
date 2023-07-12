@@ -10,7 +10,7 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from models.common_layers import CBHG, LengthRegulator, BatchNormConv
 from utils.text.symbols import phonemes
 
-CWT_DIM = 237
+CWT_DIM = 221
 
 class SeriesPredictor(nn.Module):
 
