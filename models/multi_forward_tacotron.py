@@ -93,6 +93,52 @@ class ConditionalSeriesPredictor(nn.Module):
         return x / alpha
 
 
+class PitchPredictor(nn.Module):
+
+    def __init__(self,
+                 num_chars: int,
+                 emb_dim: int = 64,
+                 cond_emb_size: int = 4,
+                 cond_emb_dims: int = 8,
+                 conv_dims: int = 256,
+                 rnn_dims: int = 64,
+                 dropout: float = 0.5,
+                 speaker_emb_dims: int = 256,
+                 cwt_dim: int = 237):
+        super().__init__()
+        self.embedding = Embedding(num_chars, emb_dim)
+        self.pitch_cond_embedding = Embedding(cond_emb_size, cond_emb_dims)
+        self.convs = torch.nn.ModuleList([
+            BatchNormConv(emb_dim + cond_emb_dims + speaker_emb_dims + cwt_dim, conv_dims, 5, relu=True),
+            BatchNormConv(conv_dims, conv_dims, 5, relu=True),
+            BatchNormConv(conv_dims, conv_dims, 5, relu=True),
+        ])
+        self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
+        self.lin_cwt = nn.Linear(2 * rnn_dims, 1)
+        self.lin = nn.Linear(2 * rnn_dims, 1)
+        self.dropout = dropout
+
+    def forward(self,
+                x: torch.Tensor,
+                x_cond: torch.Tensor,
+                cwt: torch.Tensor,
+                speaker_emb: torch.Tensor,
+                alpha: float = 1.0) -> torch.Tensor:
+        x = self.embedding(x)
+        x_cond = self.pitch_cond_embedding(x_cond)
+        speaker_emb = speaker_emb[:, None, :]
+        speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
+        x = torch.cat([x, x_cond, cwt, speaker_emb], dim=2)
+        x = x.transpose(1, 2)
+        for conv in self.convs:
+            x = conv(x)
+            x = F.dropout(x, p=self.dropout, training=self.training)
+        x = x.transpose(1, 2)
+        x, _ = self.rnn(x)
+        x = self.lin(x)
+        return x / alpha
+
+
 class MultiForwardTacotron(nn.Module):
 
     def __init__(self,
@@ -144,12 +190,19 @@ class MultiForwardTacotron(nn.Module):
                                                rnn_dims=pitch_cond_rnn_dims,
                                                dropout=pitch_cond_dropout,
                                                out_dim=pitch_cond_categorical_dims)
-        self.pitch_pred = ConditionalSeriesPredictor(num_chars=num_chars,
-                                                     emb_dim=series_embed_dims,
-                                                     conv_dims=pitch_conv_dims,
-                                                     rnn_dims=pitch_rnn_dims,
-                                                     cond_emb_dims=pitch_cond_emb_dims,
-                                                     dropout=pitch_dropout, )
+        self.cwt_pred = SeriesPredictor(num_chars=num_chars,
+                                        emb_dim=series_embed_dims,
+                                        conv_dims=pitch_conv_dims,
+                                        rnn_dims=pitch_rnn_dims,
+                                        dropout=pitch_dropout,
+                                        out_dim=237)
+        self.pitch_pred = PitchPredictor(num_chars=num_chars,
+                                         emb_dim=series_embed_dims,
+                                         conv_dims=pitch_conv_dims,
+                                         rnn_dims=pitch_rnn_dims,
+                                         cond_emb_dims=pitch_cond_emb_dims,
+                                         dropout=pitch_dropout,
+                                         cwt_dim=237)
         self.energy_pred = SeriesPredictor(num_chars=num_chars,
                                            emb_dim=series_embed_dims,
                                            conv_dims=energy_conv_dims,
@@ -192,14 +245,15 @@ class MultiForwardTacotron(nn.Module):
         pitch = batch['pitch'].unsqueeze(1)
         pitch_cond = batch['pitch_cond']
         energy = batch['energy'].unsqueeze(1)
+        cwt = batch['cwt']
 
         if self.training:
             self.step += 1
 
         pitch_cond_hat = self.pitch_cond_pred(x, semb).squeeze(-1)
-
+        cwt_hat = self.cwt_pred(x, semb)
         dur_hat = self.dur_pred(x, pitch_cond, semb).squeeze(-1)
-        pitch_hat = self.pitch_pred(x, pitch_cond, semb).transpose(1, 2)
+        pitch_hat = self.pitch_pred(x, pitch_cond, cwt, semb).transpose(1, 2)
         energy_hat = self.energy_pred(x, semb).transpose(1, 2)
 
         x = self.embedding(x)
@@ -238,7 +292,8 @@ class MultiForwardTacotron(nn.Module):
 
         return {'mel': x, 'mel_post': x_post,
                 'dur': dur_hat, 'pitch': pitch_hat,
-                'energy': energy_hat, 'pitch_cond': pitch_cond_hat}
+                'energy': energy_hat, 'pitch_cond': pitch_cond_hat,
+                'cwt': cwt_hat}
 
     def generate(self,
                  x: torch.Tensor,

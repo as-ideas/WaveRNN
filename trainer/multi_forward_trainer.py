@@ -82,6 +82,7 @@ class MultiForwardTrainer:
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
+                cwt_loss = self.l1_loss(pred['cwt'], batch['cwt'], batch['x_len'])
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
                 pitch_loss = self.l1_loss(pred['pitch'], pitch_target.unsqueeze(1), batch['x_len'])
                 energy_loss = self.l1_loss(pred['energy'], energy_target.unsqueeze(1), batch['x_len'])
@@ -91,7 +92,8 @@ class MultiForwardTrainer:
                        + self.train_cfg['dur_loss_factor'] * dur_loss \
                        + self.train_cfg['pitch_loss_factor'] * pitch_loss \
                        + self.train_cfg['energy_loss_factor'] * energy_loss \
-                       + self.train_cfg['pitch_cond_loss_factor'] * pitch_cond_loss
+                       + self.train_cfg['pitch_cond_loss_factor'] * pitch_cond_loss \
+                + cwt_loss
 
                 pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
                 pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()
@@ -121,6 +123,7 @@ class MultiForwardTrainer:
                 if step % self.train_cfg['plot_every'] == 0:
                     self.generate_plots(model, session)
 
+                self.writer.add_scalar('Cwt_Loss/train', cwt_loss, model.get_step())
                 self.writer.add_scalar('Mel_Loss/train', m1_loss + m2_loss, model.get_step())
                 self.writer.add_scalar('Pitch_Loss/train', pitch_loss, model.get_step())
                 self.writer.add_scalar('Energy_Loss/train', energy_loss, model.get_step())
@@ -133,6 +136,7 @@ class MultiForwardTrainer:
                 stream(msg)
 
             val_out = self.evaluate(model, session.val_set)
+            self.writer.add_scalar('Cwt_Loss/val', val_out['cwt_loss'], model.get_step())
             self.writer.add_scalar('Mel_Loss/val', val_out['mel_loss'], model.get_step())
             self.writer.add_scalar('Duration_Loss/val', val_out['dur_loss'], model.get_step())
             self.writer.add_scalar('Pitch_Loss/val', val_out['pitch_loss'], model.get_step())
@@ -151,13 +155,14 @@ class MultiForwardTrainer:
         model.eval()
         val_losses = {
             'mel_loss': 0, 'dur_loss': 0, 'pitch_loss': 0,
-            'energy_loss': 0, 'pitch_cond_loss': 0, 'pitch_cond_acc': 0
+            'energy_loss': 0, 'pitch_cond_loss': 0, 'pitch_cond_acc': 0, 'cwt_loss': 0
         }
         device = next(model.parameters()).device
         for i, batch in enumerate(val_set, 1):
             batch = to_device(batch, device=device)
             with torch.no_grad():
                 pred = model(batch)
+                cwt_loss = self.l1_loss(pred['cwt'], batch['cwt'], batch['x_len'])
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
@@ -172,6 +177,7 @@ class MultiForwardTrainer:
                 val_losses['dur_loss'] += dur_loss
                 val_losses['pitch_cond_loss'] += pitch_cond_loss
                 val_losses['pitch_cond_acc'] += pitch_cond_acc
+                val_losses['cwt_loss'] += cwt_loss
         val_losses = {k: v / len(val_set) for k, v in val_losses.items()}
         return val_losses
 
@@ -183,11 +189,15 @@ class MultiForwardTrainer:
         batch = to_device(batch, device=device)
 
         pred = model(batch)
+        cwt_hat = np_now(pred['cwt'])[0, :, :]
+        cwt = np_now(batch['cwt'])[0, :, :]
         m1_hat = np_now(pred['mel'])[0, :, :]
         m2_hat = np_now(pred['mel_post'])[0, :, :]
         m_target = np_now(batch['mel'])[0, :, :]
         speaker = batch['speaker_name'][0]
 
+        cwt_fig = plot_mel(cwt)
+        cwt_hat_fig = plot_mel(cwt_hat)
         m1_hat_fig = plot_mel(m1_hat)
         m2_hat_fig = plot_mel(m2_hat)
         m_target_fig = plot_mel(m_target)
@@ -196,6 +206,8 @@ class MultiForwardTrainer:
         energy_fig = plot_pitch(np_now(batch['energy'][0]))
         energy_gta_fig = plot_pitch(np_now(pred['energy'].squeeze()[0]))
 
+        self.writer.add_figure(f'Cwt/target/{speaker}', cwt_fig, model.step)
+        self.writer.add_figure(f'Cwt/ground_trugh_aligned/{speaker}', cwt_hat_fig, model.step)
         self.writer.add_figure(f'Pitch/target/{speaker}', pitch_fig, model.step)
         self.writer.add_figure(f'Pitch/ground_truth_aligned/{speaker}', pitch_gta_fig, model.step)
         self.writer.add_figure(f'Energy/target/{speaker}', energy_fig, model.step)
