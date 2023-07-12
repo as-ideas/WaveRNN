@@ -82,7 +82,7 @@ class MultiForwardTrainer:
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
-                cwt_loss = self.l1_loss(pred['cwt'], batch['cwt'], batch['x_len'])
+                cwt_loss = self.l1_loss(pred['cwt'].transpose(1, 2), batch['cwt'], batch['x_len'])
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
                 pitch_loss = self.l1_loss(pred['pitch'], pitch_target.unsqueeze(1), batch['x_len'])
                 energy_loss = self.l1_loss(pred['energy'], energy_target.unsqueeze(1), batch['x_len'])
@@ -162,7 +162,7 @@ class MultiForwardTrainer:
             batch = to_device(batch, device=device)
             with torch.no_grad():
                 pred = model(batch)
-                cwt_loss = self.l1_loss(pred['cwt'], batch['cwt'], batch['x_len'])
+                cwt_loss = self.l1_loss(pred['cwt'].transpose(1, 2), batch['cwt'], batch['x_len'])
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
@@ -189,15 +189,19 @@ class MultiForwardTrainer:
         batch = to_device(batch, device=device)
 
         pred = model(batch)
-        cwt_hat = np_now(pred['cwt'])[0, :, :]
-        cwt = np_now(batch['cwt'])[0, :, :]
+        pitch_cwt_hat = np_now(pred['pitch_cwt'].transpose(1, 2))[0, :, :]
+        dur_cwt_hat = np_now(pred['dur_cwt'].transpose(1, 2))[0, :, :]
+        pitch_cwt = np_now(batch['pitch_cwt'])[0, :, :]
+        dur_cwt = np_now(batch['dur_cwt'])[0, :, :]
         m1_hat = np_now(pred['mel'])[0, :, :]
         m2_hat = np_now(pred['mel_post'])[0, :, :]
         m_target = np_now(batch['mel'])[0, :, :]
         speaker = batch['speaker_name'][0]
 
-        cwt_fig = plot_mel(cwt)
-        cwt_hat_fig = plot_mel(cwt_hat)
+        pitch_cwt_fig = plot_mel(pitch_cwt)
+        pitch_cwt_hat_fig = plot_mel(pitch_cwt_hat)
+        dur_cwt_fig = plot_mel(dur_cwt)
+        dur_cwt_hat_fig = plot_mel(dur_cwt_hat)
         m1_hat_fig = plot_mel(m1_hat)
         m2_hat_fig = plot_mel(m2_hat)
         m_target_fig = plot_mel(m_target)
@@ -206,8 +210,10 @@ class MultiForwardTrainer:
         energy_fig = plot_pitch(np_now(batch['energy'][0]))
         energy_gta_fig = plot_pitch(np_now(pred['energy'].squeeze()[0]))
 
-        self.writer.add_figure(f'Cwt/target/{speaker}', cwt_fig, model.step)
-        self.writer.add_figure(f'Cwt/ground_trugh_aligned/{speaker}', cwt_hat_fig, model.step)
+        self.writer.add_figure(f'Pitch_Cwt/target/{speaker}', pitch_cwt_fig, model.step)
+        self.writer.add_figure(f'Pitch_Cwt/ground_trugh_aligned/{speaker}', pitch_cwt_hat_fig, model.step)
+        self.writer.add_figure(f'Dur_Cwt/target/{speaker}', dur_cwt_fig, model.step)
+        self.writer.add_figure(f'Dur_Cwt/ground_trugh_aligned/{speaker}', dur_cwt_hat_fig, model.step)
         self.writer.add_figure(f'Pitch/target/{speaker}', pitch_fig, model.step)
         self.writer.add_figure(f'Pitch/ground_truth_aligned/{speaker}', pitch_gta_fig, model.step)
         self.writer.add_figure(f'Energy/target/{speaker}', energy_fig, model.step)

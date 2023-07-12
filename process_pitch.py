@@ -50,16 +50,18 @@ if __name__ == '__main__':
     text_dict = unpickle_binary(paths.text_dict)
 
     for id in tqdm(text_dict.keys(), total=len(text_dict)):
-        pitch = np.load(paths.phon_pitch / f'{id}.npy')
+        pitch = np.load(paths.alg / f'{id}.npy')
+        if len(pitch) >= 300:
+            print('skipped', id, len(pitch))
+            continue
         pitch_padded = np.pad(pitch, (0, 300 - len(pitch)), mode='constant')
-        wave = cwt(pitch_padded)
-        w_abs = np.abs(wave[0])[:, :len(pitch)]
-        print(w_abs.shape)
+        pitch_wave = cwt(pitch_padded)
+        pitch_wave = np.abs(pitch_wave[0])[:, :len(pitch)]
 
-        plt.clf()
-        plot_pitch(pitch)
-        plt.savefig(f'/tmp/pitch/pitch_{id}.png')
+        dur = np.load(paths.alg / f'{id}.npy')
+        dur_padded = np.pad(dur, (0, 300 - len(dur)), mode='constant')
+        dur_wave = cwt(dur_padded)
+        dur_wave = np.abs(dur_wave[0])[:, :len(dur)]
 
-        plt.clf()
-        plot_mel(w_abs)
-        plt.savefig(f'/tmp/pitch/pitch_{id}_cwt.png')
+        np.save(paths.pitch_cwt, pitch_wave)
+        np.save(paths.alg_cwt, dur_wave)
