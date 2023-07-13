@@ -73,10 +73,12 @@ if __name__ == '__main__':
 
     for id in tqdm(text_dict.keys(), total=len(text_dict)):
         pitch = np.load(paths.phon_pitch / f'{id}.npy')
+
 #        pitch = convert_continuos_f0(pitch)
 #        pitch = (pitch - np.mean(pitch) / np.std(pitch))
         w, s = get_lf0_cwt(pitch)
         w = np.transpose(w, (1, 0))
+
 
         #if len(pitch) >= 300:
         #    print('skipped', id, len(pitch))
@@ -99,4 +101,17 @@ if __name__ == '__main__':
         #dur_wave = np.abs(dur_wave[0])[:, :len(dur)]
 
         np.save(paths.pitch_cwt / f'{id}.npy', w)
-        #np.save(paths.alg_cwt / f'{id}.npy', dur_wave)
+
+
+        dur = np.load(paths.alg / f'{id}.npy')
+        dur = (dur - np.mean(dur)) / np.std(dur)
+        w, s = get_lf0_cwt(dur)
+        w = np.transpose(w, (1, 0))
+        #plt.clf()
+        #plot_mel(w)
+        #plt.savefig(f'/tmp/pitch/{id}.png')
+
+        #plt.clf()
+        #plot_pitch(dur)
+        #plt.savefig(f'/tmp/pitch/{id}_alg.png')
+        np.save(paths.alg_cwt / f'{id}.npy', w)
