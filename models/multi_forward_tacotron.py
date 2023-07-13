@@ -101,7 +101,7 @@ class Discriminator(nn.Module):
     def __init__(self):
         super(Discriminator, self).__init__()
 
-        self.conv = nn.Conv1d(80, 256, 3, padding=1)
+        self.conv = nn.Conv1d(10, 256, 3, padding=1)
         self.gru = nn.GRU(256, 128, bidirectional=True)
         self.lin = nn.Linear(256, 1)
 

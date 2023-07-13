@@ -20,7 +20,7 @@ class Paths:
         self.mean_speaker_emb = self.data/'mean_speaker_emb'
         self.raw_pitch = self.data/'raw_pitch'
         self.phon_pitch = self.data/'phon_pitch'
-        self.phon_energy = self.data/'phon_energy_one_alignment'
+        self.phon_energy = self.data/'phon_energy'
         self.model_output = self.base / 'model_output'
         self.taco_checkpoints = self.base / 'checkpoints' / f'{tts_id}.tacotron'
         self.taco_log = self.taco_checkpoints / 'logs'
