@@ -97,7 +97,7 @@ class MultiForwardTrainer:
                 d_optim.step()
 
                 d_fake = d_model(pred['pitch_cwt'].transpose(1, 2))
-                g_loss = torch.mean(torch.pow(d_fake - 1.0, 2), dim=[1, 2])
+                g_loss = torch.mean(torch.pow(d_fake - 1.0, 2))
 
                 pitch_cwt_loss = self.l1_loss(pred['pitch_cwt'].transpose(1, 2), batch['pitch_cwt'], batch['x_len'])
                 dur_cwt_loss = self.l1_loss(pred['dur_cwt'].transpose(1, 2), batch['dur_cwt'], batch['x_len'])
