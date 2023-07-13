@@ -96,6 +96,22 @@ class ConditionalSeriesPredictor(nn.Module):
         return x / alpha
 
 
+class Discriminator(nn.Module):
+
+    def __init__(self):
+        super(Discriminator, self).__init__()
+
+        self.conv = nn.Conv1d(80, 256, 3, padding=1)
+        self.gru = nn.GRU(256, 128, bidirectional=True)
+        self.lin = nn.Linear(256, 1)
+
+    def forward(self, x):
+        x = self.conv(x)
+        x, _ = self.gru(x.transpose(1, 2))
+        x = self.lin(x)
+        return x
+
+
 class MultiForwardTacotron(nn.Module):
 
     def __init__(self,
