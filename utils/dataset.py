@@ -25,6 +25,24 @@ class DurationStats:
     max_duration: int
 
 
+def get_lf0_cwt(lf0):
+    """
+    input:
+        signal of shape (N)
+    output:
+        Wavelet_lf0 of shape(10, N), scales of shape(10)
+    """
+    mother = wavelet.MexicanHat()
+    dt = 0.005
+    dj = 1
+    s0 = dt * 2
+    J = 9
+
+    Wavelet_lf0, scales, _, _, _, _ = wavelet.cwt(np.squeeze(lf0), dt, dj, s0, J, mother)
+    # Wavelet.shape => (J + 1, len(lf0))
+    Wavelet_lf0 = np.real(Wavelet_lf0).T
+    return Wavelet_lf0, scales
+
 class DataFilter:
 
     def __init__(self,
