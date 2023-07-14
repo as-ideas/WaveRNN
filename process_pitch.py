@@ -82,9 +82,9 @@ if __name__ == '__main__':
 
         w, s = get_lf0_cwt(pitch_norm)
         w = np.transpose(w, (1, 0))
-        plt.clf()
-        plot_mel(w)
-        plt.savefig(f'/tmp/pitch/{id}_norm.png')
+        #plt.clf()
+        #plot_mel(w)
+        #plt.savefig(f'/tmp/pitch/{id}_norm.png')
 
 
         dur = np.load(paths.alg / f'{id}.npy')
