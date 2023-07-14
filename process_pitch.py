@@ -72,30 +72,34 @@ if __name__ == '__main__':
     text_dict = unpickle_binary(paths.text_dict)
 
     for id in tqdm(text_dict.keys(), total=len(text_dict)):
-        pitch = np.load(paths.raw_pitch / f'{id}.npy')
-        pitch = convert_continuos_f0(pitch)
-
-        pitch[pitch < 1e-5] = 1e-5
-        pitch = np.log(pitch)
-
-        pitch_norm = (pitch - np.mean(pitch)) / np.std(pitch)
-
-        w, s = get_lf0_cwt(pitch_norm)
-        w = np.transpose(w, (1, 0))
-        #plt.clf()
-        #plot_mel(w)
-        #plt.savefig(f'/tmp/pitch/{id}_norm.png')
-
-
         dur = np.load(paths.alg / f'{id}.npy')
         T = len(dur)
-        ada = np.zeros((10, T))
-        t1 = 0
-        for t in range(T):
-            t2 = t1 + int(dur[t])
-            ada[:, t] = w[:, t1:t2].mean(axis=1)
-            t1 = t2
+        try:
+            pitch = np.load(paths.raw_pitch / f'{id}.npy')
+            pitch = convert_continuos_f0(pitch)
 
-        ada[ada != ada] = 0
-        np.save(paths.pitch_cwt / f'{id}.npy', ada)
+            pitch[pitch < 1e-5] = 1e-5
+            pitch = np.log(pitch)
+
+            pitch_norm = (pitch - np.mean(pitch)) / np.std(pitch)
+
+            w, s = get_lf0_cwt(pitch_norm)
+            w = np.transpose(w, (1, 0))
+            #plt.clf()
+            #plot_mel(w)
+            #plt.savefig(f'/tmp/pitch/{id}_norm.png')
+
+
+            ada = np.zeros((10, T))
+            t1 = 0
+            for t in range(T):
+                t2 = t1 + int(dur[t])
+                ada[:, t] = w[:, t1:t2].mean(axis=1)
+                t1 = t2
+
+            ada[ada != ada] = 0
+            np.save(paths.pitch_cwt / f'{id}.npy', ada)
+        except Exception as e:
+            print(e)
+            np.save(paths.pitch_cwt / f'{id}.npy', np.zeros(10, T))
 
