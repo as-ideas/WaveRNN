@@ -90,5 +90,6 @@ if __name__ == '__main__':
             ada[:, t] = w[:, t1:t2].mean(axis=1)
             t1 = t2
 
+        ada[ada != ada] = 0
         np.save(paths.pitch_cwt / f'{id}.npy', ada)
 
