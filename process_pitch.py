@@ -72,46 +72,23 @@ if __name__ == '__main__':
     text_dict = unpickle_binary(paths.text_dict)
 
     for id in tqdm(text_dict.keys(), total=len(text_dict)):
-        pitch = np.load(paths.phon_pitch / f'{id}.npy')
+        pitch = np.load(paths.raw_pitch / f'{id}.npy')
 
-#        pitch = convert_continuos_f0(pitch)
-#        pitch = (pitch - np.mean(pitch) / np.std(pitch))
-        w, s = get_lf0_cwt(pitch)
+        pitch_norm = (pitch - np.mean(pitch)) / np.std(pitch)
+        w, s = get_lf0_cwt(pitch_norm)
         w = np.transpose(w, (1, 0))
-
-
-        #if len(pitch) >= 300:
-        #    print('skipped', id, len(pitch))
-        #    continue
-        #pitch_padded = np.pad(pitch, (0, 300 - len(pitch)), mode='constant')
-        #pitch_wave = cwt(pitch)
-        #pitch_wave = np.abs(pitch_wave[0])[:, :len(pitch)]
-
         #plt.clf()
         #plot_mel(w)
-        #plt.savefig(f'/tmp/pitch/{id}.png')
-
-        #plt.clf()
-        #plot_pitch(pitch)
-        #plt.savefig(f'/tmp/pitch/{id}_pitch.png')
-
-        #dur = np.load(paths.alg / f'{id}.npy')
-        #dur_padded = np.pad(dur, (0, 300 - len(dur)), mode='constant')
-        #dur_wave = cwt(dur_padded)
-        #dur_wave = np.abs(dur_wave[0])[:, :len(dur)]
-
-        np.save(paths.pitch_cwt / f'{id}.npy', w)
-
+        #plt.savefig(f'/tmp/pitch/{id}_norm.png')
 
         dur = np.load(paths.alg / f'{id}.npy')
-        dur = (dur - np.mean(dur)) / np.std(dur)
-        w, s = get_lf0_cwt(dur)
-        w = np.transpose(w, (1, 0))
-        #plt.clf()
-        #plot_mel(w)
-        #plt.savefig(f'/tmp/pitch/{id}.png')
+        T = len(dur)
+        ada = np.zeros((10, T))
+        t1 = 0
+        for t in range(T):
+            t2 = t1 + int(dur[t])
+            ada[:, t] = w[:, t1:t2].mean(axis=1)
+            t1 = t2
 
-        #plt.clf()
-        #plot_pitch(dur)
-        #plt.savefig(f'/tmp/pitch/{id}_alg.png')
-        np.save(paths.alg_cwt / f'{id}.npy', w)
+        np.save(paths.pitch_cwt / f'{id}.npy', ada)
+
