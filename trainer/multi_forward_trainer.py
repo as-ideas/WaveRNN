@@ -83,7 +83,7 @@ class MultiForwardTrainer:
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
-                pitch_cwt_loss = 10. * self.l2_loss(pred['pitch_cwt'].transpose(1, 2), batch['pitch_cwt'], batch['x_len'])
+                pitch_cwt_loss = self.l2_loss(pred['pitch_cwt'].transpose(1, 2), batch['pitch_cwt'], batch['x_len'])
                 dur_cwt_loss = self.l1_loss(pred['dur_cwt'].transpose(1, 2), batch['dur_cwt'], batch['x_len'])
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
                 pitch_loss = self.l1_loss(pred['pitch'], pitch_target.unsqueeze(1), batch['x_len'])
@@ -166,7 +166,7 @@ class MultiForwardTrainer:
             batch = to_device(batch, device=device)
             with torch.no_grad():
                 pred = model(batch)
-                pitch_cwt_loss = self.l1_loss(pred['pitch_cwt'].transpose(1, 2), batch['pitch_cwt'], batch['x_len'])
+                pitch_cwt_loss = self.l2_loss(pred['pitch_cwt'].transpose(1, 2), batch['pitch_cwt'], batch['x_len'])
                 dur_cwt_loss = self.l1_loss(pred['dur_cwt'].transpose(1, 2), batch['dur_cwt'], batch['x_len'])
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])

@@ -101,5 +101,5 @@ if __name__ == '__main__':
             np.save(paths.pitch_cwt / f'{id}.npy', ada)
         except Exception as e:
             print(e)
-            np.save(paths.pitch_cwt / f'{id}.npy', np.zeros(10, T))
+            np.save(paths.pitch_cwt / f'{id}.npy', np.zeros((10, T))
 
