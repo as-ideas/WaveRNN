@@ -14,21 +14,11 @@ from utils.text.symbols import phonemes
 class SeriesPredictor(nn.Module):
 
     def __init__(self,
-                 num_chars: int,
-                 d_model: int,
-                 n_heads: int,
-                 d_fft: int,
-                 layers: int,
-                 conv1_kernel: int,
-                 conv2_kernel: int,
+                 in_dim: int,
                  dropout=0.1):
         super().__init__()
-        self.embedding = Embedding(num_chars, d_model)
-        self.transformer = ForwardTransformer(heads=n_heads, dropout=dropout,
-                                              d_model=d_model, d_fft=d_fft,
-                                              conv1_kernel=conv1_kernel,
-                                              conv2_kernel=conv2_kernel,
-                                              layers=layers)
+
+        self.conv1 = nn.Conv1d(in_dim)
         self.lin = nn.Linear(d_model, 1)
 
     def forward(self,

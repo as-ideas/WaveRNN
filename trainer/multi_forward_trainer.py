@@ -83,18 +83,13 @@ class MultiForwardTrainer:
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
-                pitch_loss = self.l1_loss(pred['pitch'], pitch_target.unsqueeze(1), batch['x_len'])
-                energy_loss = self.l1_loss(pred['energy'], energy_target.unsqueeze(1), batch['x_len'])
-                pitch_cond_loss = self.ce_loss(pred['pitch_cond'].transpose(1, 2), batch['pitch_cond'])
+                pitch_loss = self.l1_loss(pred['pitch'].unsqueeze(1), pitch_target.unsqueeze(1), batch['x_len'])
+                energy_loss = self.l1_loss(pred['energy'].unsqueeze(1), energy_target.unsqueeze(1), batch['x_len'])
 
                 loss = m1_loss + m2_loss \
                        + self.train_cfg['dur_loss_factor'] * dur_loss \
                        + self.train_cfg['pitch_loss_factor'] * pitch_loss \
                        + self.train_cfg['energy_loss_factor'] * energy_loss \
-                       + self.train_cfg['pitch_cond_loss_factor'] * pitch_cond_loss
-
-                pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
-                pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -125,8 +120,6 @@ class MultiForwardTrainer:
                 self.writer.add_scalar('Pitch_Loss/train', pitch_loss, model.get_step())
                 self.writer.add_scalar('Energy_Loss/train', energy_loss, model.get_step())
                 self.writer.add_scalar('Duration_Loss/train', dur_loss, model.get_step())
-                self.writer.add_scalar('Pitch_Cond_Loss/train', pitch_cond_loss, model.get_step())
-                self.writer.add_scalar('Pitch_Cond_Accuracy/train', pitch_cond_acc, model.get_step())
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
                 self.writer.add_scalar('Params/learning_rate', session.lr, model.get_step())
 
@@ -151,7 +144,7 @@ class MultiForwardTrainer:
         model.eval()
         val_losses = {
             'mel_loss': 0, 'dur_loss': 0, 'pitch_loss': 0,
-            'energy_loss': 0, 'pitch_cond_loss': 0, 'pitch_cond_acc': 0
+            'energy_loss': 0,
         }
         device = next(model.parameters()).device
         for i, batch in enumerate(val_set, 1):
@@ -161,17 +154,12 @@ class MultiForwardTrainer:
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
-                pitch_loss = self.l1_loss(pred['pitch'], batch['pitch'].unsqueeze(1), batch['x_len'])
-                energy_loss = self.l1_loss(pred['energy'], batch['energy'].unsqueeze(1), batch['x_len'])
-                pitch_cond_loss = self.ce_loss(pred['pitch_cond'].transpose(1, 2), batch['pitch_cond'])
-                pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
-                pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()
+                pitch_loss = self.l1_loss(pred['pitch'].unsqueeze(1), batch['pitch'].unsqueeze(1), batch['x_len'])
+                energy_loss = self.l1_loss(pred['energy'].unsqueeze(1), batch['energy'].unsqueeze(1), batch['x_len'])
                 val_losses['pitch_loss'] += pitch_loss
                 val_losses['energy_loss'] += energy_loss
                 val_losses['mel_loss'] += m1_loss.item() + m2_loss.item()
                 val_losses['dur_loss'] += dur_loss
-                val_losses['pitch_cond_loss'] += pitch_cond_loss
-                val_losses['pitch_cond_acc'] += pitch_cond_acc
         val_losses = {k: v / len(val_set) for k, v in val_losses.items()}
         return val_losses
 
