@@ -113,7 +113,7 @@ if __name__ == '__main__':
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     print('Using device:', device)
-
+    model = model.to(device)
     n_val = 32
     val_steps = 100
     batch_size = 32
@@ -165,6 +165,7 @@ if __name__ == '__main__':
                 print(example_target)
 
             if step % val_steps == 0:
+                model.eval()
                 val_acc = 0
                 for batch in tqdm.tqdm(val_dataset, total=len(val_dataset)):
                     batch = to_device(batch, device)
@@ -182,3 +183,4 @@ if __name__ == '__main__':
 
                 print('checkpointing to ', save_path)
                 save_checkpoint(model, forward_optim, config, save_path)
+                model.train()
