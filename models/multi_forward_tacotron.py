@@ -11,6 +11,56 @@ from models.common_layers import CBHG, LengthRegulator, BatchNormConv
 from utils.text.symbols import phonemes
 
 
+class PosPredictor(nn.Module):
+
+    def __init__(self,
+                 num_chars: int,
+                 emb_dim: int = 64,
+                 conv_dims: int = 256,
+                 rnn_dims: int = 64,
+                 dropout: float = 0.5,
+                 out_dim: int = 1):
+        super().__init__()
+        self.embedding = Embedding(num_chars, emb_dim)
+        self.convs = torch.nn.ModuleList([
+            BatchNormConv(emb_dim, conv_dims, 5, relu=True),
+            BatchNormConv(conv_dims, conv_dims, 5, relu=True),
+            BatchNormConv(conv_dims, conv_dims, 5, relu=True),
+        ])
+        self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
+        self.lin_1 = nn.Linear(2 * rnn_dims, 32)
+        self.lin_2 = nn.Linear(32, out_dim)
+        self.dropout = dropout
+
+    def forward(self,
+                x: torch.Tensor,
+                alpha: float = 1.0) -> torch.Tensor:
+        x = self.embedding(x)
+        x = x.transpose(1, 2)
+        for conv in self.convs:
+            x = conv(x)
+            x = F.dropout(x, p=self.dropout, training=self.training)
+        x = x.transpose(1, 2)
+        x, _ = self.rnn(x)
+        x = self.lin_1(x)
+        x = self.lin_2(x)
+        return x / alpha
+
+    def embed(self,
+                x: torch.Tensor,
+                alpha: float = 1.0) -> torch.Tensor:
+        with torch.no_grad():
+            x = self.embedding(x)
+            x = x.transpose(1, 2)
+            for conv in self.convs:
+                x = conv(x)
+                x = F.dropout(x, p=self.dropout, training=self.training)
+            x = x.transpose(1, 2)
+            x, _ = self.rnn(x)
+            x = self.lin_1(x)
+            return x
+
+
 class SeriesPredictor(nn.Module):
 
     def __init__(self,
@@ -60,12 +110,13 @@ class ConditionalSeriesPredictor(nn.Module):
                  conv_dims: int = 256,
                  rnn_dims: int = 64,
                  dropout: float = 0.5,
-                 speaker_emb_dims: int = 256):
+                 speaker_emb_dims: int = 256,
+                 pos_dim: int = 32):
         super().__init__()
         self.embedding = Embedding(num_chars, emb_dim)
         self.pitch_cond_embedding = Embedding(cond_emb_size, cond_emb_dims)
         self.convs = torch.nn.ModuleList([
-            BatchNormConv(emb_dim + cond_emb_dims + speaker_emb_dims, conv_dims, 5, relu=True),
+            BatchNormConv(emb_dim + cond_emb_dims + speaker_emb_dims + pos_dim, conv_dims, 5, relu=True),
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
         ])
@@ -77,12 +128,13 @@ class ConditionalSeriesPredictor(nn.Module):
                 x: torch.Tensor,
                 x_cond: torch.Tensor,
                 speaker_emb: torch.Tensor,
+                pos_emb: torch.Tensor,
                 alpha: float = 1.0) -> torch.Tensor:
         x = self.embedding(x)
         x_cond = self.pitch_cond_embedding(x_cond)
         speaker_emb = speaker_emb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
-        x = torch.cat([x, x_cond, speaker_emb], dim=2)
+        x = torch.cat([x, x_cond, speaker_emb, pos_emb], dim=2)
         x = x.transpose(1, 2)
         for conv in self.convs:
             x = conv(x)
@@ -126,12 +178,21 @@ class MultiForwardTacotron(nn.Module):
                  speaker_emb_dims: int,
                  pitch_cond_emb_dims: int,
                  pitch_cond_categorical_dims: int,
-                 padding_value=-11.5129):
+                 padding_value=-11.5129,
+                 pos_dim=32):
         super().__init__()
         self.rnn_dims = rnn_dims
         self.padding_value = padding_value
         self.embedding = nn.Embedding(num_chars, embed_dims)
         self.lr = LengthRegulator()
+
+        self.pos_pred = PosPredictor(num_chars=num_chars,
+                                     emb_dim=128,
+                                     conv_dims=256,
+                                     rnn_dims=256,
+                                     dropout=0.1,
+                                     out_dim=40)
+
         self.dur_pred = ConditionalSeriesPredictor(num_chars=num_chars,
                                                    emb_dim=series_embed_dims,
                                                    conv_dims=durpred_conv_dims,
@@ -161,7 +222,7 @@ class MultiForwardTacotron(nn.Module):
                            proj_channels=[prenet_dims, embed_dims],
                            num_highways=prenet_num_highways,
                            dropout=prenet_dropout)
-        self.lstm = nn.LSTM(2 * prenet_dims + speaker_emb_dims,
+        self.lstm = nn.LSTM(2 * prenet_dims + speaker_emb_dims + pos_dim,
                             rnn_dims,
                             batch_first=True,
                             bidirectional=True)
@@ -176,8 +237,8 @@ class MultiForwardTacotron(nn.Module):
         self.post_proj = nn.Linear(2 * postnet_dims, n_mels, bias=False)
         self.pitch_strength = pitch_strength
         self.energy_strength = energy_strength
-        self.pitch_proj = nn.Conv1d(1, 2 * prenet_dims + speaker_emb_dims, kernel_size=3, padding=1)
-        self.energy_proj = nn.Conv1d(1, 2 * prenet_dims + speaker_emb_dims, kernel_size=3, padding=1)
+        self.pitch_proj = nn.Conv1d(1, 2 * prenet_dims + speaker_emb_dims + pos_dim, kernel_size=3, padding=1)
+        self.energy_proj = nn.Conv1d(1, 2 * prenet_dims + speaker_emb_dims + pos_dim, kernel_size=3, padding=1)
 
     def __repr__(self):
         num_params = sum([np.prod(p.size()) for p in self.parameters()])
@@ -196,10 +257,12 @@ class MultiForwardTacotron(nn.Module):
         if self.training:
             self.step += 1
 
+        pos_emb = self.pos_pred.embed(x)
+
         pitch_cond_hat = self.pitch_cond_pred(x, semb).squeeze(-1)
 
-        dur_hat = self.dur_pred(x, pitch_cond, semb).squeeze(-1)
-        pitch_hat = self.pitch_pred(x, pitch_cond, semb).transpose(1, 2)
+        dur_hat = self.dur_pred(x, pitch_cond, semb, pos_emb).squeeze(-1)
+        pitch_hat = self.pitch_pred(x, pitch_cond, semb, pos_emb).transpose(1, 2)
         energy_hat = self.energy_pred(x, semb).transpose(1, 2)
 
         x = self.embedding(x)
@@ -207,7 +270,7 @@ class MultiForwardTacotron(nn.Module):
         x = self.prenet(x)
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
-        x = torch.cat([x, speaker_emb], dim=2)
+        x = torch.cat([x, speaker_emb, pos_emb], dim=2)
 
         pitch_proj = self.pitch_proj(pitch)
         pitch_proj = pitch_proj.transpose(1, 2)
@@ -248,12 +311,13 @@ class MultiForwardTacotron(nn.Module):
                  energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, torch.Tensor]:
         self.eval()
         with torch.no_grad():
+            pos_emb = self.pos_pred.embed(x)
             pitch_cond_hat = self.pitch_cond_pred(x, speaker_emb).squeeze(-1)
             pitch_cond_hat = torch.argmax(pitch_cond_hat.squeeze(), dim=1).long().unsqueeze(0)
-            dur_hat = self.dur_pred(x, pitch_cond_hat, speaker_emb, alpha=alpha).squeeze(-1)
+            dur_hat = self.dur_pred(x, pitch_cond_hat, speaker_emb, pos_emb, alpha=alpha).squeeze(-1)
             if torch.sum(dur_hat.long()) <= 0:
                 torch.fill_(dur_hat, value=2.)
-            pitch_hat = self.pitch_pred(x, pitch_cond_hat, speaker_emb).transpose(1, 2)
+            pitch_hat = self.pitch_pred(x, pitch_cond_hat, speaker_emb, pos_emb).transpose(1, 2)
             pitch_hat = pitch_function(pitch_hat)
             energy_hat = self.energy_pred(x, speaker_emb).transpose(1, 2)
             energy_hat = energy_function(energy_hat)
@@ -262,7 +326,8 @@ class MultiForwardTacotron(nn.Module):
                                       pitch_hat=pitch_hat,
                                       energy_hat=energy_hat,
                                       pitch_cond_hat=pitch_cond_hat,
-                                      semb=speaker_emb)
+                                      semb=speaker_emb,
+                                      pos_emb=pos_emb)
 
     def get_step(self) -> int:
         return self.step.data.item()
@@ -273,13 +338,14 @@ class MultiForwardTacotron(nn.Module):
                       dur_hat: torch.Tensor,
                       pitch_hat: torch.Tensor,
                       pitch_cond_hat: torch,
+                      pos_emb: torch.Tensor,
                       energy_hat: torch.Tensor) -> Dict[str, torch.Tensor]:
         x = self.embedding(x)
         x = x.transpose(1, 2)
         x = self.prenet(x)
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
-        x = torch.cat([x, speaker_emb], dim=2)
+        x = torch.cat([x, speaker_emb, pos_emb], dim=2)
 
         pitch_proj = self.pitch_proj(pitch_hat)
         pitch_proj = pitch_proj.transpose(1, 2)
