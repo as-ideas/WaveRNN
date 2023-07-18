@@ -101,7 +101,7 @@ if __name__ == '__main__':
     config = read_config('configs/multispeaker.yaml')
     paths = Paths(config['data_path'], config['tts_model_id'])
     model = MultiForwardTacotron.from_config(config)
-    save_path = paths.forward_checkpoints / 'latest_model'
+    save_path = paths.forward_checkpoints / 'latest_model.pt'
 
     pos_dict = {}
     for _, pos in phon_pos:
