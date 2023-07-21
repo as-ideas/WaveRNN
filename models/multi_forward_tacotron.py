@@ -177,10 +177,10 @@ class MultiForwardTacotron(nn.Module):
         x_series = x.detach()
 
 
-        dur_hat = self.dur_pred(x_series, pitch_cond).squeeze(-1)
-        pitch_hat = self.pitch_pred(x_series, pitch_cond).transpose(1, 2)
-        energy_hat = self.energy_pred(x_series).transpose(1, 2)
-        pitch_cond_hat = self.pitch_cond_pred(x_series).squeeze(-1)
+        dur_hat = self.dur_pred(x, pitch_cond).squeeze(-1)
+        pitch_hat = self.pitch_pred(x, pitch_cond).transpose(1, 2)
+        energy_hat = self.energy_pred(x).transpose(1, 2)
+        pitch_cond_hat = self.pitch_cond_pred(x).squeeze(-1)
 
 
         pitch_proj = self.pitch_proj(pitch)
