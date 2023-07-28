@@ -135,8 +135,8 @@ if __name__ == '__main__':
                             drop_last=True)
 
 
-    lin = torch.nn.Linear(512, 1)
-    optim = torch.optim.Adam(list(model.pos_pred.parameters()) + list(lin.paraeters()), lr=1e-4)
+    lin = torch.nn.Linear(512, 30)
+    optim = torch.optim.Adam(list(model.embedding.parameters()) + list(model.prenet.parameters()) + list(lin.parameters()), lr=1e-4)
 
     forward_optim = torch.optim.Adam(model.parameters())
     ce_loss = torch.nn.CrossEntropyLoss(ignore_index=0)
