@@ -174,8 +174,6 @@ class MultiForwardTacotron(nn.Module):
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
         x = torch.cat([x, speaker_emb], dim=2)
-        x_series = x.detach()
-
 
         dur_hat = self.dur_pred(x, pitch_cond).squeeze(-1)
         pitch_hat = self.pitch_pred(x, pitch_cond).transpose(1, 2)

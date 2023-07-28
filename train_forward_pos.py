@@ -135,8 +135,8 @@ if __name__ == '__main__':
                             drop_last=True)
 
 
-    optim = torch.optim.Adam(model.pos_pred.parameters(), lr=1e-3)
-
+    lin = torch.nn.Linear(512, 1)
+    optim = torch.optim.Adam(list(model.pos_pred.parameters()) + list(lin.paraeters()), lr=1e-4)
 
     forward_optim = torch.optim.Adam(model.parameters())
     ce_loss = torch.nn.CrossEntropyLoss(ignore_index=0)
@@ -149,7 +149,11 @@ if __name__ == '__main__':
         for batch in tqdm.tqdm(dataloader, total=len(dataloader)):
             model.step += 1
             batch = to_device(batch, device)
-            out = model.pos_pred(batch['x'])
+
+            out = model.embedding(batch['x'])
+            out = model.prenet(out.transpose(1, 2))
+            out = lin(out)
+
             loss = ce_loss(out.transpose(1, 2), batch['pos'])
 
             optim.zero_grad()
@@ -172,8 +176,10 @@ if __name__ == '__main__':
                 for batch in tqdm.tqdm(val_dataset, total=len(val_dataset)):
                     batch = to_device(batch, device)
                     x = batch['x'].unsqueeze(0)
-                    pos = batch['pos']
-                    out = model.pos_pred(x)
+                    pos = batch['pos'].unsqueeze(0)
+                    out = model.embedding(x)
+                    out = model.prenet(out.transpose(1, 2))
+                    out = lin(out)
                     example_pred = torch.argmax(out[0], dim=-1)
                     matching = example_pred == pos
                     tp = sum(matching)
