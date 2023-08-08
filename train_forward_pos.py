@@ -94,9 +94,12 @@ class PosDataset(Dataset):
 
 
 if __name__ == '__main__':
-    df = pd.read_csv('/Users/cschaefe/datasets/nlp/pos/alpha_pos.tsv', sep='\t', encoding='utf-8')
-    df.dropna(inplace=True)
-    phon_pos = list(zip(df['text_phonemized'], df['text_phonemized_pos']))
+    df_pos = pd.read_csv('/Users/cschaefe/datasets/nlp/pos/alpha_pos.tsv', sep='\t', encoding='utf-8')
+    df_dep = pd.read_csv('/Users/cschaefe/datasets/nlp/pos/alpha_dep.tsv', sep='\t', encoding='utf-8')
+    df_pos.dropna(inplace=True)
+    df_dep.dropna(inplace=True)
+    phon_pos = list(zip(df_pos['text_phonemized'], df_pos['text_phonemized_pos']))
+    phon_dep = list(zip(df_dep['text_phonemized'], df_dep['text_phonemized_pos']))
 
     config = read_config('configs/multispeaker.yaml')
     paths = Paths(config['data_path'], config['tts_model_id'])
@@ -111,27 +114,47 @@ if __name__ == '__main__':
                 pos_dict[p] = len(pos_dict) + 1
     print(pos_dict)
 
+    dep_dict = {}
+    for _, pos in phon_dep:
+        for p in pos:
+            p = str(p)
+            if p not in dep_dict:
+                dep_dict[p] = len(dep_dict) + 1
+    print(dep_dict)
+
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     print('Using device:', device)
     model = model.to(device)
     n_val = 32
-    val_steps = 100
+    val_steps = 10
     batch_size = 32
 
     Random(42).shuffle(phon_pos)
-    val_data = phon_pos[:n_val]
-    train_data = phon_pos[n_val:]
+    val_data_pos = phon_pos[:n_val]
+    train_data_pos = phon_pos[n_val:]
+    val_data_dep = phon_dep[:n_val]
+    train_data_dep = phon_dep[n_val:]
 
-    train_dataset = PosDataset(train_data, pos_dict, Tokenizer())
-    val_dataset = PosDataset(val_data, pos_dict, Tokenizer())
-    lens = [len(p) for p, _ in train_data]
+    train_dataset_pos = PosDataset(train_data_pos, pos_dict, Tokenizer())
+    val_dataset_pos = PosDataset(val_data_pos, pos_dict, Tokenizer())
+    train_dataset_dep = PosDataset(train_data_dep, pos_dict, Tokenizer())
+    val_dataset_dep = PosDataset(val_data_dep, pos_dict, Tokenizer())
+    lens_pos = [len(p) for p, _ in train_data_pos]
+    lens_dep = [len(p) for p, _ in train_data_dep]
 
 
-    sampler = BinnedLengthSampler(phoneme_lens=lens, batch_size=batch_size, bin_size=3*batch_size)
-    dataloader = DataLoader(train_dataset,
+    sampler_pos = BinnedLengthSampler(phoneme_lens=lens_pos, batch_size=batch_size, bin_size=3*batch_size)
+    dataloader_pos = DataLoader(train_dataset_pos,
                             batch_size=batch_size,
                             collate_fn=PosCollator(),
-                            sampler=sampler,
+                            sampler=sampler_pos,
+                            drop_last=True)
+
+    sampler_dep = BinnedLengthSampler(phoneme_lens=lens_dep, batch_size=batch_size, bin_size=3*batch_size)
+    dataloader_dep = DataLoader(train_dataset_dep,
+                            batch_size=batch_size,
+                            collate_fn=PosCollator(),
+                            sampler=sampler_dep,
                             drop_last=True)
 
 
@@ -144,11 +167,17 @@ if __name__ == '__main__':
     sw = SummaryWriter('checkpoints/pos_tagger')
 
     for epoch in range(1000):
-        for batch in tqdm.tqdm(dataloader, total=len(dataloader)):
+        for batch_pos, batch_dep in tqdm.tqdm(zip(dataloader_pos, dataloader_dep), total=len(dataloader_pos)):
             model.step += 1
-            batch = to_device(batch, device)
-            out = model.pos_pred(batch['x'])
-            loss = ce_loss(out.transpose(1, 2), batch['pos'])
+            batch_pos = to_device(batch_pos, device)
+            batch_dep = to_device(batch_dep, device)
+            out_pos, _ = model.pos_pred(batch_pos['x'])
+            _, out_dep = model.pos_pred(batch_dep['x'])
+
+            loss_pos = ce_loss(out_pos.transpose(1, 2), batch_pos['pos'])
+            loss_dep = ce_loss(out_dep.transpose(1, 2), batch_dep['pos'])
+
+            loss = 0.5 * loss_pos + 0.5 * loss_dep
 
             optim.zero_grad()
             loss.backward()
@@ -158,8 +187,8 @@ if __name__ == '__main__':
             sw.add_scalar('loss', loss, global_step=step)
 
             if step % 10 == 0:
-                example_pred = torch.argmax(out[0], dim=-1)
-                example_target = batch['pos'][0]
+                example_pred = torch.argmax(out_pos[0], dim=-1)
+                example_target = batch_pos['pos'][0]
 
                 print(example_pred)
                 print(example_target)
@@ -167,17 +196,27 @@ if __name__ == '__main__':
             if step % val_steps == 0:
                 model.eval()
                 val_acc = 0
-                for batch in tqdm.tqdm(val_dataset, total=len(val_dataset)):
-                    batch = to_device(batch, device)
-                    x = batch['x'].unsqueeze(0)
-                    pos = batch['pos']
-                    out = model.pos_pred(x)
-                    example_pred = torch.argmax(out[0], dim=-1)
+                for batch_pos, batch_dep in tqdm.tqdm(zip(val_dataset_pos, val_dataset_dep), total=len(val_dataset_pos)):
+                    batch_pos = to_device(batch_pos, device)
+                    x = batch_pos['x'].unsqueeze(0)
+                    pos = batch_pos['pos']
+                    out_pos, _ = model.pos_pred(x)
+                    example_pred = torch.argmax(out_pos[0], dim=-1)
                     matching = example_pred == pos
                     tp = sum(matching)
                     acc = tp / pos.size(-1)
                     val_acc += acc
-                val_acc /= len(val_dataset)
+                    batch_dep = to_device(batch_dep, device)
+                    x = batch_dep['x'].unsqueeze(0)
+                    pos = batch_dep['pos']
+                    _, out_dep = model.pos_pred(x)
+                    example_pred = torch.argmax(out_dep[0], dim=-1)
+                    matching = example_pred == pos
+                    tp = sum(matching)
+                    acc = tp / pos.size(-1)
+                    val_acc += acc
+
+                val_acc /= 2. * len(val_dataset_pos)
                 sw.add_scalar('val_acc', val_acc, global_step=step)
                 print('VAL ACC: ', step, val_acc)
 

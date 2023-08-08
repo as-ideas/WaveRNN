@@ -28,8 +28,9 @@ class PosPredictor(nn.Module):
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
         ])
         self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
-        self.lin_1 = nn.Linear(2 * rnn_dims, 32)
-        self.lin_2 = nn.Linear(32, out_dim)
+        self.lin_1 = nn.Linear(2 * rnn_dims, 64)
+        self.lin_2 = nn.Linear(64, out_dim)
+        self.lin_3 = nn.Linear(64, out_dim)
         self.dropout = dropout
 
     def forward(self,
@@ -43,8 +44,9 @@ class PosPredictor(nn.Module):
         x = x.transpose(1, 2)
         x, _ = self.rnn(x)
         x = self.lin_1(x)
-        x = self.lin_2(x)
-        return x / alpha
+        x1 = self.lin_2(x)
+        x2 = self.lin_3(x)
+        return x1, x2
 
     def embed(self,
                 x: torch.Tensor,
@@ -111,7 +113,7 @@ class ConditionalSeriesPredictor(nn.Module):
                  rnn_dims: int = 64,
                  dropout: float = 0.5,
                  speaker_emb_dims: int = 256,
-                 pos_dim: int = 32):
+                 pos_dim: int = 64):
         super().__init__()
         self.embedding = Embedding(num_chars, emb_dim)
         self.pitch_cond_embedding = Embedding(cond_emb_size, cond_emb_dims)
@@ -179,7 +181,7 @@ class MultiForwardTacotron(nn.Module):
                  pitch_cond_emb_dims: int,
                  pitch_cond_categorical_dims: int,
                  padding_value=-11.5129,
-                 pos_dim=32):
+                 pos_dim=64):
         super().__init__()
         self.rnn_dims = rnn_dims
         self.padding_value = padding_value
