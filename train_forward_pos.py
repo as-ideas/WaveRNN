@@ -137,8 +137,8 @@ if __name__ == '__main__':
 
     train_dataset_pos = PosDataset(train_data_pos, pos_dict, Tokenizer())
     val_dataset_pos = PosDataset(val_data_pos, pos_dict, Tokenizer())
-    train_dataset_dep = PosDataset(train_data_dep, pos_dict, Tokenizer())
-    val_dataset_dep = PosDataset(val_data_dep, pos_dict, Tokenizer())
+    train_dataset_dep = PosDataset(train_data_dep, dep_dict, Tokenizer())
+    val_dataset_dep = PosDataset(val_data_dep, dep_dict, Tokenizer())
     lens_pos = [len(p) for p, _ in train_data_pos]
     lens_dep = [len(p) for p, _ in train_data_dep]
 
