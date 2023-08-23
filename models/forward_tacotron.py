@@ -11,6 +11,24 @@ from models.common_layers import CBHG, LengthRegulator, BatchNormConv
 from utils.text.symbols import phonemes
 
 
+class TransformerDecoder(nn.Module):
+    def __init__(self, vocab_size, d_model, nhead, num_layers):
+        super(TransformerDecoder, self).__init__()
+
+        self.embedding = nn.Embedding(vocab_size, d_model)
+        self.decoder = nn.TransformerDecoder(
+            nn.TransformerDecoderLayer(d_model, nhead),
+            num_layers
+        )
+        self.linear = nn.Linear(d_model, vocab_size)
+
+    def forward(self, tgt, memory, tgt_mask=None, memory_mask=None, tgt_key_padding_mask=None, memory_key_padding_mask=None):
+        tgt = self.embedding(tgt)
+        output = self.decoder(tgt, memory, tgt_mask, memory_mask, tgt_key_padding_mask, memory_key_padding_mask)
+        output = self.linear(output)
+        return output
+
+
 class SeriesPredictor(nn.Module):
 
     def __init__(self, num_chars, emb_dim=64, conv_dims=256, rnn_dims=64, dropout=0.5):

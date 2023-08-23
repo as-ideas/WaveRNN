@@ -58,9 +58,9 @@ class PosPredictor(nn.Module):
                 x = conv(x)
                 x = F.dropout(x, p=self.dropout, training=self.training)
             x = x.transpose(1, 2)
-            x, _ = self.rnn(x)
-            x = self.lin_1(x)
-            return x
+            x, x_out = self.rnn(x)
+            #x = self.lin_1(x)
+            return x_out
 
 
 class SeriesPredictor(nn.Module):

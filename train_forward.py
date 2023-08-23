@@ -75,8 +75,13 @@ if __name__ == '__main__':
     print(f'\nInitialized tts model: {model}\n')
     optimizer = optim.Adam(model.parameters())
     restore_checkpoint(model=model, optim=optimizer,
-                       path=paths.forward_checkpoints / 'latest_model.pt',
+                       path=Path('/home/sysgen/chris/workspace/ForwardTacotron/checkpoints/multi_posdep2_tts.forward/latest_model.pt'),
                        device=device)
+
+    config['multi_forward_tacotron']['model']['pos_dim'] = 128
+    model_new = init_tts_model(config).to(device)
+    model_new.pos_pred = model.pos_pred
+    optimizer_new = optim.Adam(model_new.parameters())
 
     if force_gta:
         print('Creating Ground Truth Aligned Dataset...\n')
@@ -85,7 +90,7 @@ if __name__ == '__main__':
         create_gta_features(model, train_set, val_set, paths.gta)
     elif config['tts_model'] in ['multi_forward_tacotron', 'multi_fast_pitch']:
         trainer = MultiForwardTrainer(paths=paths, dsp=dsp, config=config)
-        trainer.train(model, optimizer)
+        trainer.train(model_new, optimizer_new)
     else:
         trainer = ForwardTrainer(paths=paths, dsp=dsp, config=config)
         trainer.train(model, optimizer)
