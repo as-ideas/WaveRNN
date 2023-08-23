@@ -200,7 +200,8 @@ class MultiForwardTacotron(nn.Module):
                                                    conv_dims=durpred_conv_dims,
                                                    rnn_dims=durpred_rnn_dims,
                                                    cond_emb_dims=pitch_cond_emb_dims,
-                                                   dropout=durpred_dropout)
+                                                   dropout=durpred_dropout,
+                                                   pos_dim=pos_dim)
         self.pitch_cond_pred = SeriesPredictor(num_chars=num_chars,
                                                emb_dim=series_embed_dims,
                                                conv_dims=pitch_cond_conv_dims,
@@ -212,7 +213,8 @@ class MultiForwardTacotron(nn.Module):
                                                      conv_dims=pitch_conv_dims,
                                                      rnn_dims=pitch_rnn_dims,
                                                      cond_emb_dims=pitch_cond_emb_dims,
-                                                     dropout=pitch_dropout, )
+                                                     dropout=pitch_dropout,
+                                                     pos_dim=pos_dim)
         self.energy_pred = SeriesPredictor(num_chars=num_chars,
                                            emb_dim=series_embed_dims,
                                            conv_dims=energy_conv_dims,
