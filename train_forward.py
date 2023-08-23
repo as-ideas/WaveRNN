@@ -78,7 +78,7 @@ if __name__ == '__main__':
                        path=Path('/home/sysgen/chris/workspace/ForwardTacotron/checkpoints/multi_posdep2_tts.forward/latest_model.pt'),
                        device=device)
 
-    config['multi_forward_tacotron']['model']['pos_dim'] = 128
+    config['multi_forward_tacotron']['model']['pos_dim'] = 512
     model_new = init_tts_model(config).to(device)
     model_new.pos_pred = model.pos_pred
     optimizer_new = optim.Adam(model_new.parameters())
