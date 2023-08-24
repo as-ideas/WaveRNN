@@ -1,14 +1,15 @@
 import time
 from typing import Dict, Any, Union
-
+import torch.nn.functional as F
 import numpy as np
 import torch
+from torch.optim import Adam
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from models.multi_fast_pitch import MultiFastPitch
-from models.multi_forward_tacotron import MultiForwardTacotron
+from models.multi_forward_tacotron import MultiForwardTacotron, Discriminator
 from trainer.common import Averager, TTSSession, MaskedL1, to_device, np_now
 from utils.checkpoints import save_checkpoint
 from utils.dataset import get_forward_dataloaders
@@ -68,6 +69,10 @@ class MultiForwardTrainer:
 
         averages = {'mel_loss': Averager(), 'dur_loss': Averager(), 'step_duration': Averager()}
         device = next(model.parameters()).device  # use same device as model parameters
+
+        disc = Discriminator().to(device)
+        d_optim = Adam(disc.parameters(), lr=1e-4)
+
         for e in range(1, epochs + 1):
             for i, batch in enumerate(session.train_set, 1):
                 batch = to_device(batch, device=device)
@@ -82,6 +87,21 @@ class MultiForwardTrainer:
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
+                d_loss = 0
+                score_fake = disc(pred['dur_hat'])
+                score_real = disc(batch['dur'])
+                d_loss += torch.pow(score_real - 1.0, 2).mean()
+                d_loss += torch.pow(score_fake, 2).mean()
+                d_optim.zero_grad()
+                d_loss.backward()
+                d_optim.step()
+
+                score_fake = disc(pred['dur_hat'])
+                g_loss = torch.pow(score_fake - 1.0, 2).mean()
+
+                print('g_loss', g_loss)
+                print('d_loss', d_loss)
+
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
                 pitch_loss = self.l1_loss(pred['pitch'], pitch_target.unsqueeze(1), batch['x_len'])
                 energy_loss = self.l1_loss(pred['energy'], energy_target.unsqueeze(1), batch['x_len'])
@@ -91,7 +111,8 @@ class MultiForwardTrainer:
                        + self.train_cfg['dur_loss_factor'] * dur_loss \
                        + self.train_cfg['pitch_loss_factor'] * pitch_loss \
                        + self.train_cfg['energy_loss_factor'] * energy_loss \
-                       + self.train_cfg['pitch_cond_loss_factor'] * pitch_cond_loss
+                       + self.train_cfg['pitch_cond_loss_factor'] * pitch_cond_loss \
+                + g_loss
 
                 pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
                 pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()
@@ -121,6 +142,8 @@ class MultiForwardTrainer:
                 if step % self.train_cfg['plot_every'] == 0:
                     self.generate_plots(model, session)
 
+                self.writer.add_scalar('d_loss/train', d_loss, model.get_step())
+                self.writer.add_scalar('g_loss/train', g_loss, model.get_step())
                 self.writer.add_scalar('Mel_Loss/train', m1_loss + m2_loss, model.get_step())
                 self.writer.add_scalar('Pitch_Loss/train', pitch_loss, model.get_step())
                 self.writer.add_scalar('Energy_Loss/train', energy_loss, model.get_step())

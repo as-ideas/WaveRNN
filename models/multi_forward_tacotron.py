@@ -11,6 +11,22 @@ from models.common_layers import CBHG, LengthRegulator, BatchNormConv
 from utils.text.symbols import phonemes
 
 
+
+class Discriminator(nn.Module):
+
+    def __init__(self):
+        super(Discriminator, self).__init__()
+        self.gru = nn.GRU(1, 32, bidirectional=True)
+        self.lin = nn.Linear(64, 1)
+
+    def forward(self, x):
+        x = self.gru(x)
+        x = self.lin(x)
+        return x
+
+
+
+
 class SeriesPredictor(nn.Module):
 
     def __init__(self,
