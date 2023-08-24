@@ -88,7 +88,7 @@ class MultiForwardTrainer:
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
                 d_loss = 0
-                score_fake = disc(batch['x'], pred['dur'].unsqueeze(-1), pred['pitch'].transpose(1, 2).detach())
+                score_fake = disc(batch['x'], pred['dur'].unsqueeze(-1).detach(), pred['pitch'].transpose(1, 2).detach())
                 score_real = disc(batch['x'], batch['dur'].unsqueeze(-1), batch['pitch'].unsqueeze(-1))
 
                 for b in range(batch['x'].size(0)):
