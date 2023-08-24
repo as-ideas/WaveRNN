@@ -88,15 +88,15 @@ class MultiForwardTrainer:
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
                 d_loss = 0
-                score_fake = disc(pred['dur_hat'])
-                score_real = disc(batch['dur'])
+                score_fake = disc(pred['dur'].unsqueeze(-1).detach())
+                score_real = disc(batch['dur'].unsqueeze(-1))
                 d_loss += torch.pow(score_real - 1.0, 2).mean()
                 d_loss += torch.pow(score_fake, 2).mean()
                 d_optim.zero_grad()
                 d_loss.backward()
                 d_optim.step()
 
-                score_fake = disc(pred['dur_hat'])
+                score_fake = disc(pred['dur'].unsqueeze(-1))
                 g_loss = torch.pow(score_fake - 1.0, 2).mean()
 
                 print('g_loss', g_loss)
@@ -112,7 +112,7 @@ class MultiForwardTrainer:
                        + self.train_cfg['pitch_loss_factor'] * pitch_loss \
                        + self.train_cfg['energy_loss_factor'] * energy_loss \
                        + self.train_cfg['pitch_cond_loss_factor'] * pitch_cond_loss \
-                + g_loss
+                       + g_loss
 
                 pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
                 pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()

@@ -20,7 +20,7 @@ class Discriminator(nn.Module):
         self.lin = nn.Linear(64, 1)
 
     def forward(self, x):
-        x = self.gru(x)
+        x, _ = self.gru(x)
         x = self.lin(x)
         return x
 
