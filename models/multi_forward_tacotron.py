@@ -16,10 +16,13 @@ class Discriminator(nn.Module):
 
     def __init__(self):
         super(Discriminator, self).__init__()
-        self.gru = nn.GRU(1, 32, bidirectional=True)
+        self.embedding = Embedding(len(phonemes), 64)
+        self.gru = nn.GRU(65, 32, bidirectional=True)
         self.lin = nn.Linear(64, 1)
 
-    def forward(self, x):
+    def forward(self, x, dur):
+        emb = self.embedding(x)
+        x = torch.cat([emb, dur], dim=-1)
         x, _ = self.gru(x)
         x = self.lin(x)
         return x

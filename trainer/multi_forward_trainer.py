@@ -88,16 +88,23 @@ class MultiForwardTrainer:
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
                 d_loss = 0
-                score_fake = disc(pred['dur'].unsqueeze(-1).detach())
-                score_real = disc(batch['dur'].unsqueeze(-1))
-                d_loss += torch.pow(score_real - 1.0, 2).mean()
-                d_loss += torch.pow(score_fake, 2).mean()
+                score_fake = disc(batch['x'], pred['dur'].unsqueeze(-1).detach())
+                score_real = disc(batch['x'], batch['dur'].unsqueeze(-1))
+
+                for b in range(batch['x'].size(0)):
+                    d_loss += torch.pow(score_real[b, :batch['x_len'][b], :] - 1.0, 2).mean()
+                    d_loss += torch.pow(score_fake[b, :batch['x_len'][b], :], 2).mean()
+
+                d_loss /= batch['x'].size(0)
                 d_optim.zero_grad()
                 d_loss.backward()
                 d_optim.step()
 
-                score_fake = disc(pred['dur'].unsqueeze(-1))
-                g_loss = torch.pow(score_fake - 1.0, 2).mean()
+                score_fake = disc(batch['x'], pred['dur'].unsqueeze(-1))
+                g_loss = 0
+                for b in range(batch['x'].size(0)):
+                    g_loss += torch.pow(score_fake[b, :batch['x_len'][b], :] - 1.0, 2).mean()
+                g_loss /= batch['x'].size(0)
 
                 print('g_loss', g_loss)
                 print('d_loss', d_loss)
