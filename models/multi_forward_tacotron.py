@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Union, Callable, Dict, Any
+from typing import Union, Callable, Dict, Any, Optional
 import numpy as np
 import torch
 import torch.nn as nn
@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch.nn import Embedding
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
-from models.common_layers import CBHG, LengthRegulator, BatchNormConv
+from models.common_layers import CBHG, LengthRegulator, BatchNormConv, ForwardTransformer, make_token_len_mask
 from utils.text.symbols import phonemes
 
 
@@ -15,52 +15,43 @@ class PosPredictor(nn.Module):
 
     def __init__(self,
                  num_chars: int,
-                 emb_dim: int = 64,
-                 conv_dims: int = 256,
-                 rnn_dims: int = 64,
-                 dropout: float = 0.5,
+                 d_model: int = 512,
+                 n_heads: int = 2,
+                 d_fft: int = 512,
+                 layers: int = 4,
+                 conv1_kernel: int = 9,
+                 conv2_kernel: int = 1,
+                 dropout=0.1,
                  out_dim: int = 1):
         super().__init__()
-        self.embedding = Embedding(num_chars, emb_dim)
-        self.convs = torch.nn.ModuleList([
-            BatchNormConv(emb_dim, conv_dims, 5, relu=True),
-            BatchNormConv(conv_dims, conv_dims, 5, relu=True),
-            BatchNormConv(conv_dims, conv_dims, 5, relu=True),
-        ])
-        self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
-        self.lin_1 = nn.Linear(2 * rnn_dims, 64)
-        self.lin_2 = nn.Linear(64, out_dim)
-        self.lin_3 = nn.Linear(64, out_dim)
-        self.dropout = dropout
+        self.embedding = Embedding(num_chars, d_model)
+        self.transformer = ForwardTransformer(heads=n_heads, dropout=dropout,
+                                              d_model=d_model, d_fft=d_fft,
+                                              conv1_kernel=conv1_kernel,
+                                              conv2_kernel=conv2_kernel,
+                                              layers=layers)
+        self.lin_1 = nn.Linear(d_model, 40)
+        self.lin_2 = nn.Linear(d_model, 40)
 
     def forward(self,
                 x: torch.Tensor,
+                src_pad_mask: Optional[torch.Tensor] = None,
                 alpha: float = 1.0) -> torch.Tensor:
+        len_mask = make_token_len_mask(x.transpose(0, 1))
         x = self.embedding(x)
-        x = x.transpose(1, 2)
-        for conv in self.convs:
-            x = conv(x)
-            x = F.dropout(x, p=self.dropout, training=self.training)
-        x = x.transpose(1, 2)
-        x, _ = self.rnn(x)
-        x = self.lin_1(x)
-        x1 = self.lin_2(x)
-        x2 = self.lin_3(x)
+        x = self.transformer(x, src_pad_mask=len_mask)
+        x1 = self.lin_1(x)
+        x2 = self.lin_2(x)
         return x1, x2
 
     def embed(self,
-                x: torch.Tensor,
-                alpha: float = 1.0) -> torch.Tensor:
+              x: torch.Tensor,
+              alpha: float = 1.0) -> torch.Tensor:
+        len_mask = make_token_len_mask(x.transpose(0, 1))
         with torch.no_grad():
             x = self.embedding(x)
-            x = x.transpose(1, 2)
-            for conv in self.convs:
-                x = conv(x)
-                x = F.dropout(x, p=self.dropout, training=self.training)
-            x = x.transpose(1, 2)
-            x, _ = self.rnn(x)
-            #x = self.lin_1(x)
-            return x
+            x = self.transformer(x, src_pad_mask=len_mask)
+        return x
 
 
 class SeriesPredictor(nn.Module):
@@ -92,7 +83,7 @@ class SeriesPredictor(nn.Module):
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
         x = torch.cat([x, speaker_emb], dim=2)
-        x = x.transpose(1, 2)
+        x = x.transpose(0, 1)
         for conv in self.convs:
             x = conv(x)
             x = F.dropout(x, p=self.dropout, training=self.training)
@@ -189,9 +180,7 @@ class MultiForwardTacotron(nn.Module):
         self.lr = LengthRegulator()
 
         self.pos_pred = PosPredictor(num_chars=num_chars,
-                                     emb_dim=128,
-                                     conv_dims=256,
-                                     rnn_dims=256,
+
                                      dropout=0.1,
                                      out_dim=40)
 

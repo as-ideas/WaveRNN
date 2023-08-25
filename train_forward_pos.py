@@ -17,6 +17,7 @@ from torch.utils.data.dataloader import DataLoader
 from torch.utils.data.dataset import Dataset
 from torch.utils.tensorboard import SummaryWriter
 
+from models.common_layers import make_token_len_mask
 from models.fast_pitch import FastPitch
 from models.forward_tacotron import ForwardTacotron
 from models.multi_forward_tacotron import SeriesPredictor, MultiForwardTacotron
