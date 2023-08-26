@@ -74,9 +74,9 @@ if __name__ == '__main__':
     model = init_tts_model(config).to(device)
     print(f'\nInitialized tts model: {model}\n')
     optimizer = optim.Adam(model.parameters())
-    restore_checkpoint(model=model, optim=optimizer,
-                       path=Path('/home/sysgen/chris/workspace/ForwardTacotron/checkpoints/multi_posdep2_tts.forward/latest_model.pt'),
-                       device=device)
+    #restore_checkpoint(model=model, optim=optimizer,
+    #                   path=Path('/home/sysgen/chris/workspace/ForwardTacotron/checkpoints/multi_posdep2_tts.forward/latest_model.pt'),
+    #                   device=device)
 
     config['multi_forward_tacotron']['model']['pos_dim'] = 512
     model_new = init_tts_model(config).to(device)
