@@ -182,22 +182,3 @@ class TacoTrainer:
         self.writer.add_audio(
             tag=f'Ground_Truth_Aligned/postnet_wav/{speaker}', snd_tensor=m2_hat_wav,
             global_step=model.step, sample_rate=self.dsp.sample_rate)
-
-        m1_hat, m2_hat, att = model.generate(batch['x'][0:1], steps=batch['mel_len'][0] + 20)
-        att_fig = plot_attention(att)
-        m1_hat_fig = plot_mel(m1_hat)
-        m2_hat_fig = plot_mel(m2_hat)
-
-        self.writer.add_figure(f'Generated/attention/{speaker}', att_fig, model.step)
-        self.writer.add_figure(f'Generated/target/{speaker}', m_target_fig, model.step)
-        self.writer.add_figure(f'Generated/linear/{speaker}', m1_hat_fig, model.step)
-        self.writer.add_figure(f'Generated/postnet/{speaker}', m2_hat_fig, model.step)
-
-        m2_hat_wav = self.dsp.griffinlim(m2_hat)
-
-        self.writer.add_audio(
-            tag=f'Generated/target_wav/{speaker}', snd_tensor=target_wav,
-            global_step=model.step, sample_rate=self.dsp.sample_rate)
-        self.writer.add_audio(
-            tag=f'Generated/postnet_wav/{speaker}', snd_tensor=m2_hat_wav,
-            global_step=model.step, sample_rate=self.dsp.sample_rate)
