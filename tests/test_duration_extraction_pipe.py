@@ -26,11 +26,11 @@ def new_diagonal_attention(dims: Tuple[int, int, int]) -> torch.Tensor:
 
 class MockTacotron(torch.nn.Module):
 
-    def __call__(self, batch: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def __call__(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         """ We just use the mock model to get the returned diagonal attention matrix. """
         mel = batch['mel']
         x = batch['x']
-        return x, x, new_diagonal_attention((1, mel.size(-1), x.size(-1)))
+        return {'att': new_diagonal_attention((1, mel.size(-1), x.size(-1)))}
 
 
 class TestDurationExtractionPipe(unittest.TestCase):

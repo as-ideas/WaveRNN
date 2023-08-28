@@ -111,7 +111,8 @@ class DurationExtractionPipeline:
         for i, batch in enumerate(pbar, 1):
             batch = to_device(batch, device=device)
             with torch.no_grad():
-                _, _, attention_batch = model(batch)
+                out = model(batch)
+            attention_batch = out['att']
             _, att_score = attention_score(attention_batch, batch['mel_len'], r=1)
             sum_att_score += att_score.sum()
             B = batch['x_len'].size(0)
