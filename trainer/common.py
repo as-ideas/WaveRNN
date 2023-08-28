@@ -78,6 +78,39 @@ class MaskedL1(torch.nn.Module):
         return loss / mask.sum()
 
 
+class ForwardSumLoss(torch.nn.Module):
+
+    def __init__(self, blank_logprob=-1):
+        super(ForwardSumLoss, self).__init__()
+        self.log_softmax = torch.nn.LogSoftmax(dim=3)
+        self.blank_logprob = blank_logprob
+        self.CTCLoss = torch.nn.CTCLoss(zero_infinity=True)
+
+    def forward(self,
+                attn_logprob: torch.Tensor,
+                text_lens: torch.Tensor,
+                mel_lens: torch.Tensor) -> torch.Tensor:
+
+        # The CTC loss module assumes the existence of a blank token
+        # that can be optionally inserted anywhere in the sequence for
+        # a fixed probability.
+        # A row must be added to the attention matrix to account for this
+        attn_logprob_pd = F.pad(input=attn_logprob,
+                                pad=(1, 0, 0, 0, 0, 0),
+                                value=self.blank_logprob)
+
+        bs = attn_logprob.size(0)
+        T = attn_logprob.size(-1)
+        target_seq = torch.arange(1, T+1).expand(bs, T)
+        attn_logprob_pd = attn_logprob_pd.permute(1, 0, 2)
+        attn_logprob_pd = attn_logprob_pd.log_softmax(-1)
+
+        cost = self.CTCLoss(attn_logprob_pd,
+                            target_seq,
+                            input_lengths=mel_lens,
+                            target_lengths=text_lens)
+        return cost
+
 # Adapted from https://gist.github.com/jihunchoi/f1434a77df9db1bb337417854b398df1
 def pad_mask(lens, max_len):
     batch_size = lens.size(0)

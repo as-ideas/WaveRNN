@@ -8,7 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 from typing import Tuple, Dict, Any
 
 from models.tacotron import Tacotron
-from trainer.common import Averager, TTSSession, to_device, np_now
+from trainer.common import Averager, TTSSession, to_device, np_now, ForwardSumLoss
 from utils.checkpoints import save_checkpoint
 from utils.dataset import get_taco_dataloaders
 from utils.decorators import ignore_exception
@@ -30,6 +30,7 @@ class TacoTrainer:
         self.config = config
         self.train_cfg = config['tacotron']['training']
         self.writer = SummaryWriter(log_dir=paths.taco_log, comment='v1')
+        self.forward_loss = ForwardSumLoss()
 
     def train(self,
               model: Tacotron,
@@ -71,11 +72,17 @@ class TacoTrainer:
                 batch = to_device(batch, device=device)
                 start = time.time()
                 model.train()
-                m1_hat, m2_hat, attention = model(batch)
+
+                out = model(batch)
+                m1_hat, m2_hat, attention, att_aligner = out['mel'], out['mel_post'], out['att'], out['att_aligner']
+                ctc_loss = self.forward_loss(att_aligner, text_lens=batch['x_len'], mel_lens=batch['mel_len'])
 
                 m1_loss = F.l1_loss(m1_hat, batch['mel'])
                 m2_loss = F.l1_loss(m2_hat, batch['mel'])
-                loss = m1_loss + m2_loss
+
+                mel_loss = m1_loss + m2_loss
+                loss = mel_loss + self.train_cfg['ctc_loss_factor'] * ctc_loss
+
                 optimizer.zero_grad()
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(),
@@ -100,16 +107,17 @@ class TacoTrainer:
                 _, att_score = attention_score(attention, batch['mel_len'])
                 att_score = torch.mean(att_score)
                 self.writer.add_scalar('Attention_Score/train', att_score, model.get_step())
-                self.writer.add_scalar('Mel_Loss/train', loss, model.get_step())
+                self.writer.add_scalar('Mel_Loss/train', mel_loss, model.get_step())
                 self.writer.add_scalar('Params/reduction_factor', session.r, model.get_step())
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
                 self.writer.add_scalar('Params/learning_rate', session.lr, model.get_step())
 
                 stream(msg)
 
-            val_loss, val_att_score = self.evaluate(model, session.val_set)
+            val_loss, val_att_score, val_att_score_t = self.evaluate(model, session.val_set)
             self.writer.add_scalar('Loss/val', val_loss, model.get_step())
             self.writer.add_scalar('Attention_Score/val', val_att_score, model.get_step())
+            self.writer.add_scalar('Attention_Score/val_t', val_att_score_t, model.get_step())
             save_checkpoint(model=model, optim=optimizer, config=self.config,
                             path=self.paths.taco_checkpoints / 'latest_model.pt')
 
@@ -117,15 +125,17 @@ class TacoTrainer:
             duration_avg.reset()
             print(' ')
 
-    def evaluate(self, model: Tacotron, val_set: DataLoader) -> Tuple[float, float]:
+    def evaluate(self, model: Tacotron, val_set: DataLoader) -> Tuple[float, float, float]:
         model.eval()
+        model.decoder.prenet.train()
         val_loss = 0
         val_att_score = 0
         device = next(model.parameters()).device
         for i, batch in enumerate(val_set, 1):
             batch = to_device(batch, device=device)
             with torch.no_grad():
-                m1_hat, m2_hat, attention = model(batch)
+                out = model(batch)
+                m1_hat, m2_hat, attention = out['mel'], out['mel_post'], out['att']
                 m1_loss = F.l1_loss(m1_hat, batch['mel'])
                 m2_loss = F.l1_loss(m2_hat, batch['mel'])
                 val_loss += m1_loss.item() + m2_loss.item()
@@ -140,19 +150,27 @@ class TacoTrainer:
         device = next(model.parameters()).device
         batch = session.val_sample
         batch = to_device(batch, device=device)
-        m1_hat, m2_hat, att = model(batch)
+        with torch.no_grad():
+            out = model(batch)
+        m1_hat, m2_hat, att, att_aligner = out['mel'], out['mel_post'], out['att'], out['att_aligner']
         att = np_now(att)[0]
+        att_aligner = np_now(att_aligner.softmax(-1))[0]
         m1_hat = np_now(m1_hat)[0, :, :]
         m2_hat = np_now(m2_hat)[0, :, :]
         m_target = np_now(batch['mel'])[0, :, :]
         speaker = batch['speaker_name'][0]
 
         att_fig = plot_attention(att)
+        att_aligner_fig = plot_attention(att_aligner)
+
+
         m1_hat_fig = plot_mel(m1_hat)
         m2_hat_fig = plot_mel(m2_hat)
         m_target_fig = plot_mel(m_target)
 
         self.writer.add_figure(f'Ground_Truth_Aligned/attention/{speaker}', att_fig, model.step)
+        self.writer.add_figure(f'Ground_Truth_Aligned/attention_aligner/{speaker}', att_aligner_fig, model.step)
+        self.writer.add_figure(f'Ground_Truth_Aligned/attention_sum/{speaker}', att_aligner_sum_fig, model.step)
         self.writer.add_figure(f'Ground_Truth_Aligned/target/{speaker}', m_target_fig, model.step)
         self.writer.add_figure(f'Ground_Truth_Aligned/linear/{speaker}', m1_hat_fig, model.step)
         self.writer.add_figure(f'Ground_Truth_Aligned/postnet/{speaker}', m2_hat_fig, model.step)

@@ -4,9 +4,62 @@ from typing import Union, Dict, Any, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn import Embedding
 
 from models.common_layers import CBHG
 from utils.text.symbols import phonemes
+
+
+class Aligner(nn.Module):
+
+    def __init__(self,
+                 num_chars: int,
+                 speaker_emb_dim: int,
+                 mel_dim: int,
+                 hidden_dim: int,
+                 out_dim: int):
+        super().__init__()
+        self.register_buffer('step', torch.zeros(1, dtype=torch.long))
+        self.embedding = Embedding(num_embeddings=num_chars, embedding_dim=hidden_dim)
+
+        self.text_encoder = nn.Sequential(
+            nn.Conv1d(in_channels=hidden_dim + speaker_emb_dim,
+                      out_channels=hidden_dim,
+                      kernel_size=3,
+                      padding=1),
+        )
+        self.mel_encoder = nn.Sequential(
+            nn.Conv1d(in_channels=mel_dim, out_channels=hidden_dim,
+                      kernel_size=3, padding=1),
+            nn.Conv1d(in_channels=hidden_dim, out_channels=hidden_dim,
+                      kernel_size=3, padding=1),
+        )
+
+        self.text_lin = nn.Linear(hidden_dim, out_dim)
+        self.mel_lin = nn.Linear(hidden_dim, out_dim)
+
+    def forward(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        if self.training:
+            self.step += 1
+
+        x = batch['x']
+        speaker_emb = batch['speaker_emb']
+        mel = batch['mel']
+
+        x = self.embedding(x).transpose(1, 2)
+        speaker_emb = speaker_emb[:, :, None]
+        speaker_emb = speaker_emb.repeat(1, 1, x.shape[2])
+        x = torch.cat([x, speaker_emb], dim=1)
+
+        x = self.text_encoder(x).transpose(1, 2)
+        mel = self.mel_encoder(mel).transpose(1, 2)
+        x = self.text_lin(x)
+        mel = self.mel_lin(mel)
+
+        diff = x[:, None, :, :] - mel[:, :, None, :]
+        att = -torch.linalg.norm(diff, ord=2, dim=-1)
+
+        return {'x': x, 'mel': mel, 'att': att}
 
 
 class Encoder(nn.Module):
@@ -104,11 +157,15 @@ class Decoder(nn.Module):
     # yet ought to be scoped by class because its a property of a Decoder
     max_r = 20
 
-    def __init__(self, n_mels, decoder_dims, lstm_dims):
+    def __init__(self,
+                 n_mels: int,
+                 decoder_dims: int,
+                 lstm_dims: int,
+                 aligner_out_dims: int):
         super().__init__()
         self.register_buffer('r', torch.tensor(1, dtype=torch.int))
         self.n_mels = n_mels
-        self.prenet = PreNet(n_mels)
+        self.prenet = PreNet(n_mels+aligner_out_dims)
         self.attn_net = LSA(decoder_dims)
         self.attn_rnn = nn.GRUCell(decoder_dims + decoder_dims // 2, decoder_dims)
         self.rnn_input = nn.Linear(2 * decoder_dims, lstm_dims)
@@ -189,6 +246,8 @@ class Tacotron(nn.Module):
                  num_highways: int,
                  dropout: float,
                  stop_threshold: float,
+                 aligner_hidden_dims: int,
+                 aligner_out_dims: int,
                  speaker_emb_dim=256) -> None:
         super().__init__()
         self.n_mels = n_mels
@@ -196,9 +255,12 @@ class Tacotron(nn.Module):
         self.decoder_dims = decoder_dims
         self.encoder = Encoder(embed_dims, num_chars, encoder_dims,
                                encoder_k, num_highways, dropout)
-        self.encoder_proj_query = nn.Linear(decoder_dims + speaker_emb_dim, decoder_dims, bias=False)
-        self.encoder_proj = nn.Linear(decoder_dims + speaker_emb_dim, decoder_dims, bias=False)
-        self.decoder = Decoder(n_mels, decoder_dims, lstm_dims)
+        self.encoder_proj_query = nn.Linear(decoder_dims + speaker_emb_dim + aligner_out_dims, decoder_dims,
+                                            bias=False)
+        self.encoder_proj = nn.Linear(decoder_dims + speaker_emb_dim + aligner_out_dims, decoder_dims,
+                                      bias=False)
+        self.decoder = Decoder(n_mels=n_mels, decoder_dims=decoder_dims,
+                               lstm_dims=lstm_dims, aligner_out_dims=aligner_out_dims)
         self.postnet = CBHG(postnet_k, n_mels, postnet_dims, [256, 80], num_highways)
         self.post_proj = nn.Linear(postnet_dims * 2, n_mels, bias=False)
         self.speaker_emb_dim = speaker_emb_dim
@@ -207,6 +269,11 @@ class Tacotron(nn.Module):
 
         self.register_buffer('step', torch.zeros(1, dtype=torch.long))
         self.register_buffer('stop_threshold', torch.tensor(stop_threshold, dtype=torch.float32))
+
+        self.aligner = Aligner(num_chars=num_chars, mel_dim=n_mels, speaker_emb_dim=speaker_emb_dim,
+                               hidden_dim=aligner_hidden_dims, out_dim=aligner_out_dims)
+
+        self.aligner_out_dims = aligner_out_dims
 
     @property
     def r(self) -> int:
@@ -239,10 +306,13 @@ class Tacotron(nn.Module):
         cell_states = (rnn1_cell, rnn2_cell)
 
         # <GO> Frame for start of decoder loop
-        go_frame = torch.zeros(batch_size, self.n_mels, device=device)
+        go_frame = torch.zeros(batch_size, self.n_mels + self.aligner_out_dims, device=device)
 
         # Need an initial context vector
         context_vec = torch.zeros(batch_size, self.decoder_dims, device=device)
+
+        # get aligner output that produces encoded x and mel to be concatenated to taco inputs
+        aligner_out = self.aligner(batch)
 
         # Project the encoder outputs to avoid
         # unnecessary matmuls in the decoder loop
@@ -250,16 +320,18 @@ class Tacotron(nn.Module):
         if self.speaker_emb_dim > 0:
             speaker_emb = speaker_emb[:, None, :]
             speaker_emb = speaker_emb.repeat(1, encoder_seq.shape[1], 1)
-            encoder_seq = torch.cat([encoder_seq, speaker_emb], dim=2)
+            encoder_seq = torch.cat([encoder_seq, speaker_emb, aligner_out['x'].detach()], dim=2)
+
         encoder_seq_proj_query = self.encoder_proj_query(encoder_seq)
         encoder_seq_proj = self.encoder_proj(encoder_seq)
 
-        # Need a couple of lists for outputs
         mel_outputs, attn_scores = [], []
+
+        mel_in = torch.cat([mel, aligner_out['mel'].transpose(1, 2).detach()], dim=1)
 
         # Run the decoder loop
         for t in range(0, steps, self.r):
-            prenet_in = mel[:, :, t - 1] if t > 0 else go_frame
+            prenet_in = mel_in[:, :, t - 1] if t > 0 else go_frame
             mel_frames, scores, hidden_states, cell_states, context_vec = \
                 self.decoder(encoder_seq_proj_query, encoder_seq_proj, prenet_in,
                              hidden_states, cell_states, context_vec, t)
@@ -278,7 +350,7 @@ class Tacotron(nn.Module):
         attn_scores = torch.cat(attn_scores, 1)
         # attn_scores = attn_scores.cpu().data.numpy()
 
-        return mel_outputs, linear, attn_scores
+        return {'mel': mel_outputs, 'mel_post': linear, 'att': attn_scores, 'att_aligner': aligner_out['att']}
 
     def generate(self, x: torch.tensor, speaker_emb: torch.tensor = None, steps=2000) -> Tuple[torch.tensor, torch.tensor, torch.tensor]:
         self.eval()
@@ -301,7 +373,7 @@ class Tacotron(nn.Module):
         cell_states = (rnn1_cell, rnn2_cell)
 
         # Need a <GO> Frame for start of decoder loop
-        go_frame = torch.zeros(batch_size, self.n_mels, device=device)
+        go_frame = torch.zeros(batch_size, self.n_mels + self.aligner_out_dims, device=device)
 
         # Need an initial context vector
         context_vec = torch.zeros(batch_size, self.decoder_dims, device=device)
@@ -322,6 +394,8 @@ class Tacotron(nn.Module):
         # Run the decoder loop
         for t in range(0, steps, self.r):
             prenet_in = mel_outputs[-1][:, :, -1] if t > 0 else go_frame
+
+
             mel_frames, scores, hidden_states, cell_states, context_vec = \
             self.decoder(encoder_seq_proj_query, encoder_seq_proj, prenet_in,
                          hidden_states, cell_states, context_vec, t)
