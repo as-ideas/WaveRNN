@@ -115,10 +115,9 @@ class TacoTrainer:
 
                 stream(msg)
 
-            val_loss, val_att_score, val_att_score_t = self.evaluate(model, session.val_set)
+            val_loss, val_att_score = self.evaluate(model, session.val_set)
             self.writer.add_scalar('Loss/val', val_loss, model.get_step())
             self.writer.add_scalar('Attention_Score/val', val_att_score, model.get_step())
-            self.writer.add_scalar('Attention_Score/val_t', val_att_score_t, model.get_step())
             save_checkpoint(model=model, optim=optimizer, config=self.config,
                             path=self.paths.taco_checkpoints / 'latest_model.pt')
 
@@ -126,7 +125,7 @@ class TacoTrainer:
             duration_avg.reset()
             print(' ')
 
-    def evaluate(self, model: Tacotron, val_set: DataLoader) -> Tuple[float, float, float]:
+    def evaluate(self, model: Tacotron, val_set: DataLoader) -> Tuple[float, float]:
         model.eval()
         model.decoder.prenet.train()
         val_loss = 0
