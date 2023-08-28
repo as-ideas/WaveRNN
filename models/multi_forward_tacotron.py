@@ -16,7 +16,8 @@ class Discriminator(nn.Module):
 
     def __init__(self):
         super(Discriminator, self).__init__()
-        self.gru = nn.GRU(512 + 2 + 256, 64, bidirectional=True)
+        self.embedding = Embedding(len(phonemes), 64)
+        self.gru = nn.GRU(512 + 2 + 256 + 64, 64, bidirectional=True)
         self.pos_pred = PosPredictor(num_chars=len(phonemes),
                                      emb_dim=128,
                                      conv_dims=256,
@@ -26,10 +27,11 @@ class Discriminator(nn.Module):
         self.lin = nn.Linear(128, 1)
 
     def forward(self, x, dur, pitch, semb):
+        x_emb = self.embedding(x)
         emb = self.pos_pred.embed(x)
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
-        x = torch.cat([emb, dur, pitch, speaker_emb], dim=-1)
+        x = torch.cat([emb, dur, pitch, x_emb, speaker_emb], dim=-1)
         x, _ = self.gru(x)
         x = self.lin(x)
         return x
