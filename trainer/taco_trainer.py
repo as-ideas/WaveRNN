@@ -116,7 +116,7 @@ class TacoTrainer:
                 stream(msg)
 
             val_loss, val_att_score = self.evaluate(model, session.val_set)
-            self.writer.add_scalar('Loss/val', val_loss, model.get_step())
+            self.writer.add_scalar('Mel_Loss/val', val_loss, model.get_step())
             self.writer.add_scalar('Attention_Score/val', val_att_score, model.get_step())
             save_checkpoint(model=model, optim=optimizer, config=self.config,
                             path=self.paths.taco_checkpoints / 'latest_model.pt')
