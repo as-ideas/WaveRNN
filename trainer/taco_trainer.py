@@ -108,6 +108,7 @@ class TacoTrainer:
                 att_score = torch.mean(att_score)
                 self.writer.add_scalar('Attention_Score/train', att_score, model.get_step())
                 self.writer.add_scalar('Mel_Loss/train', mel_loss, model.get_step())
+                self.writer.add_scalar('CTC_Loss/train', ctc_loss, model.get_step())
                 self.writer.add_scalar('Params/reduction_factor', session.r, model.get_step())
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
                 self.writer.add_scalar('Params/learning_rate', session.lr, model.get_step())
