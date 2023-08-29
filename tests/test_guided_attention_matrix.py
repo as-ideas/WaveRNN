@@ -1,19 +1,9 @@
-import os
 import unittest
-from pathlib import Path
-from tempfile import TemporaryDirectory
-from typing import Tuple, Dict
-from unittest.mock import patch
 
 import numpy as np
 import torch
 
-from duration_extraction.duration_extraction_pipe import DurationExtractionPipeline
-from duration_extraction.duration_extractor import DurationExtractor
-from models.tacotron import Tacotron
 from trainer.common import new_guided_attention_matrix
-from utils.files import read_config, pickle_binary
-from utils.paths import Paths
 
 
 class TestGuidedAttentionMatrix(unittest.TestCase):
