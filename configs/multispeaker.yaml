@@ -83,10 +83,12 @@ tacotron:
       - 2,   1e-4,  50_000,  8
       - 1,   1e-4,  65_000,  8
 
-    ctc_loss_factor: 1.0             # factor for scaling aligner CTC loss
+    dia_loss_matrix_g: 0.2                # value of g for diatonal matrix (larger g = broader diagonal)
+    dia_loss_factor: 1.0             # factor for scaling diagonal loss
+    ctc_loss_factor: 0.1             # factor for scaling aligner CTC loss
     clip_grad_norm: 1.0              # clips the gradient norm to prevent explosion - set to None if not needed
     checkpoint_every: 10000          # checkpoints the model every x steps
-    plot_every: 10                 # generates samples and plots every x steps
+    plot_every: 10                  # generates samples and plots every x steps
     num_workers: 2                   # number of workers for dataloader
 
     filter:
