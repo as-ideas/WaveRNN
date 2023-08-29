@@ -9,7 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 from typing import Tuple, Dict, Any
 
 from models.tacotron import Tacotron
-from trainer.common import Averager, TTSSession, to_device, np_now, ForwardSumLoss
+from trainer.common import Averager, TTSSession, to_device, np_now, ForwardSumLoss, new_guided_attention_matrix
 from utils.checkpoints import save_checkpoint
 from utils.dataset import get_taco_dataloaders
 from utils.decorators import ignore_exception
@@ -81,14 +81,8 @@ class TacoTrainer:
                 m1_loss = F.l1_loss(m1_hat, batch['mel'])
                 m2_loss = F.l1_loss(m2_hat, batch['mel'])
 
-                dia_mat = torch.zeros(attention.size()).to(device).detach()
-                T = attention.size(1)
-                N = attention.size(2)
-                g = self.train_cfg['dia_loss_matrix_g']
-                for t in range(T):
-                    for n in range(N):
-                        dia_mat[:, t, n] = math.exp(-(n / N - t / T) ** 2 / (2 * g ** 2))
-
+                dia_mat = new_guided_attention_matrix(attention=attention,
+                                                      g=self.train_cfg['dia_loss_matrix_g'])
                 dia_loss = ((1 - dia_mat) * attention).mean()
 
                 mel_loss = m1_loss + m2_loss

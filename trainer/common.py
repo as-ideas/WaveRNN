@@ -1,3 +1,4 @@
+import math
 from typing import Dict
 
 import torch
@@ -123,6 +124,16 @@ def pad_mask(lens, max_len):
     lens = lens.expand_as(seq_range)
     mask = seq_range < lens
     return mask.float()
+
+
+def new_guided_attention_matrix(attention: torch.Tensor, g: float) -> torch.Tensor:
+    T = attention.size(1)
+    N = attention.size(2)
+    t_vals = torch.arange(T, device=attention.device, dtype=attention.dtype)
+    n_vals = torch.arange(N, device=attention.device, dtype=attention.dtype)
+    t_diff = t_vals[:, None] / T - n_vals[None, :] / N
+    dia_mat = torch.exp(-t_diff**2 / (2 * g**2)).unsqueeze(0)
+    return dia_mat
 
 
 def to_device(batch: Dict[str, torch.tensor],
