@@ -322,7 +322,9 @@ class Tacotron(nn.Module):
         if self.speaker_emb_dim > 0:
             speaker_emb = speaker_emb[:, None, :]
             speaker_emb = speaker_emb.repeat(1, encoder_seq.shape[1], 1)
-            encoder_seq = torch.cat([encoder_seq, speaker_emb, aligner_out['x'].detach()], dim=2)
+            encoder_seq = torch.cat([encoder_seq, speaker_emb], dim=2)
+
+        encoder_seq = torch.cat([encoder_seq, aligner_out['x'].detach()], dim=2)
 
         encoder_seq_proj_query = self.encoder_proj_query(encoder_seq)
         encoder_seq_proj = self.encoder_proj(encoder_seq)

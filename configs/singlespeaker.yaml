@@ -1,6 +1,6 @@
 
 tts_model_id: 'ljspeech_tts'
-data_path: 'data/'                                        # output data path
+data_path: '/Users/cschaefe/datasets/multispeaker_welt_bild'                                        # output data path
 
 tts_model: 'forward_tacotron'                             # choices: [forward_tacotron, fast_pitch]
 
