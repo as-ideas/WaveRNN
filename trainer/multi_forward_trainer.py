@@ -88,8 +88,10 @@ class MultiForwardTrainer:
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
                 d_loss = 0
-                score_fake = disc(batch['x'], pred['dur'].unsqueeze(-1).detach(), pred['pitch'].transpose(1, 2).detach(), batch['speaker_emb'])
-                score_real = disc(batch['x'], batch['dur'].unsqueeze(-1), batch['pitch'].unsqueeze(-1), batch['speaker_emb'])
+                score_fake = disc(batch['x'], pred['dur'].unsqueeze(-1).detach(),
+                                  pred['pitch'].transpose(1, 2).detach(), batch['speaker_emb'], batch['pitch_cond'])
+                score_real = disc(batch['x'], batch['dur'].unsqueeze(-1),
+                                  batch['pitch'].unsqueeze(-1), batch['speaker_emb'], batch['pitch_cond'])
 
                 for b in range(batch['x'].size(0)):
                     d_loss += torch.pow(score_real[b, :batch['x_len'][b], :] - 1.0, 2).mean()
@@ -100,7 +102,8 @@ class MultiForwardTrainer:
                 d_loss.backward()
                 d_optim.step()
 
-                score_fake = disc(batch['x'], pred['dur'].unsqueeze(-1), pred['pitch'].transpose(1, 2), batch['speaker_emb'])
+                score_fake = disc(batch['x'], pred['dur'].unsqueeze(-1), pred['pitch'].transpose(1, 2),
+                                  batch['speaker_emb'], batch['pitch_cond'])
                 g_loss = 0
                 for b in range(batch['x'].size(0)):
                     g_loss += torch.pow(score_fake[b, :batch['x_len'][b], :] - 1.0, 2).mean()
