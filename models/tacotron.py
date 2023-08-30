@@ -18,31 +18,33 @@ class Aligner(nn.Module):
                  mel_dim: int,
                  hidden_dim: int,
                  out_dim: int):
-        super().__init__()
-        self.register_buffer('step', torch.zeros(1, dtype=torch.long))
-        self.embedding = Embedding(num_embeddings=num_chars, embedding_dim=hidden_dim)
 
+        """
+        Args:
+            num_chars: Number of characters for embedding.
+            speaker_emb_dim: Dimension of speaker embedding.
+            mel_dim: Mel dimensions.
+            hidden_dim: Hidden dimensions of aligner model.
+            out_dim: Out dimensions of aligner model.
+        """
+
+        super().__init__()
+        self.embedding = Embedding(num_embeddings=num_chars, embedding_dim=hidden_dim)
         self.text_encoder = nn.Sequential(
             nn.Conv1d(in_channels=hidden_dim + speaker_emb_dim,
                       out_channels=hidden_dim,
                       kernel_size=3,
-                      padding=1),
-        )
+                      padding=1))
         self.mel_encoder = nn.Sequential(
             nn.Conv1d(in_channels=mel_dim, out_channels=hidden_dim,
                       kernel_size=3, padding=1),
             nn.Conv1d(in_channels=hidden_dim, out_channels=hidden_dim,
-                      kernel_size=3, padding=1),
-        )
-
+                      kernel_size=3, padding=1),)
         self.text_lin = nn.Linear(hidden_dim, out_dim)
         self.mel_lin = nn.Linear(hidden_dim, out_dim)
         self.speaker_emb_dim = speaker_emb_dim
 
     def forward(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        if self.training:
-            self.step += 1
-
         x = batch['x']
         speaker_emb = batch['speaker_emb']
         mel = batch['mel']

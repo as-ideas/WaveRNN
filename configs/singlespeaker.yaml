@@ -1,6 +1,6 @@
 
 tts_model_id: 'ljspeech_tts'
-data_path: '/Users/cschaefe/datasets/multispeaker_welt_bild'                                        # output data path
+data_path: 'data'                                         # output data path
 
 tts_model: 'forward_tacotron'                             # choices: [forward_tacotron, fast_pitch]
 
@@ -90,7 +90,6 @@ tacotron:
     checkpoint_every: 10000          # checkpoints the model every x steps
     plot_every: 1000                 # generates samples and plots every x steps
     num_workers: 2                   # number of workers for dataloader
-
 
     filter:
       max_mel_len: 1250                    # filter files with mel len larger than given

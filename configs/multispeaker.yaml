@@ -1,6 +1,6 @@
 
-tts_model_id: 'multispeaker_alignment_tts'
-data_path: '/Users/cschaefe/datasets/multispeaker_welt_bild'                                        # output data path
+tts_model_id: 'multispeaker_tts'
+data_path: 'data_multispeaker'                                        # output data path
 
 tts_model: 'multi_forward_tacotron'   # choices: [multi_forward_tacotron, multi_fast_pitch]
 
@@ -88,7 +88,7 @@ tacotron:
     ctc_loss_factor: 0.1             # factor for scaling aligner CTC loss
     clip_grad_norm: 1.0              # clips the gradient norm to prevent explosion - set to None if not needed
     checkpoint_every: 10000          # checkpoints the model every x steps
-    plot_every: 10                  # generates samples and plots every x steps
+    plot_every: 1000                  # generates samples and plots every x steps
     num_workers: 2                   # number of workers for dataloader
 
     filter:

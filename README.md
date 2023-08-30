@@ -18,10 +18,9 @@ The model has following advantages:
 does not use any attention. Hence, the required memory grows linearly with text size, which makes it possible to synthesize large articles at once.
 
 
-## UPDATE Multispeaker (13.01.2022)
-- Implemented speaker embedding conditioning as in [paper](https://arxiv.org/abs/1806.04558)
-- No external embedding required, we use [Resemblyzer](https://github.com/resemble-ai/Resemblyzer)
-- Multispeaker models can easily be fine-tuned to a smaller dataset.
+## UPDATE Improved attention mechanism (30.08.2023)
+- Faster tacotron attention buildup by adding alignment conditioning based on [one alignment to rule them all](https://arxiv.org/abs/2108.10447) 
+- Improved attention translates to improved synth quality.
 
 ## 🔈 Samples
 
