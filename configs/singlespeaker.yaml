@@ -35,7 +35,7 @@ preprocessing:
   n_val: 200
   language: 'en-us'
   cleaner_name: 'english_cleaners'      # choices: ['english_cleaners', 'no_cleaners'], expands numbers and abbreviations.
-  use_phonemes: False                   # whether to phonemize the text
+  use_phonemes: True                    # whether to phonemize the text
                                         # if set to False, you have to provide the phonemized text yourself
   min_text_len: 2
   pitch_min_freq: 30                    # Minimum value for pitch frequency to remove outliers (Common pitch range is
