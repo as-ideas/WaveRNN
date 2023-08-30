@@ -37,6 +37,7 @@ class Aligner(nn.Module):
 
         self.text_lin = nn.Linear(hidden_dim, out_dim)
         self.mel_lin = nn.Linear(hidden_dim, out_dim)
+        self.speaker_emb_dim = speaker_emb_dim
 
     def forward(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         if self.training:
@@ -47,9 +48,10 @@ class Aligner(nn.Module):
         mel = batch['mel']
 
         x = self.embedding(x).transpose(1, 2)
-        speaker_emb = speaker_emb[:, :, None]
-        speaker_emb = speaker_emb.repeat(1, 1, x.shape[2])
-        x = torch.cat([x, speaker_emb], dim=1)
+        if self.speaker_emb_dim > 0:
+            speaker_emb = speaker_emb[:, :, None]
+            speaker_emb = speaker_emb.repeat(1, 1, x.shape[2])
+            x = torch.cat([x, speaker_emb], dim=1)
 
         x = self.text_encoder(x).transpose(1, 2)
         mel = self.mel_encoder(mel).transpose(1, 2)
