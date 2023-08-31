@@ -71,7 +71,13 @@ class MultiForwardTrainer:
         device = next(model.parameters()).device  # use same device as model parameters
 
         disc = Discriminator().to(device)
-        d_optim = Adam(disc.parameters(), lr=1e-4)
+        d_optim = Adam(disc.parameters(), lr=5e-5)
+        mod_optim = Adam(
+            list(model.dur_pred.parameters())
+            + list(model.pitch_pred.parameters())
+            + list(model.energy_pred.parameters())
+            + list(model.pitch_cond_pred.parameters()),
+            lr=5e-5)
 
         for e in range(1, epochs + 1):
             for i, batch in enumerate(session.train_set, 1):
@@ -82,14 +88,15 @@ class MultiForwardTrainer:
                 pitch_target = batch['pitch'].detach().clone()
                 energy_target = batch['energy'].detach().clone()
 
-                pred = model(batch)
 
-                m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
-                m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
+                pitch_cond_hat = model.pitch_cond_pred(batch['x'], batch['speaker_emb']).squeeze(-1)
+                dur_hat = model.dur_pred(batch['x'], batch['pitch_cond'], batch['speaker_emb']).squeeze(-1)
+                pitch_hat = model.pitch_pred(batch['x'], batch['pitch_cond'], batch['speaker_emb']).transpose(1, 2)
+                energy_hat = model.energy_pred(batch['x'], batch['speaker_emb']).transpose(1, 2)
 
                 d_loss = 0
-                score_fake = disc(batch['x'], pred['dur'].unsqueeze(-1).detach(),
-                                  pred['pitch'].transpose(1, 2).detach(), batch['speaker_emb'], batch['pitch_cond'])
+                score_fake = disc(batch['x'], dur_hat.unsqueeze(-1).detach(),
+                                  pitch_hat.transpose(1, 2).detach(), batch['speaker_emb'], batch['pitch_cond'])
                 score_real = disc(batch['x'], batch['dur'].unsqueeze(-1),
                                   batch['pitch'].unsqueeze(-1), batch['speaker_emb'], batch['pitch_cond'])
 
@@ -102,7 +109,7 @@ class MultiForwardTrainer:
                 d_loss.backward()
                 d_optim.step()
 
-                score_fake = disc(batch['x'], pred['dur'].unsqueeze(-1), pred['pitch'].transpose(1, 2),
+                score_fake = disc(batch['x'], dur_hat.unsqueeze(-1), pitch_hat.transpose(1, 2),
                                   batch['speaker_emb'], batch['pitch_cond'])
                 g_loss = 0
                 for b in range(batch['x'].size(0)):
@@ -112,19 +119,22 @@ class MultiForwardTrainer:
                 print('g_loss', g_loss)
                 print('d_loss', d_loss)
 
-                dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
-                pitch_loss = self.l1_loss(pred['pitch'], pitch_target.unsqueeze(1), batch['x_len'])
-                energy_loss = self.l1_loss(pred['energy'], energy_target.unsqueeze(1), batch['x_len'])
-                pitch_cond_loss = self.ce_loss(pred['pitch_cond'].transpose(1, 2), batch['pitch_cond'])
+                dur_loss = self.l1_loss(dur_hat.unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
+                pitch_loss = self.l1_loss(pitch_hat, pitch_target.unsqueeze(1), batch['x_len'])
+                energy_loss = self.l1_loss(energy_hat, energy_target.unsqueeze(1), batch['x_len'])
+                pitch_cond_loss = self.ce_loss(pitch_cond_hat.transpose(1, 2), batch['pitch_cond'])
 
-                loss = m1_loss + m2_loss \
-                       + self.train_cfg['dur_loss_factor'] * dur_loss \
-                       + self.train_cfg['pitch_loss_factor'] * pitch_loss \
-                       + self.train_cfg['energy_loss_factor'] * energy_loss \
-                       + self.train_cfg['pitch_cond_loss_factor'] * pitch_cond_loss \
-                       + g_loss
+                loss_modules = dur_loss + pitch_loss + energy_loss + pitch_cond_loss + g_loss
+                mod_optim.zero_grad()
+                loss_modules.backward()
+                mod_optim.step()
 
-                pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
+                pred = model(batch)
+                m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
+                m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
+
+                loss = m1_loss + m2_loss
+                pitch_cond_true_pos = (torch.argmax(pitch_cond_hat, dim=-1) == batch['pitch_cond'])
                 pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()
 
                 optimizer.zero_grad()
@@ -191,13 +201,19 @@ class MultiForwardTrainer:
             batch = to_device(batch, device=device)
             with torch.no_grad():
                 pred = model(batch)
+
+                pitch_cond_hat = model.pitch_cond_pred(batch['x'], batch['speaker_emb']).squeeze(-1)
+                dur_hat = model.dur_pred(batch['x'], batch['pitch_cond'], batch['speaker_emb']).squeeze(-1)
+                pitch_hat = model.pitch_pred(batch['x'], batch['pitch_cond'], batch['speaker_emb']).transpose(1, 2)
+                energy_hat = model.energy_pred(batch['x'], batch['speaker_emb']).transpose(1, 2)
+
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
-                dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
-                pitch_loss = self.l1_loss(pred['pitch'], batch['pitch'].unsqueeze(1), batch['x_len'])
-                energy_loss = self.l1_loss(pred['energy'], batch['energy'].unsqueeze(1), batch['x_len'])
-                pitch_cond_loss = self.ce_loss(pred['pitch_cond'].transpose(1, 2), batch['pitch_cond'])
-                pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
+                dur_loss = self.l1_loss(dur_hat.unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
+                pitch_loss = self.l1_loss(pitch_hat, batch['pitch'].unsqueeze(1), batch['x_len'])
+                energy_loss = self.l1_loss(energy_hat, batch['energy'].unsqueeze(1), batch['x_len'])
+                pitch_cond_loss = self.ce_loss(pitch_cond_hat.transpose(1, 2), batch['pitch_cond'])
+                pitch_cond_true_pos = (torch.argmax(pitch_cond_hat, dim=-1) == batch['pitch_cond'])
                 pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()
                 val_losses['pitch_loss'] += pitch_loss
                 val_losses['energy_loss'] += energy_loss

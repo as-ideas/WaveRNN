@@ -232,11 +232,6 @@ class MultiForwardTacotron(nn.Module):
         if self.training:
             self.step += 1
 
-        pitch_cond_hat = self.pitch_cond_pred(x, semb).squeeze(-1)
-
-        dur_hat = self.dur_pred(x, pitch_cond, semb).squeeze(-1)
-        pitch_hat = self.pitch_pred(x, pitch_cond, semb).transpose(1, 2)
-        energy_hat = self.energy_pred(x, semb).transpose(1, 2)
 
         x = self.embedding(x)
         x = x.transpose(1, 2)
@@ -272,9 +267,7 @@ class MultiForwardTacotron(nn.Module):
         x_post = self._pad(x_post, mel.size(2))
         x = self._pad(x, mel.size(2))
 
-        return {'mel': x, 'mel_post': x_post,
-                'dur': dur_hat, 'pitch': pitch_hat,
-                'energy': energy_hat, 'pitch_cond': pitch_cond_hat}
+        return {'mel': x, 'mel_post': x_post}
 
     def generate(self,
                  x: torch.Tensor,

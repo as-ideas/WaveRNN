@@ -73,6 +73,7 @@ if __name__ == '__main__':
     # Instantiate Forward TTS Model
     model = init_tts_model(config).to(device)
     print(f'\nInitialized tts model: {model}\n')
+
     optimizer = optim.Adam(model.parameters())
     restore_checkpoint(model=model, optim=optimizer,
                        path=paths.forward_checkpoints / 'latest_model.pt',
