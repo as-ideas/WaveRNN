@@ -116,8 +116,8 @@ class MultiForwardTrainer:
                     g_loss += torch.pow(score_fake[b, :batch['x_len'][b], :] - 1.0, 2).mean()
                 g_loss /= batch['x'].size(0)
 
-                print('g_loss', g_loss)
-                print('d_loss', d_loss)
+                #print('g_loss', g_loss)
+                #print('d_loss', d_loss)
 
                 dur_loss = self.l1_loss(dur_hat.unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
                 pitch_loss = self.l1_loss(pitch_hat, pitch_target.unsqueeze(1), batch['x_len'])
@@ -152,7 +152,7 @@ class MultiForwardTrainer:
 
                 speed = 1. / averages['step_duration'].get()
                 msg = f'| Epoch: {e}/{epochs} ({i}/{total_iters}) | Mel Loss: {averages["mel_loss"].get():#.4} ' \
-                      f'| Dur Loss: {averages["dur_loss"].get():#.4} | {speed:#.2} steps/s | Step: {k}k | '
+                      f'| Dur Loss: {averages["dur_loss"].get():#.4} | {speed:#.2} steps/s | Step: {model.get_step()} | '
 
                 if step % self.train_cfg['checkpoint_every'] == 0:
                     save_checkpoint(model=model, optim=optimizer, config=self.config,
@@ -160,6 +160,7 @@ class MultiForwardTrainer:
                                     meta={'speaker_embeddings': self.speaker_embs})
 
                 if step % self.train_cfg['plot_every'] == 0:
+                    print('generate plots...')
                     self.generate_plots(model, session)
 
                 self.writer.add_scalar('d_loss/train', d_loss, model.get_step())
