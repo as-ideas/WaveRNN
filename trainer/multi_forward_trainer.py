@@ -129,22 +129,22 @@ class MultiForwardTrainer:
                 mod_optim.step()
                 model.step += 1
 
-                #pred = model(batch)
-                #m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
-                #m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
+                pred = model(batch)
+                m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
+                m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
-                #loss = m1_loss + m2_loss
+                loss = m1_loss + m2_loss
                 pitch_cond_true_pos = (torch.argmax(pitch_cond_hat, dim=-1) == batch['pitch_cond'])
                 pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()
 
-                #optimizer.zero_grad()
-                #loss.backward()
-                #torch.nn.utils.clip_grad_norm_(model.parameters(),
-                #                               self.train_cfg['clip_grad_norm'])
-                #optimizer.step()
+                optimizer.zero_grad()
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(),
+                                               self.train_cfg['clip_grad_norm'])
+                optimizer.step()
 
-                #averages['mel_loss'].add(m1_loss.item() + m2_loss.item())
-                #averages['dur_loss'].add(dur_loss.item())
+                averages['mel_loss'].add(m1_loss.item() + m2_loss.item())
+                averages['dur_loss'].add(dur_loss.item())
                 step = model.get_step()
                 k = step // 1000
 
@@ -165,7 +165,7 @@ class MultiForwardTrainer:
 
                 self.writer.add_scalar('d_loss/train', d_loss, model.get_step())
                 self.writer.add_scalar('g_loss/train', g_loss, model.get_step())
-                #self.writer.add_scalar('Mel_Loss/train', m1_loss + m2_loss, model.get_step())
+                self.writer.add_scalar('Mel_Loss/train', m1_loss + m2_loss, model.get_step())
                 self.writer.add_scalar('Pitch_Loss/train', pitch_loss, model.get_step())
                 self.writer.add_scalar('Energy_Loss/train', energy_loss, model.get_step())
                 self.writer.add_scalar('Duration_Loss/train', dur_loss, model.get_step())
