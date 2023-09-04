@@ -159,7 +159,7 @@ if __name__ == '__main__':
                                 drop_last=True)
 
 
-    optim = torch.optim.Adam(model.pos_pred.parameters(), lr=1e-3)
+    optim = torch.optim.Adam(model.parameters(), lr=1e-4)
     forward_optim = torch.optim.Adam(model.parameters())
     ce_loss = torch.nn.CrossEntropyLoss(ignore_index=0)
 
@@ -169,11 +169,10 @@ if __name__ == '__main__':
 
     for epoch in range(1000):
         for batch_pos, batch_dep in tqdm.tqdm(zip(dataloader_pos, dataloader_dep), total=len(dataloader_pos)):
-            model.step += 1
             batch_pos = to_device(batch_pos, device)
             batch_dep = to_device(batch_dep, device)
-            out_pos, _ = model.pos_pred(batch_pos['x'])
-            _, out_dep = model.pos_pred(batch_dep['x'])
+            out_pos, _ = model(batch_pos['x'])
+            _, out_dep = model(batch_dep['x'])
 
             loss_pos = ce_loss(out_pos.transpose(1, 2), batch_pos['pos'])
             loss_dep = ce_loss(out_dep.transpose(1, 2), batch_dep['pos'])
@@ -187,7 +186,7 @@ if __name__ == '__main__':
 
             sw.add_scalar('loss', loss, global_step=step)
 
-            if step % 10 == 0:
+            if step % 1000 == 0:
                 example_pred = torch.argmax(out_pos[0], dim=-1)
                 example_target = batch_pos['pos'][0]
 
@@ -201,7 +200,7 @@ if __name__ == '__main__':
                     batch_pos = to_device(batch_pos, device)
                     x = batch_pos['x'].unsqueeze(0)
                     pos = batch_pos['pos']
-                    out_pos, _ = model.pos_pred(x)
+                    out_pos, _ = model(x)
                     example_pred = torch.argmax(out_pos[0], dim=-1)
                     matching = example_pred == pos
                     tp = sum(matching)
@@ -210,7 +209,7 @@ if __name__ == '__main__':
                     batch_dep = to_device(batch_dep, device)
                     x = batch_dep['x'].unsqueeze(0)
                     pos = batch_dep['pos']
-                    _, out_dep = model.pos_pred(x)
+                    _, out_dep = model(x)
                     example_pred = torch.argmax(out_dep[0], dim=-1)
                     matching = example_pred == pos
                     tp = sum(matching)
