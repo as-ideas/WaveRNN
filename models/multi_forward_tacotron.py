@@ -11,14 +11,68 @@ from models.common_layers import CBHG, LengthRegulator, BatchNormConv
 from utils.text.symbols import phonemes
 
 
+
+class PosPredictor(nn.Module):
+
+    def __init__(self,
+                 num_chars: int,
+                 emb_dim: int = 64,
+                 conv_dims: int = 256,
+                 rnn_dims: int = 128,
+                 dropout: float = 0.5,
+                 out_dim: int = 1):
+        super().__init__()
+        self.embedding = Embedding(num_chars, emb_dim)
+        self.convs = torch.nn.ModuleList([
+            BatchNormConv(emb_dim, conv_dims, 5, relu=True),
+            BatchNormConv(conv_dims, conv_dims, 5, relu=True),
+            BatchNormConv(conv_dims, conv_dims, 5, relu=True),
+        ])
+        self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
+        self.lin_1 = nn.Linear(2 * rnn_dims, 64)
+        self.lin_2 = nn.Linear(64, out_dim)
+        self.lin_3 = nn.Linear(64, out_dim)
+        self.dropout = dropout
+
+    def forward(self,
+                x: torch.Tensor,
+                alpha: float = 1.0) -> torch.Tensor:
+        x = self.embedding(x)
+        x = x.transpose(1, 2)
+        for conv in self.convs:
+            x = conv(x)
+            x = F.dropout(x, p=self.dropout, training=self.training)
+        x = x.transpose(1, 2)
+        x, _ = self.rnn(x)
+        x = self.lin_1(x)
+        x1 = self.lin_2(x)
+        x2 = self.lin_3(x)
+        return x1, x2
+
+    def embed(self,
+              x: torch.Tensor,
+              alpha: float = 1.0) -> torch.Tensor:
+        with torch.no_grad():
+            x = self.embedding(x)
+            x = x.transpose(1, 2)
+            for conv in self.convs:
+                x = conv(x)
+                x = F.dropout(x, p=self.dropout, training=self.training)
+            x = x.transpose(1, 2)
+            x, _ = self.rnn(x)
+            #x = self.lin_1(x)
+            return x
+
+
 class Discriminator(nn.Module):
 
     def __init__(self):
         super(Discriminator, self).__init__()
         self.embedding = Embedding(len(phonemes), 64)
+        self.pos_predictor = PosPredictor(num_chars=len(phonemes))
         self.pitch_cond_embedding = Embedding(4, 8)
         self.convs = torch.nn.ModuleList([
-            BatchNormConv(64 + 256 + 8, 256, 3, relu=True),
+            BatchNormConv(64 + 256 + 8 , 256, 3, relu=True),
             BatchNormConv(256, 256, 3, relu=True),
             BatchNormConv(256, 256, 3, relu=True),
         ])
@@ -28,11 +82,12 @@ class Discriminator(nn.Module):
 
     def forward(self, x, dur, pitch, semb, x_cond):
         emb = self.embedding(x)
+        pos_emb = self.pos_predictor.embed(x)
         x = self.embedding(x)
         x_cond = self.pitch_cond_embedding(x_cond)
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
-        x = torch.cat([emb, speaker_emb, x_cond], dim=2)
+        x = torch.cat([emb, pos_emb, speaker_emb, x_cond], dim=2)
         x = x.transpose(1, 2)
         for conv in self.convs:
             x = conv(x)
