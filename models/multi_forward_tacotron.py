@@ -68,7 +68,7 @@ class Discriminator(nn.Module):
         self.pos_predictor = PosPredictor(num_chars=len(phonemes))
         self.pitch_cond_embedding = Embedding(4, 8)
         self.convs = torch.nn.ModuleList([
-            BatchNormConv(64 + 256 + 8 , 256, 3, relu=True),
+            BatchNormConv(64 + 256 + 8 + 256, 256, 3, relu=True),
             BatchNormConv(256, 256, 3, relu=True),
             BatchNormConv(256, 256, 3, relu=True),
         ])
