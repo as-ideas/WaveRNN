@@ -15,32 +15,45 @@ class Discriminator(nn.Module):
 
     def __init__(self):
         super(Discriminator, self).__init__()
-        self.embedding = Embedding(len(phonemes), 64)
-        self.pitch_cond_embedding = Embedding(4, 8)
+        #self.embedding = Embedding(len(phonemes), 64)
+        #self.pitch_cond_embedding = Embedding(4, 8)
         self.convs = torch.nn.ModuleList([
-            BatchNormConv(64 + 256 + 8, 256, 3, relu=True),
+            BatchNormConv(80 + 256, 256, 3, relu=True),
             BatchNormConv(256, 256, 3, relu=True),
             BatchNormConv(256, 256, 3, relu=True),
         ])
-        self.gru1 = nn.GRU(256, 64, bidirectional=True)
-        self.gru2 = nn.GRU(2, 64, bidirectional=True)
-        self.lin = nn.Linear(256, 1)
+        #self.convs_2 = torch.nn.ModuleList([
+        #    BatchNormConv(64 + 256 + 8, 256, 3, relu=True),
+        #    BatchNormConv(256, 256, 3, relu=True),
+        #    BatchNormConv(256, 256, 3, relu=True),
+        #])
 
-    def forward(self, x, dur, pitch, semb, x_cond):
-        emb = self.embedding(x)
-        x = self.embedding(x)
-        x_cond = self.pitch_cond_embedding(x_cond)
-        speaker_emb = semb[:, None, :]
-        speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
-        x = torch.cat([emb, speaker_emb, x_cond], dim=2)
-        x = x.transpose(1, 2)
+        #self.gru1 = nn.GRU(256, 256, bidirectional=True)
+        self.gru = nn.GRU(256, 256, bidirectional=True)
+        self.lin = nn.Linear(512, 1)
+
+    def forward(self, mel, semb):
+        #emb = self.embedding(x)
+        #x = self.embedding(x)
+
+        speaker_emb = semb[:, :, None]
+        speaker_emb = speaker_emb.repeat(1, 1, mel.shape[2])
+
+        #x = torch.cat([emb, speaker_emb], dim=2)
+        #x = x.transpose(1, 2)
+        #for conv in self.convs_1:
+        #    x = conv(x)
+        #x = x.transpose(1, 2)
+
+        mel = torch.cat([mel, speaker_emb], dim=1)
         for conv in self.convs:
-            x = conv(x)
-        x = x.transpose(1, 2)
-        x1, _ = self.gru1(x)
-        x2 = torch.cat([dur, pitch], dim=-1)
-        x2, _ = self.gru2(x2)
-        x = torch.cat([x1, x2], dim=-1)
+            mel = conv(mel)
+        mel = mel.transpose(1, 2)
+
+        #x1, _ = self.gru1(x)
+        #x2, _ = self.gru2(mel)
+        #x = torch.cat([x1, x2], dim=-1)
+        x, _ = self.gru(mel)
         x = self.lin(x)
         return x
 
