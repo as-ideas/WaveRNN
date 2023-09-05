@@ -1,4 +1,3 @@
-import math
 from typing import Dict
 
 import torch
@@ -96,17 +95,15 @@ class ForwardSumLoss(torch.nn.Module):
         # that can be optionally inserted anywhere in the sequence for
         # a fixed probability.
         # A row must be added to the attention matrix to account for this
-        attn_logprob_pd = F.pad(input=attn_logprob,
-                                pad=(1, 0, 0, 0, 0, 0),
-                                value=self.blank_logprob)
-
-        bs = attn_logprob.size(0)
-        T = attn_logprob.size(-1)
-        target_seq = torch.arange(1, T+1).expand(bs, T)
-        attn_logprob_pd = attn_logprob_pd.permute(1, 0, 2)
-        attn_logprob_pd = attn_logprob_pd.log_softmax(-1)
-
-        cost = self.CTCLoss(attn_logprob_pd,
+        attn_logprob_padded = F.pad(input=attn_logprob,
+                                    pad=(1, 0, 0, 0, 0, 0),
+                                    value=self.blank_logprob)
+        batch_size = attn_logprob.size(0)
+        steps = attn_logprob.size(-1)
+        target_seq = torch.arange(1, steps+1).expand(batch_size, steps)
+        attn_logprob_padded = attn_logprob_padded.permute(1, 0, 2)
+        attn_logprob_padded = attn_logprob_padded.log_softmax(-1)
+        cost = self.CTCLoss(attn_logprob_padded,
                             target_seq,
                             input_lengths=mel_lens,
                             target_lengths=text_lens)
