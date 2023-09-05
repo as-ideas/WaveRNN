@@ -88,8 +88,8 @@ class MultiForwardTrainer:
                 m2_loss = 0*self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
                 d_loss = 0
-                score_fake = disc(pred['mel_post'].detach(), batch['speaker_emb'])
-                score_real = disc(batch['mel'], batch['speaker_emb'])
+                score_fake = disc(batch['x'], batch['dur'], pred['mel_post'].detach(), batch['speaker_emb'])
+                score_real = disc(batch['x'], batch['dur'], batch['mel'], batch['speaker_emb'])
 
                 for b in range(batch['x'].size(0)):
                     d_loss += torch.pow(score_real[b, :, :batch['mel_len'][b]] - 1.0, 2).mean()
@@ -100,7 +100,7 @@ class MultiForwardTrainer:
                 d_loss.backward()
                 d_optim.step()
 
-                score_fake = disc(pred['mel_post'], batch['speaker_emb'])
+                score_fake = disc(batch['x'], batch['dur'], pred['mel_post'], batch['speaker_emb'])
                 g_loss = 0
                 for b in range(batch['x'].size(0)):
                     g_loss += torch.pow(score_fake[b, :, :batch['mel_len'][b]] - 1.0, 2).mean()

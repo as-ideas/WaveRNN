@@ -15,13 +15,15 @@ class Discriminator(nn.Module):
 
     def __init__(self):
         super(Discriminator, self).__init__()
-        #self.embedding = Embedding(len(phonemes), 64)
+        self.embedding = Embedding(len(phonemes), 64)
         #self.pitch_cond_embedding = Embedding(4, 8)
+
         self.convs = torch.nn.ModuleList([
-            BatchNormConv(80 + 256, 256, 3, relu=True),
+            BatchNormConv(80 + 64 + 256, 256, 3, relu=True),
             BatchNormConv(256, 256, 3, relu=True),
             BatchNormConv(256, 256, 3, relu=True),
         ])
+
         #self.convs_2 = torch.nn.ModuleList([
         #    BatchNormConv(64 + 256 + 8, 256, 3, relu=True),
         #    BatchNormConv(256, 256, 3, relu=True),
@@ -31,10 +33,13 @@ class Discriminator(nn.Module):
         #self.gru1 = nn.GRU(256, 256, bidirectional=True)
         self.gru = nn.GRU(256, 256, bidirectional=True)
         self.lin = nn.Linear(512, 1)
+        self.lr = LengthRegulator()
+        self.padding_value = 0
 
-    def forward(self, mel, semb):
-        #emb = self.embedding(x)
-        #x = self.embedding(x)
+    def forward(self, x, dur, mel, semb):
+        x = self.embedding(x)
+        x = self.lr(x, dur)
+        x = self._pad(x.transpose(1, 2), mel.size(2))
 
         speaker_emb = semb[:, :, None]
         speaker_emb = speaker_emb.repeat(1, 1, mel.shape[2])
@@ -45,7 +50,8 @@ class Discriminator(nn.Module):
         #    x = conv(x)
         #x = x.transpose(1, 2)
 
-        mel = torch.cat([mel, speaker_emb], dim=1)
+
+        mel = torch.cat([x, mel, speaker_emb], dim=1)
         for conv in self.convs:
             mel = conv(mel)
         mel = mel.transpose(1, 2)
@@ -55,6 +61,12 @@ class Discriminator(nn.Module):
         #x = torch.cat([x1, x2], dim=-1)
         x, _ = self.gru(mel)
         x = self.lin(x)
+        return x
+
+
+    def _pad(self, x: torch.Tensor, max_len: int) -> torch.Tensor:
+        x = x[:, :, :max_len]
+        x = F.pad(x, [0, max_len - x.size(2), 0, 0], 'constant', self.padding_value)
         return x
 
 
