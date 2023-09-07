@@ -92,6 +92,7 @@ class Discriminator(nn.Module):
         x2 = torch.cat([dur, pitch], dim=-1)
         x2, _ = self.gru2(x2)
         x = torch.cat([x1, x2], dim=-1)
+        x = F.dropout(x, p=0.5, training=self.training)
         x = self.lin(x)
         return x
 
