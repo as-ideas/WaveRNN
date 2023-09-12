@@ -19,7 +19,7 @@ class SeriesPredictor(nn.Module):
                  conv_dims: int = 256,
                  rnn_dims: int = 64,
                  dropout: float = 0.5,
-                 speaker_emb_dims: int = 256,
+                 speaker_emb_dims: int = 256 + 4,
                  out_dim: int = 1):
         super().__init__()
         self.embedding = Embedding(num_chars, emb_dim)
@@ -60,7 +60,7 @@ class ConditionalSeriesPredictor(nn.Module):
                  conv_dims: int = 256,
                  rnn_dims: int = 64,
                  dropout: float = 0.5,
-                 speaker_emb_dims: int = 256):
+                 speaker_emb_dims: int = 256 + 4):
         super().__init__()
         self.embedding = Embedding(num_chars, emb_dim)
         self.pitch_cond_embedding = Embedding(cond_emb_size, cond_emb_dims)
@@ -128,6 +128,8 @@ class MultiForwardTacotron(nn.Module):
                  pitch_cond_categorical_dims: int,
                  padding_value=-11.5129):
         super().__init__()
+
+        speaker_emb_dims += 4
         self.rnn_dims = rnn_dims
         self.padding_value = padding_value
         self.embedding = nn.Embedding(num_chars, embed_dims)
@@ -184,6 +186,8 @@ class MultiForwardTacotron(nn.Module):
         return f'MultiForwardTacotron, num params: {num_params}'
 
     def forward(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+
+
         x = batch['x']
         mel = batch['mel']
         dur = batch['dur']
@@ -192,6 +196,9 @@ class MultiForwardTacotron(nn.Module):
         pitch = batch['pitch'].unsqueeze(1)
         pitch_cond = batch['pitch_cond']
         energy = batch['energy'].unsqueeze(1)
+        stats = batch['stats']
+
+        semb = torch.cat([semb, stats], dim=-1)
 
         if self.training:
             self.step += 1
@@ -243,11 +250,13 @@ class MultiForwardTacotron(nn.Module):
     def generate(self,
                  x: torch.Tensor,
                  speaker_emb: torch.Tensor,
+                 stats=torch.tensor([0, 1, 5, 3]).unsqueeze(0).float(),
                  alpha=1.0,
                  pitch_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x,
                  energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, torch.Tensor]:
         self.eval()
         with torch.no_grad():
+            speaker_emb = torch.cat([speaker_emb, stats], dim=-1)
             pitch_cond_hat = self.pitch_cond_pred(x, speaker_emb).squeeze(-1)
             pitch_cond_hat = torch.argmax(pitch_cond_hat.squeeze(), dim=1).long().unsqueeze(0)
             dur_hat = self.dur_pred(x, pitch_cond_hat, speaker_emb, alpha=alpha).squeeze(-1)

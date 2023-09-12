@@ -143,9 +143,29 @@ class ForwardDataset(Dataset):
         pitch_cond = np.ones(pitch.shape)
         pitch_cond[pitch != 0] = 2
 
+
+        pitch_nonzero = pitch[pitch != 0]
+        pitch_mean = np.mean(pitch_nonzero)
+        pitch_std = np.std(pitch_nonzero)
+        if np.isnan(pitch_mean):
+            pitch_mean = 0
+        if np.isnan(pitch_std):
+            pitch_std = 0
+
+        dur_mean = np.mean(dur)
+        dur_std = np.std(dur)
+        if np.isnan(dur_mean):
+            dur_mean = 0
+        if np.isnan(dur_std):
+            dur_std = 0
+
+        stats = np.array([pitch_mean, pitch_std, dur_mean, dur_std]).astype(float)
+
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
                 'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy,
-                'speaker_emb': speaker_emb, 'pitch_cond': pitch_cond, 'speaker_name': speaker_name}
+                'speaker_emb': speaker_emb, 'pitch_cond': pitch_cond, 'speaker_name': speaker_name,
+                'stats': stats
+                }
 
     def __len__(self):
         return len(self.metadata)
@@ -235,7 +255,8 @@ class TacoCollator:
 
         return {'x': text, 'mel': mel, 'item_id': item_id,
                 'x_len': x_len, 'mel_len': mel_lens,
-                'speaker_emb': speaker_emb, 'speaker_name': speaker_name}
+                'speaker_emb': speaker_emb, 'speaker_name': speaker_name,
+                }
 
 
 class ForwardCollator:
@@ -256,11 +277,14 @@ class ForwardCollator:
         energy = _stack_to_tensor(energy).float()
         pitch_cond = [_pad1d(b['pitch_cond'][:max_x_len], max_x_len) for b in batch]
         pitch_cond = _stack_to_tensor(pitch_cond).long()
+        stats = [b['stats'] for b in batch]
+        stats = _stack_to_tensor(stats).float()
         output.update({
             'pitch': pitch,
             'energy': energy,
             'dur': dur,
-            'pitch_cond': pitch_cond
+            'pitch_cond': pitch_cond,
+            'stats': stats
         })
         return output
 

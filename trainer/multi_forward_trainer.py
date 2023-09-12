@@ -222,22 +222,30 @@ class MultiForwardTrainer:
             tag=f'Generated/target_wav/{speaker}', snd_tensor=target_wav,
             global_step=model.step, sample_rate=self.dsp.sample_rate)
 
+        stat_vecs = [
+            torch.tensor([0, 1, 5, 3]).float().unsqueeze(0).to(device),
+            torch.tensor([0, 2, 5, 3]).float().unsqueeze(0).to(device),
+            torch.tensor([0, 2, 5, 0]).float().unsqueeze(0).to(device),
+            torch.tensor([0, 2, 5, 6]).float().unsqueeze(0).to(device)
+        ]
+
         for speaker in speakers_to_plot:
-            speaker_emb = self.speaker_embs[speaker].to(device)
-            gen = model.generate(batch['x'][0:1, :batch['x_len'][0]], speaker_emb=speaker_emb)
-            m2_hat = np_now(gen['mel_post'].squeeze())
+            for stat_vec in stat_vecs:
+                stat_vec_str = str(stat_vec.tolist())
+                speaker_emb = self.speaker_embs[speaker].to(device)
+                gen = model.generate(batch['x'][0:1, :batch['x_len'][0]],
+                                     speaker_emb=speaker_emb, stats=stat_vec)
+                m2_hat = np_now(gen['mel_post'].squeeze())
 
-            m2_hat_fig = plot_mel(m2_hat)
+                m2_hat_fig = plot_mel(m2_hat)
 
-            pitch_gen_fig = plot_pitch(np_now(gen['pitch'].squeeze()))
-            energy_gen_fig = plot_pitch(np_now(gen['energy'].squeeze()))
+                pitch_gen_fig = plot_pitch(np_now(gen['pitch'].squeeze()))
 
-            self.writer.add_figure(f'Pitch/generated/{speaker}', pitch_gen_fig, model.step)
-            self.writer.add_figure(f'Energy/generated/{speaker}', energy_gen_fig, model.step)
-            self.writer.add_figure(f'Generated/postnet/{speaker}', m2_hat_fig, model.step)
+                self.writer.add_figure(f'Pitch/generated/{speaker}_{stat_vec_str}', pitch_gen_fig, model.step)
+                self.writer.add_figure(f'Generated/postnet/{speaker}_{stat_vec_str}', m2_hat_fig, model.step)
 
-            m2_hat_wav = self.dsp.griffinlim(m2_hat)
+                m2_hat_wav = self.dsp.griffinlim(m2_hat)
 
-            self.writer.add_audio(
-                tag=f'Generated/postnet_wav/{speaker}', snd_tensor=m2_hat_wav,
-                global_step=model.step, sample_rate=self.dsp.sample_rate)
+                self.writer.add_audio(
+                    tag=f'Generated/postnet_wav/{speaker}_{stat_vec_str}', snd_tensor=m2_hat_wav,
+                    global_step=model.step, sample_rate=self.dsp.sample_rate)
