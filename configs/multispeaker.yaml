@@ -1,6 +1,6 @@
 
 tts_model_id: 'multispeaker_tts'
-data_path: 'data_multispeaker'                                        # output data path
+data_path: '/Users/cschaefe/datasets/multispeaker_welt_bild'                                        # output data path
 
 tts_model: 'multi_forward_tacotron'   # choices: [multi_forward_tacotron, multi_fast_pitch]
 
@@ -137,8 +137,7 @@ multi_forward_tacotron:
 
   training:
     schedule:
-      - 5e-5,  500_000,  32       # progressive training schedule
-      - 1e-5,  600_000,  32       # lr, step, batch_size
+      - 5e-5,  200_000,  2       # progressive training schedule
     dur_loss_factor: 0.1
     pitch_loss_factor: 0.1
     energy_loss_factor: 0.1
@@ -146,7 +145,7 @@ multi_forward_tacotron:
 
     clip_grad_norm: 1.0           # clips the gradient norm to prevent explosion - set to None if not needed
     checkpoint_every: 50_000      # checkpoints the model every x steps
-    plot_every: 5000              # generates samples and plots every x steps
+    plot_every: 5              # generates samples and plots every x steps
     plot_n_speakers: 3            # max number of speakers to generate plots for
     plot_speakers:                # speakers to generate plots for (additionally to plot_n_speakers)
       - default_speaker
