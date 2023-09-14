@@ -95,8 +95,8 @@ class PosDataset(Dataset):
 
 
 if __name__ == '__main__':
-    df_pos = pd.read_csv('/Users/cschaefe/datasets/nlp/pos/alpha_pos.tsv', sep='\t', encoding='utf-8')
-    df_dep = pd.read_csv('/Users/cschaefe/datasets/nlp/pos/alpha_dep.tsv', sep='\t', encoding='utf-8')
+    df_pos = pd.read_csv('/Users/cschaefe/datasets/pos/alpha_pos.tsv', sep='\t', encoding='utf-8')
+    df_dep = pd.read_csv('/Users/cschaefe/datasets/pos/alpha_dep.tsv', sep='\t', encoding='utf-8')
     df_pos.dropna(inplace=True)
     df_dep.dropna(inplace=True)
     phon_pos = list(zip(df_pos['text_phonemized'], df_pos['text_phonemized_pos']))
@@ -133,7 +133,7 @@ if __name__ == '__main__':
     print('Using device:', device)
     model = model.to(device)
     n_val = 1024
-    val_steps = 1000
+    val_steps = 2
     batch_size = 32
 
     Random(42).shuffle(phon_pos)
