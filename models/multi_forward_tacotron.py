@@ -17,20 +17,19 @@ class PosPredictor(nn.Module):
                  num_chars: int,
                  emb_dim: int = 64,
                  conv_dims: int = 256,
-                 rnn_dims: int = 64,
+                 rnn_dims: int = 256,
                  dropout: float = 0.5,
                  out_dim: int = 1):
         super().__init__()
         self.embedding = Embedding(num_chars, emb_dim)
         self.convs = torch.nn.ModuleList([
-            BatchNormConv(emb_dim, conv_dims, 5, relu=True),
-            BatchNormConv(conv_dims, conv_dims, 5, relu=True),
-            BatchNormConv(conv_dims, conv_dims, 5, relu=True),
+            BatchNormConv(emb_dim, conv_dims, 3, relu=True),
+            BatchNormConv(conv_dims, conv_dims, 3, relu=True),
+            BatchNormConv(conv_dims, conv_dims, 3, relu=True),
         ])
-        self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
-        self.lin_1 = nn.Linear(2 * rnn_dims, 64)
-        self.lin_2 = nn.Linear(64, out_dim)
-        self.lin_3 = nn.Linear(64, out_dim)
+        self.rnn = nn.LSTM(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
+        self.lin_2 = nn.Linear(2 * rnn_dims, out_dim)
+        self.lin_3 = nn.Linear(2 * rnn_dims, out_dim)
         self.dropout = dropout
 
     def forward(self,
@@ -43,7 +42,6 @@ class PosPredictor(nn.Module):
             x = F.dropout(x, p=self.dropout, training=self.training)
         x = x.transpose(1, 2)
         x, _ = self.rnn(x)
-        x = self.lin_1(x)
         x1 = self.lin_2(x)
         x2 = self.lin_3(x)
         return x1, x2
@@ -58,9 +56,9 @@ class PosPredictor(nn.Module):
                 x = conv(x)
                 x = F.dropout(x, p=self.dropout, training=self.training)
             x = x.transpose(1, 2)
-            x, _ = self.rnn(x)
-            #x = self.lin_1(x)
-            return x
+            _, out = self.rnn(x)
+            return out
+
 
 
 class SeriesPredictor(nn.Module):

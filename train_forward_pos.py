@@ -92,14 +92,16 @@ class PosDataset(Dataset):
         return len(self.text_pos)
 
 
-
 if __name__ == '__main__':
-    df_pos = pd.read_csv('/Users/cschaefe/datasets/nlp/pos/alpha_pos.tsv', sep='\t', encoding='utf-8')
-    df_dep = pd.read_csv('/Users/cschaefe/datasets/nlp/pos/alpha_dep.tsv', sep='\t', encoding='utf-8')
+    df_pos = pd.read_csv('/Users/cschaefe/datasets/pos/alpha_pos.tsv', sep='\t', encoding='utf-8')
+    df_dep = pd.read_csv('/Users/cschaefe/datasets/pos/alpha_dep.tsv', sep='\t', encoding='utf-8')
     df_pos.dropna(inplace=True)
     df_dep.dropna(inplace=True)
     phon_pos = list(zip(df_pos['text_phonemized'], df_pos['text_phonemized_pos']))
     phon_dep = list(zip(df_dep['text_phonemized'], df_dep['text_phonemized_pos']))
+
+    phon_pos = [p for p in phon_pos if len(p[0]) < 300]
+    phon_dep = [p for p in phon_dep if len(p[0]) < 300]
 
     config = read_config('configs/multispeaker.yaml')
     paths = Paths(config['data_path'], config['tts_model_id'])
@@ -125,11 +127,12 @@ if __name__ == '__main__':
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     print('Using device:', device)
     model = model.to(device)
-    n_val = 32
-    val_steps = 10
+    n_val = 1024
+    val_steps = 1000
     batch_size = 32
 
     Random(42).shuffle(phon_pos)
+    Random(42).shuffle(phon_dep)
     val_data_pos = phon_pos[:n_val]
     train_data_pos = phon_pos[n_val:]
     val_data_dep = phon_dep[:n_val]
@@ -142,23 +145,21 @@ if __name__ == '__main__':
     lens_pos = [len(p) for p, _ in train_data_pos]
     lens_dep = [len(p) for p, _ in train_data_dep]
 
-
     sampler_pos = BinnedLengthSampler(phoneme_lens=lens_pos, batch_size=batch_size, bin_size=3*batch_size)
     dataloader_pos = DataLoader(train_dataset_pos,
-                            batch_size=batch_size,
-                            collate_fn=PosCollator(),
-                            sampler=sampler_pos,
-                            drop_last=True)
+                                batch_size=batch_size,
+                                collate_fn=PosCollator(),
+                                sampler=sampler_pos,
+                                drop_last=True)
 
     sampler_dep = BinnedLengthSampler(phoneme_lens=lens_dep, batch_size=batch_size, bin_size=3*batch_size)
     dataloader_dep = DataLoader(train_dataset_dep,
-                            batch_size=batch_size,
-                            collate_fn=PosCollator(),
-                            sampler=sampler_dep,
-                            drop_last=True)
+                                batch_size=batch_size,
+                                collate_fn=PosCollator(),
+                                sampler=sampler_dep,
+                                drop_last=True)
 
-
-    optim = torch.optim.Adam(model.pos_pred.parameters(), lr=1e-3)
+    optim = torch.optim.Adam(model.pos_pred.parameters(), lr=1e-4)
     forward_optim = torch.optim.Adam(model.parameters())
     ce_loss = torch.nn.CrossEntropyLoss(ignore_index=0)
 
@@ -186,7 +187,7 @@ if __name__ == '__main__':
 
             sw.add_scalar('loss', loss, global_step=step)
 
-            if step % 10 == 0:
+            if step % 1000 == 0:
                 example_pred = torch.argmax(out_pos[0], dim=-1)
                 example_target = batch_pos['pos'][0]
 
