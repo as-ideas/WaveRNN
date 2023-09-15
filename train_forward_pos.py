@@ -106,7 +106,7 @@ if __name__ == '__main__':
     config = read_config('configs/multispeaker.yaml')
     paths = Paths(config['data_path'], config['tts_model_id'])
     model = MultiForwardTacotron.from_config(config)
-    save_path = paths.forward_checkpoints / 'latest_model.pt'
+    save_path = paths.forward_checkpoints / 'pos_latest_model_lstm.pt'
 
     pos_dict = {}
     for _, pos in phon_pos:
@@ -165,7 +165,7 @@ if __name__ == '__main__':
 
     step = 0
 
-    sw = SummaryWriter('checkpoints/pos_tagger')
+    sw = SummaryWriter('checkpoints/pos_tagger_lstm')
 
     for epoch in range(1000):
         for batch_pos, batch_dep in tqdm.tqdm(zip(dataloader_pos, dataloader_dep), total=len(dataloader_pos)):
