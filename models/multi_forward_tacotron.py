@@ -56,7 +56,7 @@ class PosPredictor(nn.Module):
                 x = conv(x)
                 x = F.dropout(x, p=self.dropout, training=self.training)
             x = x.transpose(1, 2)
-            _, out = self.rnn(x)
+            out, _ = self.rnn(x)
             return out
 
 
@@ -179,7 +179,7 @@ class MultiForwardTacotron(nn.Module):
                  pitch_cond_emb_dims: int,
                  pitch_cond_categorical_dims: int,
                  padding_value=-11.5129,
-                 pos_dim=64):
+                 pos_dim=512):
         super().__init__()
         self.rnn_dims = rnn_dims
         self.padding_value = padding_value

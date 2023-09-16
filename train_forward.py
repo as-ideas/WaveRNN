@@ -77,7 +77,7 @@ if __name__ == '__main__':
 
     ckpt = '/Users/cschaefe/workspace/ForwardTacotron/checkpoints/multispeaker_tts.forward/pos_latest_model.pt'
     ckpt = torch.load(ckpt, map_location=torch.device('cpu'))
-    model.pos_pred.load_state_dict(ckpt)
+    #model.pos_pred.load_state_dict(ckpt)
 
     if force_gta:
         print('Creating Ground Truth Aligned Dataset...\n')
