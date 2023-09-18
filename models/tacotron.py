@@ -191,7 +191,7 @@ class Tacotron(nn.Module):
                  stop_threshold: float,
                  speaker_emb_dim=256) -> None:
         super().__init__()
-        self.n_mels = n_mels
+        self.n_mels = 1024
         self.lstm_dims = lstm_dims
         self.decoder_dims = decoder_dims
         self.encoder = Encoder(embed_dims, num_chars, encoder_dims,

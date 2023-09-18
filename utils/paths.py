@@ -10,7 +10,7 @@ class Paths:
         self.base = Path(__file__).parent.parent.expanduser().resolve()
         self.data = Path(data_path).expanduser().resolve()
         self.quant = self.data/'quant'
-        self.mel = self.data/'mel'
+        self.mel = self.data/'hubert'
         self.gta = self.data/'gta'
         self.att_pred = self.data/'att_pred'
         self.alg = self.data/'alg'
