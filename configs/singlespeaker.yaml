@@ -1,6 +1,6 @@
 
 tts_model_id: 'ljspeech_tts'
-data_path: 'data/'                                        # output data path
+data_path: 'data'                                         # output data path
 
 tts_model: 'forward_tacotron'                             # choices: [forward_tacotron, fast_pitch]
 
@@ -35,7 +35,7 @@ preprocessing:
   n_val: 200
   language: 'en-us'
   cleaner_name: 'english_cleaners'      # choices: ['english_cleaners', 'no_cleaners'], expands numbers and abbreviations.
-  use_phonemes: False                   # whether to phonemize the text
+  use_phonemes: True                    # whether to phonemize the text
                                         # if set to False, you have to provide the phonemized text yourself
   min_text_len: 2
   pitch_min_freq: 30                    # Minimum value for pitch frequency to remove outliers (Common pitch range is
@@ -73,6 +73,9 @@ tacotron:
     dropout: 0.5
     stop_threshold: -11             # Value below which audio generation ends.
 
+    aligner_hidden_dims: 256        # text-mel aligner hidden dimensions
+    aligner_out_dims: 32            # text-mel aligner encoding dimensions for text and mel
+
   training:
     schedule:
       - 5,  1e-3,  10_000,  32      # progressive training schedule
@@ -80,12 +83,13 @@ tacotron:
       - 2,   1e-4,  30_000,  8
       - 1,   1e-4,  40_000,  8
 
-    max_mel_len: 1250                # if you have a couple of extremely long spectrograms you might want to use this
+    dia_loss_matrix_g: 0.2                # value of g for diatonal matrix (larger g = broader diagonal)
+    dia_loss_factor: 1.0             # factor for scaling diagonal loss
+    ctc_loss_factor: 0.1             # factor for scaling aligner CTC loss
     clip_grad_norm: 1.0              # clips the gradient norm to prevent explosion - set to None if not needed
     checkpoint_every: 10000          # checkpoints the model every x steps
     plot_every: 1000                 # generates samples and plots every x steps
     num_workers: 2                   # number of workers for dataloader
-
 
     filter:
       max_mel_len: 1250                    # filter files with mel len larger than given
