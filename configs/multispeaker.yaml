@@ -73,6 +73,9 @@ tacotron:
     dropout: 0.5
     stop_threshold: -11             # Value below which audio generation ends.
 
+    aligner_hidden_dims: 256        # text-mel aligner hidden dimensions
+    aligner_out_dims: 32            # text-mel aligner encoding dimensions for text and mel
+
   training:
     schedule:
       - 8,  1e-3,  30_000,  32      # progressive training schedule
@@ -80,10 +83,12 @@ tacotron:
       - 2,   1e-4,  50_000,  8
       - 1,   1e-4,  65_000,  8
 
-
+    dia_loss_matrix_g: 0.2                # value of g for diatonal matrix (larger g = broader diagonal)
+    dia_loss_factor: 1.0             # factor for scaling diagonal loss
+    ctc_loss_factor: 0.1             # factor for scaling aligner CTC loss
     clip_grad_norm: 1.0              # clips the gradient norm to prevent explosion - set to None if not needed
     checkpoint_every: 10000          # checkpoints the model every x steps
-    plot_every: 1000                 # generates samples and plots every x steps
+    plot_every: 1000                  # generates samples and plots every x steps
     num_workers: 2                   # number of workers for dataloader
 
     filter:
