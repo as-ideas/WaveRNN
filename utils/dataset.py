@@ -427,7 +427,9 @@ def _get_filtered_datasets(paths: Paths,
     speaker_dict = unpickle_binary(paths.speaker_dict)
 
     train_data = _filter_max_len(train_data, max_mel_len)
+    train_data = _filter_hub(paths, train_data, max_mel_len)
     val_data = _filter_max_len(val_data, max_mel_len)
+    val_data = _filter_hub(paths, val_data, max_mel_len)
 
     if filter_duration_stats:
         duration_stats = unpickle_binary(paths.duration_stats)
@@ -459,6 +461,12 @@ def _filter_max_len(dataset: List[tuple], max_mel_len: int) -> List[tuple]:
     if max_mel_len is None:
         return dataset
     return [(id, len) for id, len in dataset if len <= max_mel_len]
+
+
+def _filter_hub(paths: Paths, dataset: List[tuple], max_mel_len: int) -> List[tuple]:
+    if max_mel_len is None:
+        return dataset
+    return [(id, len) for id, len in dataset if (paths.mel / f'{id}.pt').is_file()]
 
 
 def _stack_to_tensor(x: List[np.array]) -> torch.Tensor:
