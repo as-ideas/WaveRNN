@@ -1,6 +1,6 @@
 
 tts_model_id: 'multispeaker_tts'
-data_path: 'data_multispeaker'                                        # output data path
+data_path: '/Users/cschaefe/datasets/multispeaker_welt_bild'                                        # output data path
 
 tts_model: 'multi_forward_tacotron'   # choices: [multi_forward_tacotron, multi_fast_pitch]
 
@@ -78,7 +78,7 @@ tacotron:
 
   training:
     schedule:
-      - 8,  1e-3,  30_000,  32      # progressive training schedule
+      - 8,  1e-3,  30_000,  2      # progressive training schedule
       - 4,   1e-4,  40_000,  16     # (r, lr, step, batch_size)
       - 2,   1e-4,  50_000,  8
       - 1,   1e-4,  65_000,  8

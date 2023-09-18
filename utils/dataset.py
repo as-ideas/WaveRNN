@@ -104,7 +104,7 @@ class TacoDataset(Dataset):
         text = self.text_dict[item_id]
         speaker_name = self.speaker_dict[item_id]
         x = self.tokenizer(text)
-        mel = np.load(str(self.paths.mel/f'{item_id}.npy'))
+        mel = torch.load(str(self.paths.mel/f'{item_id}.pt')).squeeze().transpose(0, 1).detach().numpy()
         mel_len = mel.shape[-1]
         speaker_emb = np.load(str(self.paths.speaker_emb/f'{item_id}.npy'))
         return {'x': x, 'mel': mel, 'item_id': item_id,
@@ -134,7 +134,7 @@ class ForwardDataset(Dataset):
         text = self.text_dict[item_id]
         speaker_name = self.speaker_dict[item_id]
         x = self.tokenizer(text)
-        mel = np.load(str(self.paths.mel/f'{item_id}.npy'))
+        mel = torch.load(str(self.paths.mel/f'{item_id}.pt')).squeeze().transpose(0, 1).detach().numpy()
         mel_len = mel.shape[-1]
         dur = np.load(str(self.paths.alg/f'{item_id}.npy'))
         pitch = np.load(str(self.paths.phon_pitch/f'{item_id}.npy'))

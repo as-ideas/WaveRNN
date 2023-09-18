@@ -168,14 +168,14 @@ class Decoder(nn.Module):
                  aligner_out_dims: int):
         super().__init__()
         self.register_buffer('r', torch.tensor(1, dtype=torch.int))
-        self.n_mels = n_mels
-        self.prenet = PreNet(n_mels + aligner_out_dims)
+        self.n_mels = 1024
+        self.prenet = PreNet(1024 + aligner_out_dims)
         self.attn_net = LSA(decoder_dims)
         self.attn_rnn = nn.GRUCell(decoder_dims + decoder_dims // 2, decoder_dims)
         self.rnn_input = nn.Linear(2 * decoder_dims, lstm_dims)
         self.res_rnn1 = nn.LSTMCell(lstm_dims, lstm_dims)
         self.res_rnn2 = nn.LSTMCell(lstm_dims, lstm_dims)
-        self.mel_proj = nn.Linear(lstm_dims, n_mels * self.max_r, bias=False)
+        self.mel_proj = nn.Linear(lstm_dims, 1024 * self.max_r, bias=False)
     
     def zoneout(self, prev, current, p=0.1):
         device = next(self.parameters()).device  # Use same device as parameters
@@ -254,6 +254,7 @@ class Tacotron(nn.Module):
                  aligner_out_dims: int,
                  speaker_emb_dim=256) -> None:
         super().__init__()
+        n_mels = 1024
         self.n_mels = 1024
         self.lstm_dims = lstm_dims
         self.decoder_dims = decoder_dims
@@ -265,7 +266,7 @@ class Tacotron(nn.Module):
                                       bias=False)
         self.decoder = Decoder(n_mels=n_mels, decoder_dims=decoder_dims,
                                lstm_dims=lstm_dims, aligner_out_dims=aligner_out_dims)
-        self.postnet = CBHG(postnet_k, n_mels, postnet_dims, [256, 80], num_highways)
+        self.postnet = CBHG(postnet_k, n_mels, postnet_dims, [256, 1024], num_highways)
         self.post_proj = nn.Linear(postnet_dims * 2, n_mels, bias=False)
         self.speaker_emb_dim = speaker_emb_dim
 
@@ -274,7 +275,7 @@ class Tacotron(nn.Module):
         self.register_buffer('step', torch.zeros(1, dtype=torch.long))
         self.register_buffer('stop_threshold', torch.tensor(stop_threshold, dtype=torch.float32))
 
-        self.aligner = Aligner(num_chars=num_chars, mel_dim=n_mels, speaker_emb_dim=speaker_emb_dim,
+        self.aligner = Aligner(num_chars=num_chars, mel_dim=1024, speaker_emb_dim=speaker_emb_dim,
                                hidden_dim=aligner_hidden_dims, out_dim=aligner_out_dims)
 
         self.aligner_out_dims = aligner_out_dims
