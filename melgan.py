@@ -122,7 +122,7 @@ class Generator(nn.Module):
                   mel: torch.Tensor,
                   pad_steps: int = 10) -> torch.Tensor:
         with torch.no_grad():
-            pad = torch.full((1, 80, pad_steps), -11.5129).to(mel.device)
+            pad = torch.full((1, 1024, pad_steps), 0).to(mel.device)
             mel = torch.cat((mel, pad), dim=2)
             spec, phase = self.forward(mel)
         return spec, phase
