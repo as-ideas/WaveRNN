@@ -489,7 +489,7 @@ def _get_filtered_datasets(paths: Paths,
 def _filter_max_len(dataset: List[tuple], max_mel_len: int) -> List[tuple]:
     if max_mel_len is None:
         return dataset
-    return [(id, len) for id, len in dataset if 100 < len <= max_mel_len]
+    return [(id, len) for id, len in dataset if 200 < len <= max_mel_len]
 
 
 def _filter_hub(paths: Paths, dataset: List[tuple], max_mel_len: int) -> List[tuple]:
