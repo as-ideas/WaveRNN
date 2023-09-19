@@ -247,7 +247,7 @@ class MultiForwardTrainer:
                 mel_end = batch['mel_end']
                 mel_batch = torch.zeros((mel_start.size(0), 1024, 64)).to(device)
                 for b in range(mel_start.size(0)):
-                    mel_batch[b, :, :] = pred['mel_post'][b, :, mel_start[b]:mel_end[b]]
+                    mel_batch[b, :, :] = batch['mel'][b, :, mel_start[b]:mel_end[b]]
 
                 a, b = g_model(mel_batch)
                 wav_fake = torch_stft.inverse(a, b)
@@ -278,7 +278,7 @@ class MultiForwardTrainer:
                        + self.train_cfg['pitch_loss_factor'] * pitch_loss \
                        + self.train_cfg['energy_loss_factor'] * energy_loss \
                        + self.train_cfg['pitch_cond_loss_factor'] * pitch_cond_loss \
-                       + 0.1 * g_loss + norm + spec
+                       + g_loss + norm + spec
 
                 pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
                 pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()
@@ -288,6 +288,7 @@ class MultiForwardTrainer:
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(),
                                                self.train_cfg['clip_grad_norm'])
+
                 optimizer.step()
                 g_optim.step()
 
