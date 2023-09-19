@@ -311,6 +311,8 @@ class MultiForwardTrainer:
                 if step % self.train_cfg['plot_every'] == 0:
                     self.generate_plots(model, session, g_model, torch_stft)
 
+                self.writer.add_scalar('g_loss/train', g_loss, model.get_step())
+                self.writer.add_scalar('d_loss/train', d_loss, model.get_step())
                 self.writer.add_scalar('Mel_Loss/train', m1_loss + m2_loss, model.get_step())
                 self.writer.add_scalar('Pitch_Loss/train', pitch_loss, model.get_step())
                 self.writer.add_scalar('Energy_Loss/train', energy_loss, model.get_step())
