@@ -1,5 +1,5 @@
 
-tts_model_id: 'bild_welt_e2e_tts'
+tts_model_id: 'bild_welt_hub_e2e_tts'
 data_path: '/Users/cschaefe/datasets/multispeaker_welt_bild'                                        # output data path
 
 tts_model: 'multi_forward_tacotron'   # choices: [multi_forward_tacotron, multi_fast_pitch]
@@ -147,7 +147,7 @@ multi_forward_tacotron:
 
     clip_grad_norm: 1.0           # clips the gradient norm to prevent explosion - set to None if not needed
     checkpoint_every: 50_000      # checkpoints the model every x steps
-    plot_every: 100              # generates samples and plots every x steps
+    plot_every: 10              # generates samples and plots every x steps
     plot_n_speakers: 3            # max number of speakers to generate plots for
     plot_speakers:                # speakers to generate plots for (additionally to plot_n_speakers)
       - default_speaker

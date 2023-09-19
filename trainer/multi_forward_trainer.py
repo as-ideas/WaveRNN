@@ -210,16 +210,16 @@ class MultiForwardTrainer:
         device = next(model.parameters()).device  # use same device as model parameters
 
         multires_stft_loss = MultiResStftLoss().to(device)
-        g_model = Generator(80).to(device)
+        g_model = Generator(1024).to(device)
         d_model = MultiScaleDiscriminator().to(device)
 
-        voc_path = '/Users/cschaefe/stream_tts_models/melgan_welt_hifi_istft/model.pt'
-        voc_checkpoint = torch.load(voc_path, map_location=torch.device('cpu'))
-        g_model.load_state_dict(voc_checkpoint['model_g'])
-        d_model.load_state_dict(voc_checkpoint['model_d'])
-        g_optim = Adam(g_model.parameters(), lr=1e-5,  betas=(0.5, 0.9))
-        d_optim = Adam(d_model.parameters(), lr=1e-5,  betas=(0.5, 0.9))
-        d_optim.load_state_dict(voc_checkpoint['optim_d'])
+        #voc_path = '/Users/cschaefe/stream_tts_models/melgan_welt_hifi_istft/model.pt'
+        #voc_checkpoint = torch.load(voc_path, map_location=torch.device('cpu'))
+        #g_model.load_state_dict(voc_checkpoint['model_g'])
+        #d_model.load_state_dict(voc_checkpoint['model_d'])
+        g_optim = Adam(g_model.parameters(), lr=2e-5,  betas=(0.5, 0.9))
+        d_optim = Adam(d_model.parameters(), lr=2e-5,  betas=(0.5, 0.9))
+        #d_optim.load_state_dict(voc_checkpoint['optim_d'])
 
         torch_stft = TorchSTFT(filter_length=16, hop_length=4, win_length=16).to(device)
 
@@ -245,7 +245,7 @@ class MultiForwardTrainer:
 
                 mel_start = batch['mel_start']
                 mel_end = batch['mel_end']
-                mel_batch = torch.zeros((mel_start.size(0), 80, 64)).to(device)
+                mel_batch = torch.zeros((mel_start.size(0), 1024, 64)).to(device)
                 for b in range(mel_start.size(0)):
                     mel_batch[b, :, :] = pred['mel_post'][b, :, mel_start[b]:mel_end[b]]
 
@@ -271,29 +271,22 @@ class MultiForwardTrainer:
                     for feat_fake_i, feat_real_i in zip(feat_fake, feat_real):
                         g_loss += 10. * F.l1_loss(feat_fake_i, feat_real_i.detach())
 
-                print('g_loss', g_loss)
-
-                norm, spec = multires_stft_loss(wav_fake.squeeze(1), batch['wav'])
-
                 loss = m1_loss + m2_loss \
                        + self.train_cfg['dur_loss_factor'] * dur_loss \
                        + self.train_cfg['pitch_loss_factor'] * pitch_loss \
                        + self.train_cfg['energy_loss_factor'] * energy_loss \
                        + self.train_cfg['pitch_cond_loss_factor'] * pitch_cond_loss \
-                       + norm + spec
+                       + 0.1 * g_loss
 
-                #print(norm, spec)
                 pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
                 pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()
 
-                #optimizer.zero_grad()
-                #loss.backward()
-                #torch.nn.utils.clip_grad_norm_(model.parameters(),
-                                               #self.train_cfg['clip_grad_norm'])
-                #optimizer.step()
-
+                optimizer.zero_grad()
                 g_optim.zero_grad()
-                g_loss.backward()
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(),
+                                               self.train_cfg['clip_grad_norm'])
+                optimizer.step()
                 g_optim.step()
 
                 averages['mel_loss'].add(m1_loss.item() + m2_loss.item())
@@ -311,12 +304,13 @@ class MultiForwardTrainer:
                     save_checkpoint(model=model, optim=optimizer, config=self.config,
                                     path=self.paths.forward_checkpoints / f'forward_step{k}k.pt',
                                     meta={'speaker_embeddings': self.speaker_embs})
-                    torch.save({'model_g': g_model.state_dict()}, self.paths.forward_checkpoints / f'melgan_step{k}.k.pt')
+                    torch.save({'model_g': g_model.state_dict(),
+                                'model_d': d_model.state_dict()},
+                               self.paths.forward_checkpoints / f'melgan_step{k}.k.pt')
 
                 if step % self.train_cfg['plot_every'] == 0:
                     self.generate_plots(model, session, g_model, torch_stft)
 
-                self.writer.add_scalar('stft_loss/train', norm + spec, model.get_step())
                 self.writer.add_scalar('Mel_Loss/train', m1_loss + m2_loss, model.get_step())
                 self.writer.add_scalar('Pitch_Loss/train', pitch_loss, model.get_step())
                 self.writer.add_scalar('Energy_Loss/train', energy_loss, model.get_step())

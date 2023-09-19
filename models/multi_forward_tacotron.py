@@ -334,7 +334,7 @@ class MultiForwardTacotron(nn.Module):
     def from_config(cls, config: Dict[str, Any]) -> 'MultiForwardTacotron':
         model_config = config['multi_forward_tacotron']['model']
         model_config['num_chars'] = len(phonemes)
-        model_config['n_mels'] = config['dsp']['num_mels']
+        model_config['n_mels'] = 1024#config['dsp']['num_mels']
         return MultiForwardTacotron(**model_config)
 
     @classmethod
