@@ -127,7 +127,7 @@ class ForwardDataset(Dataset):
         self.speaker_dict = speaker_dict
         self.tokenizer = tokenizer
         self.mel_segment_len = 64
-        self.hop_len = 256
+        self.hop_len = 320
 
     def __getitem__(self, index: int) -> Dict[str, torch.tensor]:
         item_id = self.metadata[index]
@@ -154,9 +154,9 @@ class ForwardDataset(Dataset):
         wav = wav[wav_start:wav_end]
         #print('wav shape', wav.shape)
         #assert mel.shape[-1] == 64, mel.shape
-        if wav.shape[-1] < 64 * 256:
-            wav = np.concatenate([wav, np.zeros(64 * 256 - wav.shape[-1])])
-        assert wav.shape[-1] == 64 * 256, wav.shape
+        if wav.shape[-1] < 64 * 320:
+            wav = np.concatenate([wav, np.zeros(64 * 320 - wav.shape[-1])])
+        assert wav.shape[-1] == 64 * 320, wav.shape
 
         return {'x': x, 'mel': mel, 'item_id': item_id, 'x_len': len(x),
                 'mel_len': mel_len, 'dur': dur, 'pitch': pitch, 'energy': energy,
