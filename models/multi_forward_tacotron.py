@@ -23,7 +23,7 @@ class AutoregSeriesPredictor(nn.Module):
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
         ])
         self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
-        self.I = nn.Linear(2 * rnn_dims + 1, rnn_dims)
+        self.I = nn.Linear(2 * rnn_dims, rnn_dims)
         self.decoder = nn.GRU(rnn_dims, rnn_dims, batch_first=True, bidirectional=False)
         self.lin_enc = nn.Linear(2 * rnn_dims, rnn_dims)
         self.lin = nn.Linear(rnn_dims, out_dims)
@@ -36,8 +36,6 @@ class AutoregSeriesPredictor(nn.Module):
                 semb: torch.Tensor,
                 p_in: torch.Tensor) -> torch.Tensor:
 
-        if self.round:
-            p_in = p_in * 0.
         x = self.embedding(x)
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
@@ -51,7 +49,8 @@ class AutoregSeriesPredictor(nn.Module):
 
         h_dec = torch.zeros(1, x.size(0), self.rnn_dims, device=x.device)
 
-        x_dec_in = torch.cat([x, p_in], dim=-1)
+        #x_dec_in = torch.cat([x, p_in], dim=-1)
+        x_dec_in = x
         x_dec_in = self.I(x_dec_in)
         x, _ = self.decoder(x_dec_in, h_dec)
         x_out = self.lin(x)
@@ -66,41 +65,42 @@ class AutoregSeriesPredictor(nn.Module):
         return gru_cell
 
     def generate(self, x, semb):
-        x = self.embedding(x)
-        speaker_emb = semb[:, None, :]
-        speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
-        x = torch.cat([x, speaker_emb], dim=2)
-        x = x.transpose(1, 2)
-        for conv in self.convs:
-            x = conv(x)
-            x = F.dropout(x, p=self.dropout, training=self.training)
-        x = x.transpose(1, 2)
-        x, _ = self.rnn(x)
-
-        device = next(self.parameters()).device  # use same device as parameters
-        rnn = self.get_gru_cell(self.decoder).to(device)
-        b_size, seq_len, _ = x.size()
-
-        h = torch.zeros(b_size, self.rnn_dims, device=device)
-        o = torch.zeros(b_size, 1, device=device, dtype=torch.long)
-
-        output = []
-
         with torch.no_grad():
+            x = self.embedding(x)
+            speaker_emb = semb[:, None, :]
+            speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
+            x = torch.cat([x, speaker_emb], dim=2)
+            x = x.transpose(1, 2)
+            for conv in self.convs:
+                x = conv(x)
+                x = F.dropout(x, p=self.dropout, training=self.training)
+            x = x.transpose(1, 2)
+            x, _ = self.rnn(x)
+
+            device = next(self.parameters()).device  # use same device as parameters
+            rnn = self.get_gru_cell(self.decoder).to(device)
+            b_size, seq_len, _ = x.size()
+
+            h = torch.zeros(b_size, self.rnn_dims, device=device)
+            o = torch.zeros(b_size, 1, device=device, dtype=torch.long)
+
+            output = []
+
             for i in range(seq_len):
                 x_i = x[0, i:i+1, :]
-                x_dec_in = torch.cat([x_i, o], dim=-1)
+                #x_dec_in = torch.cat([x_i, o], dim=-1)
+                x_dec_in = x_i
                 x_dec_in = self.I(x_dec_in)
                 h = rnn(x_dec_in, h)
                 sample = self.lin(h)
-                if self.round:
-                    sample = torch.round(sample)
+                #if self.round:
+                #    sample = torch.round(sample)
                 output.append(sample)
                 o = sample
                 if self.round:
                     o *= 0
 
-        output = torch.stack(output)
+            output = torch.stack(output)
         return output
 
 
