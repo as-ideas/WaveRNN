@@ -23,14 +23,19 @@ class AutoregSeriesPredictor(nn.Module):
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
         ])
         self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
-        self.lin = nn.Linear(2 * rnn_dims, 1)
+        self.I = nn.Linear(2 * rnn_dims + 1, rnn_dims)
+        self.decoder = nn.GRU(rnn_dims, rnn_dims, batch_first=True, bidirectional=False)
+        self.lin_enc = nn.Linear(2 * rnn_dims, rnn_dims)
+        self.lin = nn.Linear(rnn_dims, out_dims)
+        self.rnn_dims = rnn_dims
         self.dropout = dropout
+        self.round = round
 
     def forward(self,
                 x: torch.Tensor,
                 semb: torch.Tensor,
-                p_in,
-                alpha: float = 1.0) -> torch.Tensor:
+                p_in: torch.Tensor) -> torch.Tensor:
+
         x = self.embedding(x)
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
@@ -41,8 +46,21 @@ class AutoregSeriesPredictor(nn.Module):
             x = F.dropout(x, p=self.dropout, training=self.training)
         x = x.transpose(1, 2)
         x, _ = self.rnn(x)
-        x = self.lin(x)
-        return x / alpha
+
+        h_dec = torch.zeros(1, x.size(0), self.rnn_dims, device=x.device)
+        x_dec_in = torch.cat([x, p_in], dim=-1)
+        x_dec_in = self.I(x_dec_in)
+        x, _ = self.decoder(x_dec_in, h_dec)
+        x_out = self.lin(x)
+        return x_out
+
+    def get_gru_cell(self, gru):
+        gru_cell = nn.GRUCell(gru.input_size, gru.hidden_size)
+        gru_cell.weight_hh.data = gru.weight_hh_l0.data
+        gru_cell.weight_ih.data = gru.weight_ih_l0.data
+        gru_cell.bias_hh.data = gru.bias_hh_l0.data
+        gru_cell.bias_ih.data = gru.bias_ih_l0.data
+        return gru_cell
 
     def generate(self, x, semb):
         with torch.no_grad():
@@ -57,19 +75,24 @@ class AutoregSeriesPredictor(nn.Module):
             x = x.transpose(1, 2)
             x, _ = self.rnn(x)
 
-            #device = next(self.parameters()).device  # use same device as parameters
+            device = next(self.parameters()).device  # use same device as parameters
             b_size, seq_len, _ = x.size()
 
-            #h = torch.zeros(b_size, self.rnn_dims, device=device)
-            #o = torch.zeros(b_size, 1, device=device, dtype=torch.long)
+            h = torch.zeros(b_size, self.rnn_dims, device=device)
+            o = torch.zeros(b_size, 1, device=device, dtype=torch.long)
 
             output = []
 
             for i in range(seq_len):
                 x_i = x[0, i:i+1, :]
-                sample = self.lin(x_i)
+                x_dec_in = torch.cat([x_i, o], dim=-1)
+                x_dec_in = self.I(x_dec_in)
+                h, _ = self.decoder(x_dec_in, h)
+                sample = self.lin(h)
                 output.append(sample)
                 o = sample
+                if self.round:
+                    o = torch.round(o)
 
             output = torch.stack(output)
         return output
@@ -323,15 +346,13 @@ class MultiForwardTacotron(nn.Module):
         with torch.no_grad():
             pitch_cond_hat = self.pitch_cond_pred(x, speaker_emb).squeeze(-1)
             pitch_cond_hat = torch.argmax(pitch_cond_hat.squeeze(), dim=1).long().unsqueeze(0)
-            dur_hat = self.dur_pred.generate(x, speaker_emb).squeeze(-1)
-            dur_hat_for = self.dur_pred(x, speaker_emb, torch.zeros(dur_hat.size(), device=dur_hat.device)).squeeze(-1)
+            dur_hat = self.dur_pred.generate(x, speaker_emb).squeeze().unsqueeze(0)
             pitch_hat = self.pitch_pred.generate(x, speaker_emb).transpose(0, 1).transpose(1, 2)
             pitch_hat = pitch_function(pitch_hat)
             energy_hat = self.energy_pred(x, speaker_emb).transpose(1, 2)
             energy_hat = energy_function(energy_hat)
 
             print('dur', dur_hat.squeeze())
-            print('dur_forward', dur_hat_for.squeeze())
             print('pitch', pitch_hat.squeeze())
 
             return self._generate_mel(x=x,
