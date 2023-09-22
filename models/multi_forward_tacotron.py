@@ -23,19 +23,14 @@ class AutoregSeriesPredictor(nn.Module):
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
         ])
         self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
-        #self.I = nn.Linear(2 * rnn_dims, rnn_dims)
-        self.decoder = nn.GRU(2*rnn_dims, rnn_dims, batch_first=True, bidirectional=False)
-        self.lin_enc = nn.Linear(2 * rnn_dims, rnn_dims)
-        self.lin = nn.Linear(2*rnn_dims, out_dims)
-        self.rnn_dims = rnn_dims
+        self.lin = nn.Linear(2 * rnn_dims, 1)
         self.dropout = dropout
-        self.round = round
 
     def forward(self,
                 x: torch.Tensor,
                 semb: torch.Tensor,
-                p_in: torch.Tensor) -> torch.Tensor:
-
+                p_in,
+                alpha: float = 1.0) -> torch.Tensor:
         x = self.embedding(x)
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
@@ -46,21 +41,8 @@ class AutoregSeriesPredictor(nn.Module):
             x = F.dropout(x, p=self.dropout, training=self.training)
         x = x.transpose(1, 2)
         x, _ = self.rnn(x)
-
-        #h_dec = torch.zeros(1, x.size(0), self.rnn_dims, device=x.device)
-        #x_dec_in = x
-        #x_dec_in = self.I(x_dec_in)
-        #x, _ = self.decoder(x_dec_in, h_dec)
-        x_out = self.lin(x)
-        return x_out
-
-    def get_gru_cell(self, gru):
-        gru_cell = nn.GRUCell(gru.input_size, gru.hidden_size)
-        gru_cell.weight_hh.data = gru.weight_hh_l0.data
-        gru_cell.weight_ih.data = gru.weight_ih_l0.data
-        gru_cell.bias_hh.data = gru.bias_hh_l0.data
-        gru_cell.bias_ih.data = gru.bias_ih_l0.data
-        return gru_cell
+        x = self.lin(x)
+        return x / alpha
 
     def generate(self, x, semb):
         with torch.no_grad():
@@ -75,19 +57,16 @@ class AutoregSeriesPredictor(nn.Module):
             x = x.transpose(1, 2)
             x, _ = self.rnn(x)
 
-            device = next(self.parameters()).device  # use same device as parameters
+            #device = next(self.parameters()).device  # use same device as parameters
             b_size, seq_len, _ = x.size()
 
-            h = torch.zeros(b_size, self.rnn_dims, device=device)
-            o = torch.zeros(b_size, 1, device=device, dtype=torch.long)
+            #h = torch.zeros(b_size, self.rnn_dims, device=device)
+            #o = torch.zeros(b_size, 1, device=device, dtype=torch.long)
 
             output = []
 
             for i in range(seq_len):
                 x_i = x[0, i:i+1, :]
-                #x_dec_in = torch.cat([x_i, o], dim=-1)
-                #x_dec_in = x_i
-                #h, _ = self.decoder(x_dec_in, h)
                 sample = self.lin(x_i)
                 output.append(sample)
                 o = sample
