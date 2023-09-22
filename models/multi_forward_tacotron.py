@@ -46,11 +46,12 @@ class AutoregSeriesPredictor(nn.Module):
             x = F.dropout(x, p=self.dropout, training=self.training)
         x = x.transpose(1, 2)
         x, _ = self.rnn(x)
-        x_res = self.lin_enc(x)
+
+        h_dec = torch.zeros(1, x.size(0), self.rnn_dims, device=x.device)
+
         x_dec_in = torch.cat([x, p_in], dim=-1)
         x_dec_in = self.I(x_dec_in)
-        x, _ = self.decoder(x_dec_in)
-        x = x_res + x
+        x, _ = self.decoder(x_dec_in, h_dec)
         x_out = self.lin(x)
         return x_out
 
@@ -73,7 +74,6 @@ class AutoregSeriesPredictor(nn.Module):
             x = F.dropout(x, p=self.dropout, training=self.training)
         x = x.transpose(1, 2)
         x, _ = self.rnn(x)
-        x_res = self.lin_enc(x)
 
         device = next(self.parameters()).device  # use same device as parameters
         rnn = self.get_gru_cell(self.decoder).to(device)
@@ -90,8 +90,7 @@ class AutoregSeriesPredictor(nn.Module):
                 x_dec_in = torch.cat([x_i, o], dim=-1)
                 x_dec_in = self.I(x_dec_in)
                 h = rnn(x_dec_in, h)
-                x_out = x_res[0, i:i+1, :] + h
-                sample = self.lin(x_out)
+                sample = self.lin(h)
                 if self.round:
                     sample = torch.round(sample)
                 output.append(sample)
