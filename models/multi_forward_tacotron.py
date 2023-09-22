@@ -23,8 +23,8 @@ class AutoregSeriesPredictor(nn.Module):
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
         ])
         self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
-        self.I = nn.Linear(2 * rnn_dims, rnn_dims)
-        self.decoder = nn.GRU(rnn_dims, rnn_dims, batch_first=True, bidirectional=False)
+        #self.I = nn.Linear(2 * rnn_dims, rnn_dims)
+        self.decoder = nn.GRU(2*rnn_dims, rnn_dims, batch_first=True, bidirectional=False)
         self.lin_enc = nn.Linear(2 * rnn_dims, rnn_dims)
         self.lin = nn.Linear(rnn_dims, out_dims)
         self.rnn_dims = rnn_dims
@@ -49,7 +49,7 @@ class AutoregSeriesPredictor(nn.Module):
 
         h_dec = torch.zeros(1, x.size(0), self.rnn_dims, device=x.device)
         x_dec_in = x
-        x_dec_in = self.I(x_dec_in)
+        #x_dec_in = self.I(x_dec_in)
         x, _ = self.decoder(x_dec_in, h_dec)
         x_out = self.lin(x)
         return x_out
@@ -88,7 +88,7 @@ class AutoregSeriesPredictor(nn.Module):
                 x_i = x[0, i:i+1, :]
                 #x_dec_in = torch.cat([x_i, o], dim=-1)
                 x_dec_in = x_i
-                x_dec_in = self.I(x_dec_in)
+                #x_dec_in = self.I(x_dec_in)
                 h, _ = self.decoder(x_dec_in, h)
 
                 sample = self.lin(h)
