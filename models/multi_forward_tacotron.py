@@ -36,6 +36,7 @@ class AutoregSeriesPredictor(nn.Module):
                 semb: torch.Tensor,
                 p_in: torch.Tensor) -> torch.Tensor:
 
+        p_in = p_in + torch.rand_like(p_in) / 100.
         x = self.embedding(x)
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
