@@ -14,7 +14,8 @@ from utils.text.symbols import phonemes
 class AutoregSeriesPredictor(nn.Module):
 
     def __init__(self, num_chars, emb_dim=64, conv_dims=256,
-                 rnn_dims=64, dropout=0.5, semb_dims=256, out_dims=1, round=False):
+                 rnn_dims=64, dropout=0.5, semb_dims=256, out_dims=1, round=False,
+                 norm_mean=0., norm_max=0.):
         super().__init__()
         self.embedding = Embedding(num_chars, emb_dim)
         self.convs = torch.nn.ModuleList([
@@ -30,6 +31,8 @@ class AutoregSeriesPredictor(nn.Module):
         self.rnn_dims = rnn_dims
         self.dropout = dropout
         self.round = round
+        self.norm_mean = norm_mean
+        self.norm_max = norm_max
 
     def forward(self,
                 x: torch.Tensor,
@@ -88,7 +91,12 @@ class AutoregSeriesPredictor(nn.Module):
                 x_dec_in = torch.cat([x_i, o], dim=-1)
                 x_dec_in = self.I(x_dec_in)
                 h, _ = self.decoder(x_dec_in, h)
-                sample = self.lin(h)
+                logits = self.lin(h)
+                posterior = F.softmax(logits, dim=1)
+                distrib = torch.distributions.Categorical(posterior)
+                sample = distrib.sample().unsqueeze(0).float()
+                sample = (sample - self.norm_mean) / self.norm_max
+
                 output.append(sample)
                 o = sample
                 if self.round:
@@ -225,20 +233,26 @@ class MultiForwardTacotron(nn.Module):
                                                conv_dims=pitch_cond_conv_dims,
                                                rnn_dims=pitch_cond_rnn_dims,
                                                dropout=pitch_cond_dropout,
-                                               out_dim=pitch_cond_categorical_dims)
+                                               out_dim=pitch_cond_categorical_dims,)
 
         self.dur_pred = AutoregSeriesPredictor(num_chars=num_chars,
-                                                emb_dim=series_embed_dims,
-                                                conv_dims=durpred_conv_dims,
-                                                rnn_dims=durpred_rnn_dims,
-                                                dropout=durpred_dropout,
+                                               emb_dim=series_embed_dims,
+                                               conv_dims=durpred_conv_dims,
+                                               rnn_dims=durpred_rnn_dims,
+                                               dropout=durpred_dropout,
+                                               out_dims=20,
+                                               norm_mean=0,
+                                               norm_max=1,
                                                round=True)
 
         self.pitch_pred = AutoregSeriesPredictor(num_chars=num_chars,
-                                                  emb_dim=series_embed_dims,
-                                                  conv_dims=pitch_conv_dims,
-                                                  rnn_dims=pitch_rnn_dims,
-                                                  dropout=pitch_dropout)
+                                                 emb_dim=series_embed_dims,
+                                                 conv_dims=pitch_conv_dims,
+                                                 rnn_dims=pitch_rnn_dims,
+                                                 dropout=pitch_dropout,
+                                                 norm_mean=128,
+                                                 norm_max=254./6.,
+                                                 out_dims=256)
 
         self.energy_pred = SeriesPredictor(num_chars=num_chars,
                                            emb_dim=series_embed_dims,
@@ -291,11 +305,16 @@ class MultiForwardTacotron(nn.Module):
         b, x_len = x.size()
         zeros = torch.zeros((b, 1), device=device)
         p_zeros = torch.zeros((b, 1, 1), device=device)
-        dur_in = torch.cat([zeros, dur[:, :-1]], dim=-1).unsqueeze(-1)
-        pitch_in = torch.cat([p_zeros, pitch[:, :, :-1]], dim=-1).transpose(1, 2)
+        dur_normed = torch.clamp(dur, min=0, max=19).long()
+        dur_in = torch.cat([zeros, dur_normed[:, :-1]], dim=-1).unsqueeze(-1)
 
+        pitch_normed = torch.clamp(pitch, min=-3, max=3)
+        pitch_normed = pitch_normed * 254 / 6. + 128
+        pitch_normed = pitch_normed.long()
+
+        pitch_in = torch.cat([p_zeros, pitch_normed[:, :, :-1]], dim=-1).transpose(1, 2)
         dur_hat = self.dur_pred(x, semb, dur_in).squeeze(-1)
-        pitch_hat = self.pitch_pred(x, semb, pitch_in).transpose(1, 2)
+        pitch_hat = self.pitch_pred(x, semb, pitch_in)
         energy_hat = self.energy_pred(x, semb).transpose(1, 2)
 
         x = self.embedding(x)
@@ -334,7 +353,8 @@ class MultiForwardTacotron(nn.Module):
 
         return {'mel': x, 'mel_post': x_post,
                 'dur': dur_hat, 'pitch': pitch_hat,
-                'energy': energy_hat, 'pitch_cond': pitch_cond_hat}
+                'energy': energy_hat, 'pitch_cond': pitch_cond_hat, 'dur_target': dur_normed,
+                'pitch_target': pitch_normed}
 
     def generate(self,
                  x: torch.Tensor,

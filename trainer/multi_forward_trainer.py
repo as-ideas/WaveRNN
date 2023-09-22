@@ -82,9 +82,11 @@ class MultiForwardTrainer:
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
-                dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
-                pitch_loss = self.l1_loss(pred['pitch'], pitch_target.unsqueeze(1), batch['x_len'])
+                dur_loss = self.ce_loss(pred['dur'].transpose(1, 2), pred['dur_target'].squeeze())
+                pitch_loss = self.ce_loss(pred['pitch'].transpose(1, 2), pred['pitch_target'].squeeze())
+
                 energy_loss = self.l1_loss(pred['energy'], energy_target.unsqueeze(1), batch['x_len'])
+
                 pitch_cond_loss = self.ce_loss(pred['pitch_cond'].transpose(1, 2), batch['pitch_cond'])
 
                 loss = m1_loss + m2_loss \
@@ -160,8 +162,8 @@ class MultiForwardTrainer:
                 pred = model(batch)
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
-                dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
-                pitch_loss = self.l1_loss(pred['pitch'], batch['pitch'].unsqueeze(1), batch['x_len'])
+                dur_loss = self.ce_loss(pred['dur'].transpose(1, 2), pred['dur_target'].squeeze())
+                pitch_loss = self.ce_loss(pred['pitch'].transpose(1, 2), pred['pitch_target'].squeeze())
                 energy_loss = self.l1_loss(pred['energy'], batch['energy'].unsqueeze(1), batch['x_len'])
                 pitch_cond_loss = self.ce_loss(pred['pitch_cond'].transpose(1, 2), batch['pitch_cond'])
                 pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
