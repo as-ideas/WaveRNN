@@ -234,7 +234,7 @@ class MultiForwardTacotron(nn.Module):
                                                 conv_dims=durpred_conv_dims,
                                                 rnn_dims=durpred_rnn_dims,
                                                 dropout=durpred_dropout,
-                                               round=True)
+                                               round=False)
 
         self.pitch_pred = AutoregSeriesPredictor(num_chars=num_chars,
                                                   emb_dim=series_embed_dims,
