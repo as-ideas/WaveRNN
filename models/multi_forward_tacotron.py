@@ -309,8 +309,8 @@ class MultiForwardTacotron(nn.Module):
         dur_in = torch.cat([zeros, dur_normed[:, :-1]], dim=-1).unsqueeze(-1)
 
         pitch_normed = torch.clamp(pitch, min=-3, max=3)
-        pitch_normed = pitch_normed * 254 / 6. + 128
-        pitch_normed = pitch_normed.long()
+        pitch_normed_out = pitch_normed * 254 / 6. + 128
+        pitch_normed_out = pitch_normed_out.long()
 
         pitch_in = torch.cat([p_zeros, pitch_normed[:, :, :-1]], dim=-1).transpose(1, 2)
         dur_hat = self.dur_pred(x, semb, dur_in).squeeze(-1)
@@ -354,7 +354,7 @@ class MultiForwardTacotron(nn.Module):
         return {'mel': x, 'mel_post': x_post,
                 'dur': dur_hat, 'pitch': pitch_hat,
                 'energy': energy_hat, 'pitch_cond': pitch_cond_hat, 'dur_target': dur_normed,
-                'pitch_target': pitch_normed}
+                'pitch_target': pitch_normed_out}
 
     def generate(self,
                  x: torch.Tensor,
