@@ -26,7 +26,7 @@ class AutoregSeriesPredictor(nn.Module):
         #self.I = nn.Linear(2 * rnn_dims, rnn_dims)
         self.decoder = nn.GRU(2*rnn_dims, rnn_dims, batch_first=True, bidirectional=False)
         self.lin_enc = nn.Linear(2 * rnn_dims, rnn_dims)
-        self.lin = nn.Linear(rnn_dims, out_dims)
+        self.lin = nn.Linear(2*rnn_dims, out_dims)
         self.rnn_dims = rnn_dims
         self.dropout = dropout
         self.round = round
@@ -47,10 +47,10 @@ class AutoregSeriesPredictor(nn.Module):
         x = x.transpose(1, 2)
         x, _ = self.rnn(x)
 
-        h_dec = torch.zeros(1, x.size(0), self.rnn_dims, device=x.device)
-        x_dec_in = x
+        #h_dec = torch.zeros(1, x.size(0), self.rnn_dims, device=x.device)
+        #x_dec_in = x
         #x_dec_in = self.I(x_dec_in)
-        x, _ = self.decoder(x_dec_in, h_dec)
+        #x, _ = self.decoder(x_dec_in, h_dec)
         x_out = self.lin(x)
         return x_out
 
@@ -76,7 +76,6 @@ class AutoregSeriesPredictor(nn.Module):
             x, _ = self.rnn(x)
 
             device = next(self.parameters()).device  # use same device as parameters
-            rnn = self.get_gru_cell(self.decoder).to(device)
             b_size, seq_len, _ = x.size()
 
             h = torch.zeros(b_size, self.rnn_dims, device=device)
@@ -87,11 +86,9 @@ class AutoregSeriesPredictor(nn.Module):
             for i in range(seq_len):
                 x_i = x[0, i:i+1, :]
                 #x_dec_in = torch.cat([x_i, o], dim=-1)
-                x_dec_in = x_i
-                #x_dec_in = self.I(x_dec_in)
-                h, _ = self.decoder(x_dec_in, h)
-
-                sample = self.lin(h)
+                #x_dec_in = x_i
+                #h, _ = self.decoder(x_dec_in, h)
+                sample = self.lin(x_i)
                 output.append(sample)
                 o = sample
 
