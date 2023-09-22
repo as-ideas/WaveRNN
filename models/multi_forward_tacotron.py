@@ -48,8 +48,6 @@ class AutoregSeriesPredictor(nn.Module):
         x, _ = self.rnn(x)
 
         h_dec = torch.zeros(1, x.size(0), self.rnn_dims, device=x.device)
-
-        #x_dec_in = torch.cat([x, p_in], dim=-1)
         x_dec_in = x
         x_dec_in = self.I(x_dec_in)
         x, _ = self.decoder(x_dec_in, h_dec)
@@ -91,14 +89,11 @@ class AutoregSeriesPredictor(nn.Module):
                 #x_dec_in = torch.cat([x_i, o], dim=-1)
                 x_dec_in = x_i
                 x_dec_in = self.I(x_dec_in)
-                h = rnn(x_dec_in, h)
+                h, _ = self.decoder(x_dec_in, h)
+
                 sample = self.lin(h)
-                #if self.round:
-                #    sample = torch.round(sample)
                 output.append(sample)
                 o = sample
-                if self.round:
-                    o *= 0
 
             output = torch.stack(output)
         return output
@@ -353,14 +348,14 @@ class MultiForwardTacotron(nn.Module):
             pitch_cond_hat = self.pitch_cond_pred(x, speaker_emb).squeeze(-1)
             pitch_cond_hat = torch.argmax(pitch_cond_hat.squeeze(), dim=1).long().unsqueeze(0)
             dur_hat = self.dur_pred.generate(x, speaker_emb).squeeze(-1)
-            if torch.sum(dur_hat.long()) <= 0:
-                torch.fill_(dur_hat, value=2.)
+            dur_hat_for = self.dur_pred(x, speaker_emb, torch.zeros(dur_hat.size(), device=dur_hat.device)).squeeze(-1)
             pitch_hat = self.pitch_pred.generate(x, speaker_emb).transpose(0, 1).transpose(1, 2)
             pitch_hat = pitch_function(pitch_hat)
             energy_hat = self.energy_pred(x, speaker_emb).transpose(1, 2)
             energy_hat = energy_function(energy_hat)
 
             print('dur', dur_hat.squeeze())
+            print('dur_forward', dur_hat_for.squeeze())
             print('pitch', pitch_hat.squeeze())
 
             return self._generate_mel(x=x,
