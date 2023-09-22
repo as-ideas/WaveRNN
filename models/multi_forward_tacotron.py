@@ -97,6 +97,8 @@ class AutoregSeriesPredictor(nn.Module):
                     sample = torch.round(sample)
                 output.append(sample)
                 o = sample
+                if self.round:
+                    o *= 0
 
         output = torch.stack(output)
         return output
