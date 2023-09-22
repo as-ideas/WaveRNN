@@ -36,7 +36,8 @@ class AutoregSeriesPredictor(nn.Module):
                 semb: torch.Tensor,
                 p_in: torch.Tensor) -> torch.Tensor:
 
-        p_in = p_in + torch.rand_like(p_in) / 100.
+        if self.round:
+            p_in = p_in * 0.
         x = self.embedding(x)
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
@@ -235,7 +236,7 @@ class MultiForwardTacotron(nn.Module):
                                                 conv_dims=durpred_conv_dims,
                                                 rnn_dims=durpred_rnn_dims,
                                                 dropout=durpred_dropout,
-                                               round=False)
+                                               round=True)
 
         self.pitch_pred = AutoregSeriesPredictor(num_chars=num_chars,
                                                   emb_dim=series_embed_dims,
