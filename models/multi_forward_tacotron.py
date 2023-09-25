@@ -22,9 +22,10 @@ class Discriminator(nn.Module):
             BatchNormConv(256, 256, 3, relu=True),
             BatchNormConv(256, 256, 3, relu=True),
         ])
-        self.gru1 = nn.GRU(256, 64, bidirectional=True)
-        self.gru2 = nn.GRU(2, 64, bidirectional=True)
-        self.lin = nn.Linear(256, 1)
+        self.gru1 = nn.GRU(256, 128, bidirectional=True)
+        self.gru2 = nn.GRU(64, 64, bidirectional=True)
+        self.conv_post = nn.Conv1d(2, 64, 3, padding=1)
+        self.lin = nn.Linear(256 + 128, 1)
 
     def forward(self, x, dur, pitch, semb, x_cond):
         emb = self.embedding(x)
@@ -36,9 +37,13 @@ class Discriminator(nn.Module):
         x = x.transpose(1, 2)
         for conv in self.convs:
             x = conv(x)
+            x = F.dropout(x, p=0.5, training=self.training)
         x = x.transpose(1, 2)
         x1, _ = self.gru1(x)
         x2 = torch.cat([dur, pitch], dim=-1)
+        x2 = x2.transpose(1, 2)
+        x2 = self.conv_post(x2)
+        x2 = x2.transpose(1, 2)
         x2, _ = self.gru2(x2)
         x = torch.cat([x1, x2], dim=-1)
         x = self.lin(x)
