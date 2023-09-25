@@ -84,8 +84,8 @@ class MultiForwardTrainer:
 
                 pred = model(batch)
 
-                m1_loss = 0*self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
-                m2_loss = 0*self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
+                m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
+                m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
                 d_loss = 0
                 score_fake = disc(batch['x'], batch['dur'], pred['mel_post'].detach(), batch['speaker_emb'])
@@ -114,7 +114,7 @@ class MultiForwardTrainer:
                 energy_loss = self.l1_loss(pred['energy'], energy_target.unsqueeze(1), batch['x_len'])
                 pitch_cond_loss = self.ce_loss(pred['pitch_cond'].transpose(1, 2), batch['pitch_cond'])
 
-                loss = m1_loss + m2_loss \
+                loss = 0.1*m1_loss + 0.1*m2_loss \
                        + self.train_cfg['dur_loss_factor'] * dur_loss \
                        + self.train_cfg['pitch_loss_factor'] * pitch_loss \
                        + self.train_cfg['energy_loss_factor'] * energy_loss \
