@@ -17,7 +17,7 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
         self.embedding = Embedding(len(phonemes), 64)
         self.convs = torch.nn.ModuleList([
-            BatchNormConv(80, 256, 3, relu=True),
+            BatchNormConv(80 + 256, 256, 3, relu=True),
             BatchNormConv(256, 256, 3, relu=True),
             BatchNormConv(256, 256, 3, relu=True),
         ])
@@ -29,10 +29,10 @@ class Discriminator(nn.Module):
 
     def forward(self, x, dur, mel, semb):
 
-        #speaker_emb = semb[:, :, None]
-        #speaker_emb = speaker_emb.repeat(1, 1, mel.shape[2])
+        speaker_emb = semb[:, :, None]
+        speaker_emb = speaker_emb.repeat(1, 1, mel.shape[2])
 
-        mel = torch.cat([mel], dim=1)
+        mel = torch.cat([mel, speaker_emb], dim=1)
         for conv in self.convs:
             mel = conv(mel)
         mel = mel.transpose(1, 2)
