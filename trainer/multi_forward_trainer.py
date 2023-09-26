@@ -71,7 +71,7 @@ class MultiForwardTrainer:
         device = next(model.parameters()).device  # use same device as model parameters
 
         disc = Discriminator().to(device)
-        d_optim = Adam(disc.parameters(), lr=1e-4)
+        d_optim = Adam(disc.parameters(), lr=2e-5)
 
         for e in range(1, epochs + 1):
             for i, batch in enumerate(session.train_set, 1):
@@ -94,8 +94,8 @@ class MultiForwardTrainer:
                                   batch['pitch'].unsqueeze(-1), batch['speaker_emb'], batch['pitch_cond'])
 
                 for b in range(batch['x'].size(0)):
-                    d_loss += torch.pow(score_real[b, :batch['x_len'][b], :] - 1.0, 2).mean()
-                    d_loss += torch.pow(score_fake[b, :batch['x_len'][b], :], 2).mean()
+                    d_loss += F.relu(1.0 - score_real[b, :batch['x_len'][b], :]).mean()
+                    d_loss += F.relu(1.0 + score_fake[b, :batch['x_len'][b], :]).mean()
 
                 d_loss /= batch['x'].size(0)
                 d_optim.zero_grad()
@@ -106,7 +106,7 @@ class MultiForwardTrainer:
                                   batch['speaker_emb'], batch['pitch_cond'])
                 g_loss = 0
                 for b in range(batch['x'].size(0)):
-                    g_loss += torch.pow(score_fake[b, :batch['x_len'][b], :] - 1.0, 2).mean()
+                    g_loss += -score_fake[b, :batch['x_len'][b], :].mean()
                 g_loss /= batch['x'].size(0)
 
                 print('g_loss', g_loss)
@@ -122,7 +122,7 @@ class MultiForwardTrainer:
                        + self.train_cfg['pitch_loss_factor'] * pitch_loss \
                        + self.train_cfg['energy_loss_factor'] * energy_loss \
                        + self.train_cfg['pitch_cond_loss_factor'] * pitch_cond_loss \
-                       + g_loss
+                       + 0.1 * g_loss
 
                 pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
                 pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()
