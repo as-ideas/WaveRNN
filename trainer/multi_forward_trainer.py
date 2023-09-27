@@ -153,6 +153,7 @@ class MultiForwardTrainer:
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
                 self.writer.add_scalar('Params/learning_rate', session.lr, model.get_step())
                 self.writer.add_scalar('KL_loss/train', kl_loss, model.get_step())
+                self.writer.add_scalar('KL_diff_loss/train', kl_diff_loss, model.get_step())
 
                 stream(msg)
 
