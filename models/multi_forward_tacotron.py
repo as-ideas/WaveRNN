@@ -228,8 +228,8 @@ class MultiForwardTacotron(nn.Module):
 
         x, _ = pad_packed_sequence(x, padding_value=self.padding_value, batch_first=True)
 
-        z_mean = self.lin_m(x)
-        z_log_var = self.lin_v(x)
+        z_mean = F.leaky_relu(self.lin_m(x), negative_slope=0.2)
+        z_log_var = F.leaky_relu(self.lin_v(x), negative_slope=0.2)
         noise = torch.rand_like(z_log_var).to(x.device)
         z = z_mean + torch.exp(0.5 * z_log_var) * noise
 
@@ -302,8 +302,9 @@ class MultiForwardTacotron(nn.Module):
 
         x, _ = self.lstm(x)
 
-        z_mean = self.lin_m(x)
-        z_log_var = self.lin_v(x)
+        z_mean = F.leaky_relu(self.lin_m(x), negative_slope=0.2)
+        z_log_var = F.leaky_relu(self.lin_v(x), negative_slope=0.2)
+
         noise = torch.rand_like(z_log_var).to(x.device)
         z = z_mean + torch.exp(0.5 * z_log_var) * noise
 
