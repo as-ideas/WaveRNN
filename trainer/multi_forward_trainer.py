@@ -87,6 +87,14 @@ class MultiForwardTrainer:
                 energy_loss = self.l1_loss(pred['energy'], energy_target.unsqueeze(1), batch['x_len'])
                 pitch_cond_loss = self.ce_loss(pred['pitch_cond'].transpose(1, 2), batch['pitch_cond'])
 
+
+                kl_loss = 0
+                B = pred['mel'].size(0)
+                for b in range(B):
+                    kl_loss += 0.5 * torch.sum(1 + pred['z_log_var'][b]
+                                               - pred['z_mean'][b].pow(2) - pred['z_log_var'][b].exp())
+                kl_loss /= B
+
                 loss = m1_loss + m2_loss \
                        + self.train_cfg['dur_loss_factor'] * dur_loss \
                        + self.train_cfg['pitch_loss_factor'] * pitch_loss \

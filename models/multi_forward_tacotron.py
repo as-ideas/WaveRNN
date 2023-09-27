@@ -165,7 +165,8 @@ class MultiForwardTacotron(nn.Module):
                             rnn_dims,
                             batch_first=True,
                             bidirectional=True)
-        self.lin = torch.nn.Linear(2 * rnn_dims, n_mels)
+        self.lin_m_v = torch.nn.Linear(2 * rnn_dims, 1024)
+        self.lin = torch.nn.Linear(512, n_mels)
         self.register_buffer('step', torch.zeros(1, dtype=torch.long))
         self.postnet = CBHG(K=postnet_k,
                             in_channels=n_mels,
@@ -226,6 +227,12 @@ class MultiForwardTacotron(nn.Module):
 
         x, _ = pad_packed_sequence(x, padding_value=self.padding_value, batch_first=True)
 
+        z_mean, z_log_var = self.lin_m_v(x)
+        noise = torch.rand_like(z_log_var).to(x.device)
+        z = z_mean + torch.exp(0.5 * z_log_var) * noise
+
+        x = self.lin(z)
+
         x = self.lin(x)
         x = x.transpose(1, 2)
 
@@ -238,7 +245,8 @@ class MultiForwardTacotron(nn.Module):
 
         return {'mel': x, 'mel_post': x_post,
                 'dur': dur_hat, 'pitch': pitch_hat,
-                'energy': energy_hat, 'pitch_cond': pitch_cond_hat}
+                'energy': energy_hat, 'pitch_cond': pitch_cond_hat,
+                'z_mean': z_mean, 'z_log_var': z_log_var}
 
     def generate(self,
                  x: torch.Tensor,
