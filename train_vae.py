@@ -179,6 +179,6 @@ if __name__ == '__main__':
         fig = plt.figure()
         plt.imshow(x[idx].cpu().numpy())
 
-    print(label[0])
-    show_image(x_hat, idx=0)
+    print(label[1])
+    show_image(x_hat, idx=1)
     plt.show()
