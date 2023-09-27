@@ -91,7 +91,7 @@ class MultiForwardTrainer:
                 kl_loss = 0
                 B = pred['mel'].size(0)
                 for b in range(B):
-                    kl_loss += 0.5 * torch.sum(1 + pred['z_log_var'][b]
+                    kl_loss += - 0.5 * torch.sum(1 + pred['z_log_var'][b]
                                                - pred['z_mean'][b].pow(2) - pred['z_log_var'][b].exp())
                 kl_loss /= B
 
