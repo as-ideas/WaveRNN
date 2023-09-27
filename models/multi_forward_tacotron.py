@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn import Embedding
+from torch.nn import Embedding, Sequential
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 from models.common_layers import CBHG, LengthRegulator, BatchNormConv
@@ -168,8 +168,11 @@ class MultiForwardTacotron(nn.Module):
                             bidirectional=True)
         self.lin_m = torch.nn.Linear(2 * rnn_dims, 512)
         self.lin_v = torch.nn.Linear(2 * rnn_dims, 512)
-        #self.lin_m_mel = torch.nn.Linear(80, 512)
-        #self.lin_v_mel = torch.nn.Linear(80, 512)
+        self.lin_m_mel = nn.GRU(80, 256, batch_first=True, bidirectional=True)
+        self.lin_v_mel = nn.GRU(80, 256, batch_first=True, bidirectional=True)
+        self.lin_m_mel_2 = nn.Linear(512, 512)
+        self.lin_v_mel_2 = nn.Linear(512, 512)
+
         self.lin = torch.nn.Linear(512, 512)
         self.lin_2 = torch.nn.Linear(512, n_mels)
         self.register_buffer('step', torch.zeros(1, dtype=torch.long))
@@ -232,8 +235,14 @@ class MultiForwardTacotron(nn.Module):
 
         x, _ = pad_packed_sequence(x, padding_value=self.padding_value, batch_first=True)
 
-        z_mean = F.leaky_relu(self.lin_m(x), negative_slope=0.2)
-        z_log_var = F.leaky_relu(self.lin_v(x), negative_slope=0.2)
+        z_mean, _ = self.lin_m_mel(mel.transpose(1, 2))
+        z_mean = self.lin_m_mel_2(F.leaky_relu(z_mean))
+        z_log_var, _ = self.lin_v_mel(mel.transpose(1, 2))
+        z_log_var = self.lin_v_mel_2(F.leaky_relu(z_log_var))
+
+        z_mean_ft = F.leaky_relu(self.lin_m(x), negative_slope=0.2)
+        z_log_var_ft = F.leaky_relu(self.lin_v(x), negative_slope=0.2)
+
         noise = torch.rand_like(z_log_var).to(x.device)
         z = z_mean + torch.exp(0.5 * z_log_var) * noise
 
@@ -252,7 +261,7 @@ class MultiForwardTacotron(nn.Module):
         return {'mel': x, 'mel_post': x_post,
                 'dur': dur_hat, 'pitch': pitch_hat,
                 'energy': energy_hat, 'pitch_cond': pitch_cond_hat,
-                'z_mean': z_mean, 'z_log_var': z_log_var}
+                'z_mean': z_mean, 'z_log_var': z_log_var, 'z_mean_ft': z_mean_ft, 'z_log_var_ft': z_log_var_ft}
 
     def generate(self,
                  x: torch.Tensor,
