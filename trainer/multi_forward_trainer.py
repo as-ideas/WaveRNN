@@ -99,8 +99,10 @@ class MultiForwardTrainer:
                        + self.train_cfg['dur_loss_factor'] * dur_loss \
                        + self.train_cfg['pitch_loss_factor'] * pitch_loss \
                        + self.train_cfg['energy_loss_factor'] * energy_loss \
-                       + self.train_cfg['pitch_cond_loss_factor'] * pitch_cond_loss
+                       + self.train_cfg['pitch_cond_loss_factor'] * pitch_cond_loss \
+                       + kl_loss
 
+                print(kl_loss)
                 pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
                 pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()
 
@@ -137,6 +139,7 @@ class MultiForwardTrainer:
                 self.writer.add_scalar('Pitch_Cond_Accuracy/train', pitch_cond_acc, model.get_step())
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
                 self.writer.add_scalar('Params/learning_rate', session.lr, model.get_step())
+                self.writer.add_scalar('KL_loss/train', kl_loss, model.get_step())
 
                 stream(msg)
 
