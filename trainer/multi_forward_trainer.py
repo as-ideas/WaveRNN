@@ -92,9 +92,9 @@ class MultiForwardTrainer:
                 kl_diff_loss = 0
                 B = pred['mel'].size(0)
                 for b in range(B):
-                    m_len = batch['mel_len'][b]
-                    kl_loss += - 0.5 * torch.sum(1 + pred['z_log_var'][b, :m_len, :]
-                                               - pred['z_mean'][b, :m_len, :].pow(2) - pred['z_log_var'][b, :m_len, :].exp(), dim=-1).mean()
+                    x_len = batch['x_len'][b]
+                    kl_loss += - 0.5 * torch.sum(1 + pred['z_log_var'][b, :x_len, :]
+                                               - pred['z_mean'][b, :x_len, :].pow(2) - pred['z_log_var'][b, :x_len, :].exp(), dim=-1).mean()
                     #z_mean = pred['z_mean'][b, :m_len, :]
                     #z_log = pred['z_log_var'][b, :m_len, :]
                     #z_mean_ft = pred['z_mean_ft'][b, :m_len, :]
