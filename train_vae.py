@@ -154,7 +154,7 @@ if __name__ == '__main__':
 
             x_hat, mean, log_var = model(x, label)
             loss = loss_function(x, x_hat, mean, log_var)
-
+            print(torch.mean(mean), torch.mean(log_var.exp()))
             overall_loss += loss.item()
 
             loss.backward()
