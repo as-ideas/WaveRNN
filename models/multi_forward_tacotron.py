@@ -162,7 +162,7 @@ class MultiForwardTacotron(nn.Module):
                            proj_channels=[prenet_dims, embed_dims],
                            num_highways=prenet_num_highways,
                            dropout=prenet_dropout)
-        self.lstm = nn.LSTM(2 * prenet_dims + speaker_emb_dims,
+        self.lstm = nn.LSTM(2 * prenet_dims,
                             rnn_dims,
                             batch_first=True,
                             bidirectional=True)
@@ -173,8 +173,8 @@ class MultiForwardTacotron(nn.Module):
         self.lin_m_mel_2 = nn.Linear(512, 512)
         self.lin_v_mel_2 = nn.Linear(512, 512)
 
-        self.lin = torch.nn.Linear(512, 512)
-        self.lin_2 = torch.nn.Linear(512, n_mels)
+        self.lin = torch.nn.Linear(512 + speaker_emb_dims, 512)
+        self.lin_2 = torch.nn.Linear(512 + speaker_emb_dims, n_mels)
         self.register_buffer('step', torch.zeros(1, dtype=torch.long))
         self.postnet = CBHG(K=postnet_k,
                             in_channels=n_mels,
@@ -185,8 +185,8 @@ class MultiForwardTacotron(nn.Module):
         self.post_proj = nn.Linear(2 * postnet_dims, n_mels, bias=False)
         self.pitch_strength = pitch_strength
         self.energy_strength = energy_strength
-        self.pitch_proj = nn.Conv1d(1, 2 * prenet_dims + speaker_emb_dims, kernel_size=3, padding=1)
-        self.energy_proj = nn.Conv1d(1, 2 * prenet_dims + speaker_emb_dims, kernel_size=3, padding=1)
+        self.pitch_proj = nn.Conv1d(1, 2 * prenet_dims, kernel_size=3, padding=1)
+        self.energy_proj = nn.Conv1d(1, 2 * prenet_dims, kernel_size=3, padding=1)
 
     def __repr__(self):
         num_params = sum([np.prod(p.size()) for p in self.parameters()])
@@ -214,9 +214,6 @@ class MultiForwardTacotron(nn.Module):
         x = self.embedding(x)
         x = x.transpose(1, 2)
         x = self.prenet(x)
-        speaker_emb = semb[:, None, :]
-        speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
-        x = torch.cat([x, speaker_emb], dim=2)
 
         pitch_proj = self.pitch_proj(pitch)
         pitch_proj = pitch_proj.transpose(1, 2)
@@ -245,6 +242,10 @@ class MultiForwardTacotron(nn.Module):
 
         noise = torch.rand_like(z_log_var).to(x.device)
         z = z_mean + torch.exp(0.5 * z_log_var) * noise
+
+        speaker_emb = semb[:, None, :]
+        speaker_emb = speaker_emb.repeat(1, z.shape[1], 1)
+        z = torch.cat([z, speaker_emb], dim=2)
 
         x = F.leaky_relu(self.lin(z), negative_slope=0.2)
         x = F.leaky_relu(self.lin_2(x), negative_slope=0.2)
@@ -300,9 +301,6 @@ class MultiForwardTacotron(nn.Module):
         x = self.embedding(x)
         x = x.transpose(1, 2)
         x = self.prenet(x)
-        speaker_emb = semb[:, None, :]
-        speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
-        x = torch.cat([x, speaker_emb], dim=2)
 
         pitch_proj = self.pitch_proj(pitch_hat)
         pitch_proj = pitch_proj.transpose(1, 2)
@@ -321,6 +319,10 @@ class MultiForwardTacotron(nn.Module):
 
         noise = torch.rand_like(z_log_var).to(x.device)
         z = z_mean + torch.exp(0.5 * z_log_var) * noise
+
+        speaker_emb = semb[:, None, :]
+        speaker_emb = speaker_emb.repeat(1, z.shape[1], 1)
+        z = torch.cat([z, speaker_emb], dim=2)
 
         x = F.leaky_relu(self.lin(z), negative_slope=0.2)
         x = F.leaky_relu(self.lin_2(x), negative_slope=0.2)
