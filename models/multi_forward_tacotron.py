@@ -174,7 +174,7 @@ class MultiForwardTacotron(nn.Module):
         self.lin_v_mel_2 = nn.Linear(512, 512)
 
         self.lin = torch.nn.Linear(512 + speaker_emb_dims, 512)
-        self.lin_2 = torch.nn.Linear(512 + speaker_emb_dims, n_mels)
+        self.lin_2 = torch.nn.Linear(512, n_mels)
         self.register_buffer('step', torch.zeros(1, dtype=torch.long))
         self.postnet = CBHG(K=postnet_k,
                             in_channels=n_mels,
