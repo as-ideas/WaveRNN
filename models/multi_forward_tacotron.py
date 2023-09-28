@@ -162,19 +162,19 @@ class MultiForwardTacotron(nn.Module):
                            proj_channels=[prenet_dims, embed_dims],
                            num_highways=prenet_num_highways,
                            dropout=prenet_dropout)
-        self.lstm = nn.LSTM(2 * prenet_dims,
+        self.lstm = nn.LSTM(2 * prenet_dims + speaker_emb_dims,
                             rnn_dims,
                             batch_first=True,
                             bidirectional=True)
-        self.lin_m = torch.nn.Linear(2 * rnn_dims, 512)
-        self.lin_v = torch.nn.Linear(2 * rnn_dims, 512)
-        self.lin_m_mel = nn.GRU(80, 256, batch_first=True, bidirectional=True)
-        self.lin_v_mel = nn.GRU(80, 256, batch_first=True, bidirectional=True)
-        self.lin_m_mel_2 = nn.Linear(512, 512)
-        self.lin_v_mel_2 = nn.Linear(512, 512)
+        self.lin_m = torch.nn.Linear(2 * prenet_dims, 512)
+        self.lin_v = torch.nn.Linear(2 * prenet_dims, 512)
+        #self.lin_m_mel = nn.GRU(80, 256, batch_first=True, bidirectional=True)
+        #self.lin_v_mel = nn.GRU(80, 256, batch_first=True, bidirectional=True)
+        #self.lin_m_mel_2 = nn.Linear(512, 512)
+        #self.lin_v_mel_2 = nn.Linear(512, 512)
 
-        self.lin = torch.nn.Linear(512 + speaker_emb_dims, 512)
-        self.lin_2 = torch.nn.Linear(512, n_mels)
+        self.lin = torch.nn.Linear(2*rnn_dims, 80)
+        #self.lin_2 = torch.nn.Linear(512, n_mels)
         self.register_buffer('step', torch.zeros(1, dtype=torch.long))
         self.postnet = CBHG(K=postnet_k,
                             in_channels=n_mels,
@@ -223,7 +223,16 @@ class MultiForwardTacotron(nn.Module):
         energy_proj = energy_proj.transpose(1, 2)
         x = x + energy_proj * self.energy_strength
 
-        x = self.lr(x, dur)
+        z_mean = F.leaky_relu(self.lin_m(x), negative_slope=0.2)
+        z_log_var = F.leaky_relu(self.lin_v(x), negative_slope=0.2)
+        noise = torch.rand_like(z_log_var).to(x.device)
+        z = z_mean + torch.exp(0.5 * z_log_var) * noise
+
+        speaker_emb = semb[:, None, :]
+        speaker_emb = speaker_emb.repeat(1, z.shape[1], 1)
+        z = torch.cat([z, speaker_emb], dim=2)
+
+        x = self.lr(z, dur)
 
         x = pack_padded_sequence(x, lengths=mel_lens.cpu(), enforce_sorted=False,
                                  batch_first=True)
@@ -232,23 +241,7 @@ class MultiForwardTacotron(nn.Module):
 
         x, _ = pad_packed_sequence(x, padding_value=self.padding_value, batch_first=True)
 
-        z_mean, _ = self.lin_m_mel(mel.transpose(1, 2))
-        z_mean = self.lin_m_mel_2(F.leaky_relu(z_mean))
-        z_log_var, _ = self.lin_v_mel(mel.transpose(1, 2))
-        z_log_var = self.lin_v_mel_2(F.leaky_relu(z_log_var))
-
-        z_mean_ft = F.leaky_relu(self.lin_m(x), negative_slope=0.2)
-        z_log_var_ft = F.leaky_relu(self.lin_v(x), negative_slope=0.2)
-
-        noise = torch.rand_like(z_log_var).to(x.device)
-        z = z_mean + torch.exp(0.5 * z_log_var) * noise
-
-        speaker_emb = semb[:, None, :]
-        speaker_emb = speaker_emb.repeat(1, z.shape[1], 1)
-        z = torch.cat([z, speaker_emb], dim=2)
-
-        x = F.leaky_relu(self.lin(z), negative_slope=0.2)
-        x = F.leaky_relu(self.lin_2(x), negative_slope=0.2)
+        x = self.lin(x)
 
         x = x.transpose(1, 2)
 
@@ -262,7 +255,7 @@ class MultiForwardTacotron(nn.Module):
         return {'mel': x, 'mel_post': x_post,
                 'dur': dur_hat, 'pitch': pitch_hat,
                 'energy': energy_hat, 'pitch_cond': pitch_cond_hat,
-                'z_mean': z_mean, 'z_log_var': z_log_var, 'z_mean_ft': z_mean_ft, 'z_log_var_ft': z_log_var_ft}
+                'z_mean': z_mean, 'z_log_var': z_log_var}
 
     def generate(self,
                  x: torch.Tensor,
@@ -310,13 +303,8 @@ class MultiForwardTacotron(nn.Module):
         energy_proj = energy_proj.transpose(1, 2)
         x = x + energy_proj * self.energy_strength
 
-        x = self.lr(x, dur_hat)
-
-        x, _ = self.lstm(x)
-
         z_mean = F.leaky_relu(self.lin_m(x), negative_slope=0.2)
         z_log_var = F.leaky_relu(self.lin_v(x), negative_slope=0.2)
-
         noise = torch.rand_like(z_log_var).to(x.device)
         z = z_mean + torch.exp(0.5 * z_log_var) * noise
 
@@ -324,8 +312,11 @@ class MultiForwardTacotron(nn.Module):
         speaker_emb = speaker_emb.repeat(1, z.shape[1], 1)
         z = torch.cat([z, speaker_emb], dim=2)
 
-        x = F.leaky_relu(self.lin(z), negative_slope=0.2)
-        x = F.leaky_relu(self.lin_2(x), negative_slope=0.2)
+        x = self.lr(z, dur_hat)
+
+        x, _ = self.lstm(x)
+
+        x = self.lin(x)
 
         x = x.transpose(1, 2)
 

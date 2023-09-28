@@ -95,15 +95,15 @@ class MultiForwardTrainer:
                     m_len = batch['mel_len'][b]
                     kl_loss += - 0.5 * torch.sum(1 + pred['z_log_var'][b, :m_len, :]
                                                - pred['z_mean'][b, :m_len, :].pow(2) - pred['z_log_var'][b, :m_len, :].exp(), dim=-1).mean()
-                    z_mean = pred['z_mean'][b, :m_len, :]
-                    z_log = pred['z_log_var'][b, :m_len, :]
-                    z_mean_ft = pred['z_mean_ft'][b, :m_len, :]
-                    z_log_ft = pred['z_log_var_ft'][b, :m_len, :]
+                    #z_mean = pred['z_mean'][b, :m_len, :]
+                    #z_log = pred['z_log_var'][b, :m_len, :]
+                    #z_mean_ft = pred['z_mean_ft'][b, :m_len, :]
+                    #z_log_ft = pred['z_log_var_ft'][b, :m_len, :]
 
-                    kl_tens = (z_log_ft - z_log + 0.5 * (torch.exp(z_log).pow(2)  + (z_mean - z_mean_ft).pow(2)) / torch.exp(z_log_ft).pow(2) - 0.5)
-                    kl_tens = torch.sum(kl_tens, dim=-1)
-                    kl_tens = kl_tens.mean()
-                    kl_diff_loss += kl_tens
+                    #kl_tens = (z_log_ft - z_log + 0.5 * (torch.exp(z_log).pow(2)  + (z_mean - z_mean_ft).pow(2)) / torch.exp(z_log_ft).pow(2) - 0.5)
+                    #kl_tens = torch.sum(kl_tens, dim=-1)
+                    #kl_tens = kl_tens.mean()
+                    #kl_diff_loss += kl_tens
 
                 kl_loss /= B
                 kl_diff_loss /= B
@@ -113,9 +113,9 @@ class MultiForwardTrainer:
                        + self.train_cfg['pitch_loss_factor'] * pitch_loss \
                        + self.train_cfg['energy_loss_factor'] * energy_loss \
                        + self.train_cfg['pitch_cond_loss_factor'] * pitch_cond_loss \
-                       + kl_loss + kl_diff_loss
+                       + kl_loss #+ kl_diff_loss
 
-                print(kl_loss, kl_diff_loss)
+                #print(kl_loss, kl_diff_loss)
                 pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
                 pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()
 
@@ -153,7 +153,7 @@ class MultiForwardTrainer:
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
                 self.writer.add_scalar('Params/learning_rate', session.lr, model.get_step())
                 self.writer.add_scalar('KL_loss/train', kl_loss, model.get_step())
-                self.writer.add_scalar('KL_diff_loss/train', kl_diff_loss, model.get_step())
+                #self.writer.add_scalar('KL_diff_loss/train', kl_diff_loss, model.get_step())
 
                 stream(msg)
 
