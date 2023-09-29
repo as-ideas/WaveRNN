@@ -25,7 +25,7 @@ class VAEPredictor(nn.Module):
         z_mean = F.leaky_relu(self.rnn_m(x.transpose(1, 2))[0], negative_slope=0.2).transpose(1, 2)
         z_log_var = F.leaky_relu(self.rnn_v(x.transpose(1, 2))[0], negative_slope=0.2).transpose(1, 2)
         noise = torch.rand_like(z_log_var).to(x.device)
-        z = z_mean + torch.exp(z_log_var) * noise
+        z = z_mean + torch.exp(0.5 * z_log_var) * noise
         out = F.leaky_relu(self.out_conv(z), negative_slope=0.2)
         out = self.out_conv2(out)
         return out, z, z_mean, z_log_var
@@ -45,7 +45,7 @@ class PredModel(nn.Module):
         z_mean = F.leaky_relu(self.rnn_m(x)[0], negative_slope=0.2).transpose(1, 2)
         z_log_var = F.leaky_relu(self.rnn_v(x)[0], negative_slope=0.2).transpose(1, 2)
         noise = torch.rand_like(z_log_var).to(x.device)
-        z = z_mean + torch.exp(z_log_var) * noise
+        z = z_mean + torch.exp(0.5 * z_log_var) * noise
         out = F.leaky_relu(self.out_conv(z), negative_slope=0.2)
         out = self.out_conv2(out)
 
@@ -87,10 +87,10 @@ if __name__ == '__main__':
 
             #kl_loss_2 = - 0.5 * torch.mean(1 + logs_p - m_p.pow(2) - logs_p.exp())
 
-            #kl_loss = - 0.5 * torch.mean(1 + logs_q - m_q.pow(2) - logs_q.exp())
-            #kl_diff_loss = logs_p - logs_q - 0.5 + (logs_q.exp().pow(2) + (m_p - m_q).pow(2)) / (2 * logs_p.exp().pow(2))
+            kl_loss = - 0.5 * torch.mean(1 + logs_q - m_q.pow(2) - logs_q.exp())
+            kl_diff_loss = logs_p - logs_q - 0.5 + (logs_q.exp().pow(2) + (m_p - m_q).pow(2)) / (2 * logs_p.exp().pow(2))
             # kl_loss = - 0.5 * torch.sum(1+ logs_q - m_q.pow(2) - logs_q.exp())
-            kl_loss = logs_p - logs_q - 0.5 + 0.5 * ((z_p - m_p)**2) * torch.exp(-2. * logs_p)
+            #kl_loss = logs_p - logs_q - 0.5 + 0.5 * ((z_p - m_p)**2) * torch.exp(-2. * logs_p)
             kl_loss = kl_loss.mean()
             #kl_diff_loss = kl_diff_loss.mean()
 
@@ -102,6 +102,7 @@ if __name__ == '__main__':
             step += 1
 
             sw.add_scalar('kl_loss', kl_loss, step)
+            sw.add_scalar('kl_diff_loss', kl_diff_loss, step)
             sw.add_scalar('l1_loss', l1_loss, step)
             sw.add_scalar('l1_loss_2', l1_loss_2, step)
             sw.add_scalar('q_mean', torch.mean(m_q), step)
