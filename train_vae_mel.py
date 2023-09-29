@@ -107,4 +107,4 @@ if __name__ == '__main__':
             sw.add_scalar('q_mean', torch.mean(m_q), step)
             sw.add_scalar('q_var', torch.mean(logs_q.exp()), step)
 
-            print(i, float(l1_loss), float(l1_loss_2), 'kl_loss', float(kl_loss), 'mean', float(torch.mean(m_q)), 'std', float(torch.mean(torch.exp(logs_q))))
+            print(step, float(l1_loss), float(l1_loss_2), 'kl_loss', float(kl_loss), 'mean', float(torch.mean(m_q)), 'std', float(torch.mean(torch.exp(logs_q))))
