@@ -68,7 +68,7 @@ if __name__ == '__main__':
     optim2 = torch.optim.Adam(model2.parameters(), lr=1e-4)
     masked_l1_loss = MaskedL1()
 
-    sw = SummaryWriter('logs_vae')
+    sw = SummaryWriter('checkpoints/logs_vae')
 
     step = 0
 
