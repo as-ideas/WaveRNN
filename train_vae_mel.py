@@ -1,3 +1,5 @@
+from tensorboardX import SummaryWriter
+
 from trainer.common import MaskedL1, to_device
 from utils.dataset import get_forward_dataloaders
 from utils.files import read_config
@@ -66,6 +68,10 @@ if __name__ == '__main__':
     optim2 = torch.optim.Adam(model2.parameters(), lr=1e-4)
     masked_l1_loss = MaskedL1()
 
+    sw = SummaryWriter('logs_vae')
+
+    step = 0
+
     for epoch in range(10):
         for i, batch in enumerate(train_set):
             batch = to_device(batch, DEVICE)
@@ -92,5 +98,13 @@ if __name__ == '__main__':
             optim.zero_grad()
             loss.backward()
             optim.step()
+
+            step += 1
+
+            sw.add_scalar('kl_loss', kl_loss, step)
+            sw.add_scalar('l1_loss', l1_loss, step)
+            sw.add_scalar('l1_loss_2', l1_loss_2, step)
+            sw.add_scalar('q_mean', torch.mean(m_q), step)
+            sw.add_scalar('q_var', torch.mean(logs_q.exp()), step)
 
             print(i, float(l1_loss), float(l1_loss_2), 'kl_loss', float(kl_loss), 'mean', float(torch.mean(m_q)), 'std', float(torch.mean(torch.exp(logs_q))))
