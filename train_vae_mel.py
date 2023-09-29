@@ -79,12 +79,18 @@ if __name__ == '__main__':
             l1_loss = masked_l1_loss(out_q, batch['mel'], batch['mel_len'])
             l1_loss_2 = masked_l1_loss(out2, batch['mel'], batch['mel_len']).detach()
 
-            kl_loss = logs_p - logs_q - 0.5 + 0.5 * ((z_p - m_p)**2) * torch.exp(-2. * logs_p)
+            kl_loss = - 0.5 * torch.mean(1 + logs_q - m_q.pow(2) - logs_q.exp())
+            kl_loss_2 = - 0.5 * torch.mean(1 + logs_p - m_p.pow(2) - logs_p.exp())
+            kl_diff_loss = logs_p - logs_q - 0.5 + (logs_q.exp().pow(2) + (m_p - m_q).pow(2)) / (2 * logs_p.exp().pow(2))
+            # kl_loss = - 0.5 * torch.sum(1+ logs_q - m_q.pow(2) - logs_q.exp())
+            #kl_loss = logs_p - logs_q - 0.5 + 0.5 * ((z_p - m_p)**2) * torch.exp(-2. * logs_p)
             kl_loss = kl_loss.mean()
+            kl_loss_2 = kl_loss_2.mean()
+            kl_diff_loss = kl_diff_loss.mean()
 
-            loss = kl_loss + l1_loss
+            loss = kl_loss + kl_loss_2 + kl_diff_loss + l1_loss
             optim.zero_grad()
             loss.backward()
             optim.step()
 
-            print(i, float(l1_loss), float(l1_loss_2), 'kl_loss', float(kl_loss), 'mean', float(torch.mean(m_q)), 'std', float(torch.mean(torch.exp(logs_q))))
+            print(i, float(l1_loss), float(l1_loss_2), 'kl_loss', float(kl_loss), 'kl_loss_2', kl_loss_2, 'kl_diff_loss', kl_diff_loss, 'mean', float(torch.mean(m_q)), 'std', float(torch.mean(torch.exp(logs_q))))
