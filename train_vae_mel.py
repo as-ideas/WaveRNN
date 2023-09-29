@@ -25,7 +25,7 @@ class VAEPredictor(nn.Module):
         z_mean = F.leaky_relu(self.rnn_m(x.transpose(1, 2))[0], negative_slope=0.2).transpose(1, 2)
         z_log_var = F.leaky_relu(self.rnn_v(x.transpose(1, 2))[0], negative_slope=0.2).transpose(1, 2)
         noise = torch.rand_like(z_log_var).to(x.device)
-        z = z_mean + torch.exp(0.5 * z_log_var) * noise
+        z = z_mean + torch.exp(z_log_var) * noise
         out = F.leaky_relu(self.out_conv(z), negative_slope=0.2)
         out = self.out_conv2(out)
         return out, z, z_mean, z_log_var
