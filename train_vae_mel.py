@@ -92,7 +92,7 @@ if __name__ == '__main__':
             # kl_loss = - 0.5 * torch.sum(1+ logs_q - m_q.pow(2) - logs_q.exp())
             #kl_loss = logs_p - logs_q - 0.5 + 0.5 * ((z_p - m_p)**2) * torch.exp(-2. * logs_p)
             kl_loss = kl_loss.mean()
-            #kl_diff_loss = kl_diff_loss.mean()
+            kl_diff_loss = kl_diff_loss.mean()
 
             loss = kl_loss +  l1_loss
             optim.zero_grad()
