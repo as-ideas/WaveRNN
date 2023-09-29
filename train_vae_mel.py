@@ -58,12 +58,12 @@ if __name__ == '__main__':
 
     paths = Paths(config['data_path'], config['tts_model_id'])
 
-    train_set, val_set = get_forward_dataloaders(paths=paths, batch_size=1, **filter_params)
+    train_set, val_set = get_forward_dataloaders(paths=paths, batch_size=32, **filter_params)
 
     model = VAEPredictor().to(DEVICE)
     model2 = VAEPredictor().to(DEVICE)
-    optim = torch.optim.Adam(model.parameters(), lr=1e-3)
-    optim2 = torch.optim.Adam(model2.parameters(), lr=1e-3)
+    optim = torch.optim.Adam(model.parameters(), lr=1e-4)
+    optim2 = torch.optim.Adam(model2.parameters(), lr=1e-4)
     masked_l1_loss = MaskedL1()
 
     for epoch in range(10):
