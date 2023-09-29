@@ -1,4 +1,4 @@
-from tensorboardX import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 
 from trainer.common import MaskedL1, to_device
 from utils.dataset import get_forward_dataloaders
