@@ -11,6 +11,26 @@ from models.common_layers import CBHG, LengthRegulator, BatchNormConv
 from utils.text.symbols import phonemes
 
 
+
+class VAEPredictor(nn.Module):
+
+    def __init__(self):
+        super(VAEPredictor, self).__init__()
+        self.rnn_m = nn.GRU(80, 64, bidirectional=True, batch_first=True)
+        self.rnn_v = nn.GRU(80, 64, bidirectional=True, batch_first=True)
+        self.out_conv = nn.Conv1d(128, 256, 1, padding=0)
+        self.out_conv2 = nn.Conv1d(256, 80, 1, padding=0)
+
+    def forward(self, x):
+        z_mean = F.leaky_relu(self.rnn_m(x.transpose(1, 2))[0], negative_slope=0.2).transpose(1, 2)
+        z_log_var = F.leaky_relu(self.rnn_v(x.transpose(1, 2))[0], negative_slope=0.2).transpose(1, 2)
+        noise = torch.rand_like(z_log_var).to(x.device)
+        z = z_mean + torch.exp(0.5 * z_log_var) * noise
+        out = F.leaky_relu(self.out_conv(z), negative_slope=0.2)
+        out = self.out_conv2(out)
+        return out, z, z_mean, z_log_var
+
+
 class SeriesPredictor(nn.Module):
 
     def __init__(self,
