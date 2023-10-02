@@ -22,7 +22,7 @@ class Discriminator(nn.Module):
             BatchNormConv(256, 256, 3, relu=True),
         ])
 
-        self.gru = nn.GRU(256, 256, bidirectional=True)
+        self.gru = nn.GRU(256, 256, bidirectional=True, batch_first=True)
         self.lin = nn.Linear(512, 1)
         self.lr = LengthRegulator()
         self.padding_value = 0
