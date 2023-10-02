@@ -71,8 +71,8 @@ class MultiForwardTrainer:
         device = next(model.parameters()).device  # use same device as model parameters
 
         disc = Discriminator()
-        checkpoint = torch.load('checkpoints', map_location=torch.device('cpu'))
-        disc.pos_predictor.load_state_dict(checkpoint)
+        #checkpoint = torch.load('checkpoints', map_location=torch.device('cpu'))
+        #disc.pos_predictor.load_state_dict(checkpoint)
         disc = disc.to(device)
         d_optim = Adam(disc.parameters(), lr=5e-5)
         mod_optim = Adam(
