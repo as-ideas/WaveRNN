@@ -18,11 +18,12 @@ class Discriminator(nn.Module):
         self.embedding = Embedding(len(phonemes), 64)
         self.pitch_cond_embedding = Embedding(4, 8)
         self.convs = torch.nn.ModuleList([
-            BatchNormConv(64 + 256 + 8 + 2, 256, 3, relu=True),
+            BatchNormConv(64 + 256 + 8, 256, 3, relu=True),
             BatchNormConv(256, 256, 3, relu=True),
             BatchNormConv(256, 256, 3, relu=True),
         ])
-        self.gru = nn.GRU(256, 64, bidirectional=True)
+        self.gru = nn.GRU(256, 64, bidirectional=True, batch_first=True)
+        self.gru2 = nn.GRU(128 + 2, 64, bidirectional=True, batch_first=True)
         self.lin = nn.Linear(128, 1)
 
     def forward(self, x, dur, pitch, semb, x_cond):
@@ -31,13 +32,15 @@ class Discriminator(nn.Module):
         x_cond = self.pitch_cond_embedding(x_cond)
         speaker_emb = semb[:, None, :]
         speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
-        x = torch.cat([emb, speaker_emb, x_cond, dur, pitch], dim=-1)
+        x = torch.cat([emb, speaker_emb, x_cond], dim=-1)
         x = x.transpose(1, 2)
         for conv in self.convs:
             x = conv(x)
             x = F.dropout(x, training=self.training, p=0.5)
         x = x.transpose(1, 2)
         x, _ = self.gru(x)
+        x = torch.cat([x, dur, pitch], dim=-1)
+        x, _ = self.gru2(x)
         x = self.lin(x)
         return x
 
