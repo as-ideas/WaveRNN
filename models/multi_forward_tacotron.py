@@ -22,8 +22,7 @@ class Discriminator(nn.Module):
             BatchNormConv(256, 256, 3, relu=True),
             BatchNormConv(256, 256, 3, relu=True),
         ])
-        self.gru = nn.GRU(256, 64, bidirectional=True, batch_first=True)
-        self.gru2 = nn.GRU(128 + 2, 64, bidirectional=True, batch_first=True)
+        self.gru = nn.GRU(256 + 2, 64, bidirectional=True)
         self.lin = nn.Linear(128, 1)
 
     def forward(self, x, dur, pitch, semb, x_cond):
@@ -38,9 +37,8 @@ class Discriminator(nn.Module):
             x = conv(x)
             x = F.dropout(x, training=self.training, p=0.5)
         x = x.transpose(1, 2)
+        x = torch.cat([x, dur, pitch])
         x, _ = self.gru(x)
-        x = torch.cat([x, dur, pitch], dim=-1)
-        x, _ = self.gru2(x)
         x = self.lin(x)
         return x
 
