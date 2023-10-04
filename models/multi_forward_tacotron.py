@@ -37,7 +37,7 @@ class Discriminator(nn.Module):
             x = conv(x)
             x = F.dropout(x, training=self.training, p=0.5)
         x = x.transpose(1, 2)
-        x = torch.cat([x, dur, pitch])
+        x = torch.cat([x, dur, pitch], dim=-1)
         x, _ = self.gru(x)
         x = self.lin(x)
         return x
