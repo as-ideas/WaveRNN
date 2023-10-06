@@ -17,7 +17,7 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
         self.embedding = Embedding(len(phonemes), 64)
         self.pitch_cond_embedding = Embedding(4, 8)
-        self.gru = nn.GRU(64 + 256 + 8 + 2, 64, bidirectional=True)
+        self.gru = nn.GRU(64 + 256 + 8 + 2, 64, bidirectional=True, batch_first=True)
         self.lin = nn.Linear(128, 1)
 
     def forward(self, x, dur, pitch, semb, x_cond):
@@ -30,8 +30,6 @@ class Discriminator(nn.Module):
         x, _ = self.gru(x)
         x = self.lin(x)
         return x
-
-
 
 
 class SeriesPredictor(nn.Module):
