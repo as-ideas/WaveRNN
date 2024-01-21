@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch.nn import Embedding
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
-from models.common_layers import CBHG, LengthRegulator, BatchNormConv
+from models.common_layers import CBHG, LengthRegulator, LengthRegulator_onnx, BatchNormConv
 from utils.text.symbols import phonemes
 
 
@@ -71,7 +71,8 @@ class ForwardTacotron(nn.Module):
         self.rnn_dims = rnn_dims
         self.padding_value = padding_value
         self.embedding = nn.Embedding(num_chars, embed_dims)
-        self.lr = LengthRegulator()
+        #self.lr = LengthRegulator()
+        self.lr_onnx = LengthRegulator_onnx()
         self.dur_pred = SeriesPredictor(num_chars=num_chars,
                                         emb_dim=series_embed_dims,
                                         conv_dims=durpred_conv_dims,
@@ -168,7 +169,8 @@ class ForwardTacotron(nn.Module):
                  x: torch.Tensor,
                  alpha=1.0,
                  pitch_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x,
-                 energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, torch.Tensor]:
+                 energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x,
+                 onnx: bool = False) -> Dict[str, torch.Tensor]:
         self.eval()
         with torch.no_grad():
             dur_hat = self.dur_pred(x, alpha=alpha)
@@ -181,7 +183,8 @@ class ForwardTacotron(nn.Module):
             energy_hat = energy_function(energy_hat)
             return self._generate_mel(x=x, dur_hat=dur_hat,
                                       pitch_hat=pitch_hat,
-                                      energy_hat=energy_hat)
+                                      energy_hat=energy_hat,
+                                      onnx=onnx)
 
     @torch.jit.export
     def generate_jit(self,
@@ -206,7 +209,8 @@ class ForwardTacotron(nn.Module):
                       x: torch.Tensor,
                       dur_hat: torch.Tensor,
                       pitch_hat: torch.Tensor,
-                      energy_hat: torch.Tensor) -> Dict[str, torch.Tensor]:
+                      energy_hat: torch.Tensor,
+                      onnx: bool = False) -> Dict[str, torch.Tensor]:
         x = self.embedding(x)
         x = x.transpose(1, 2)
         x = self.prenet(x)
@@ -218,9 +222,10 @@ class ForwardTacotron(nn.Module):
         energy_proj = self.energy_proj(energy_hat)
         energy_proj = energy_proj.transpose(1, 2)
         x = x + energy_proj * self.energy_strength
-
-        x = self.lr(x, dur_hat)
-
+        if not onnx:
+            x = self.lr(x, dur_hat)
+        else:
+            x = self.lr_onnx(x, dur_hat)
         x, _ = self.lstm(x)
 
         x = self.lin(x)

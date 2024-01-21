@@ -52,3 +52,7 @@ _site/
 .sass-cache/
 .jekyll-cache/
 .jekyll-metadata
+# FT:
+data/
+checkpoints/
+*.onnx
