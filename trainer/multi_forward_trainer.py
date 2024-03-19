@@ -116,15 +116,18 @@ class MultiForwardTrainer:
                 score_fake = disc(pred2['mel'].detach())
                 score_real = disc(batch['mel'].detach())
 
-                d_loss = F.relu(1.0 - score_real).mean()
-                d_loss += F.relu(1.0 + score_fake).mean()
+                #d_loss = F.relu(1.0 - score_real).mean()
+                #d_loss += F.relu(1.0 + score_fake).mean()
+                d_loss = torch.pow(score_real - 1.0, 2).mean()
+                d_loss += torch.pow(score_fake, 2).mean()
 
                 d_optim.zero_grad()
                 d_loss.backward()
                 d_optim.step()
 
                 score_fake = disc(pred2['mel'])
-                g_loss = -score_fake.mean()
+                #g_loss = -score_fake.mean()
+                g_loss = torch.pow(score_fake - 1.0, 2).mean()
 
                 print('g_loss', g_loss)
                 print('d_loss', d_loss)
