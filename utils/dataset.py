@@ -139,7 +139,7 @@ class ForwardDataset(Dataset):
         dur = np.load(str(self.paths.alg/f'{item_id}.npy'))
         pitch = np.load(str(self.paths.phon_pitch/f'{item_id}.npy'))
         energy = np.load(str(self.paths.phon_energy/f'{item_id}.npy'))
-        speaker_emb = np.load(str(self.paths.speaker_emb/f'{item_id}.npy'))
+        speaker_emb = np.load(str(self.paths.mean_speaker_emb/f'{speaker_name}.npy'))
         pitch_cond = np.ones(pitch.shape)
         pitch_cond[pitch != 0] = 2
 
