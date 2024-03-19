@@ -225,6 +225,8 @@ class MultiForwardTrainer:
 
         speaker_emb = batch['speaker_emb'][0:1]
         gen = model.generate(batch['x'][0:1], speaker_emb=speaker_emb)
+        m2_hat = np_now(gen['mel_post'])[0, :, :]
+
         m2_hat_fig = plot_mel(m2_hat)
 
         pitch_gen_fig = plot_pitch(np_now(gen['pitch'].squeeze()))
