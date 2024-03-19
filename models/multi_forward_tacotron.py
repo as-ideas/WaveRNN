@@ -216,9 +216,10 @@ class MultiForwardTacotron(nn.Module):
         pitch_cond_hat = self.pitch_cond_pred(x, semb).squeeze(-1)
 
         dur_hat = None
+        pitch_hat = None
         if not skip_dur:
             dur_hat = self.dur_pred(x, pitch_cond, semb).squeeze(-1)
-        pitch_hat = self.pitch_pred(x, pitch_cond, semb).transpose(1, 2)
+            pitch_hat = self.pitch_pred(x, pitch_cond, semb).transpose(1, 2)
         energy_hat = self.energy_pred(x, semb).transpose(1, 2)
 
         x = self.embedding(x)

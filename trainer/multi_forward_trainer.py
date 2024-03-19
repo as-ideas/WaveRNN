@@ -108,7 +108,9 @@ class MultiForwardTrainer:
 
                 batch_new = batch.copy()
                 dur_hat = model.dur_pred(batch['x'], batch['pitch_cond'], batch['speaker_emb'])
+                pitch_hat = model.pitch_pred(batch['x'], batch['pitch_cond'], batch['speaker_emb'])
                 batch_new['dur'] = dur_hat.squeeze()
+                batch_new['pitch'] = pitch_hat.squeeze()
                 pred2 = model(batch_new, skip_dur=True)
 
                 score_fake = disc(pred2['mel'].detach())
