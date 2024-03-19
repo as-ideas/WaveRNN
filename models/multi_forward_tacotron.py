@@ -16,37 +16,13 @@ class Discriminator(nn.Module):
     def __init__(self):
         super(Discriminator, self).__init__()
         self.embedding = Embedding(len(phonemes), 64)
-        self.pitch_cond_embedding = Embedding(4, 8)
-        self.convs = torch.nn.ModuleList([
-            BatchNormConv(64 + 256 + 8, 256, 3, relu=True),
-            BatchNormConv(256, 256, 3, relu=True),
-            BatchNormConv(256, 256, 3, relu=True),
-        ])
-        self.gru1 = nn.GRU(256, 128, bidirectional=True)
-        self.gru2 = nn.GRU(64, 64, bidirectional=True)
-        self.conv_post = nn.Conv1d(2, 64, 3, padding=1)
-        self.lin = nn.Linear(256 + 128, 1)
+        self.gru = nn.GRU(80, 128, bidirectional=True)
+        self.lin = nn.Linear(256, 1)
 
-    def forward(self, x, dur, pitch, semb, x_cond):
-        emb = self.embedding(x)
-        x = self.embedding(x)
-        x_cond = self.pitch_cond_embedding(x_cond)
-        speaker_emb = semb[:, None, :]
-        speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
-        x = torch.cat([emb, speaker_emb, x_cond], dim=2)
-        x = x.transpose(1, 2)
-        for conv in self.convs:
-            x = conv(x)
-            x = F.dropout(x, p=0.5, training=self.training)
-        x = x.transpose(1, 2)
-        x1, _ = self.gru1(x)
-        x2 = torch.cat([dur, pitch], dim=-1)
-        x2 = x2.transpose(1, 2)
-        x2 = self.conv_post(x2)
-        x2 = x2.transpose(1, 2)
-        x2, _ = self.gru2(x2)
-        x = torch.cat([x1, x2], dim=-1)
-        x = self.lin(x)
+    def forward(self, mel):
+        x, _ = self.gru(mel.transpose(1, 2))
+        x = self.lin(x[:, -1, :])
+
         return x
 
 
@@ -224,7 +200,7 @@ class MultiForwardTacotron(nn.Module):
         num_params = sum([np.prod(p.size()) for p in self.parameters()])
         return f'MultiForwardTacotron, num params: {num_params}'
 
-    def forward(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def forward(self, batch: Dict[str, torch.Tensor], skip_dur=False) -> Dict[str, torch.Tensor]:
         x = batch['x']
         mel = batch['mel']
         dur = batch['dur']
@@ -239,7 +215,9 @@ class MultiForwardTacotron(nn.Module):
 
         pitch_cond_hat = self.pitch_cond_pred(x, semb).squeeze(-1)
 
-        dur_hat = self.dur_pred(x, pitch_cond, semb).squeeze(-1)
+        dur_hat = None
+        if not skip_dur:
+            dur_hat = self.dur_pred(x, pitch_cond, semb).squeeze(-1)
         pitch_hat = self.pitch_pred(x, pitch_cond, semb).transpose(1, 2)
         energy_hat = self.energy_pred(x, semb).transpose(1, 2)
 
@@ -260,12 +238,7 @@ class MultiForwardTacotron(nn.Module):
 
         x = self.lr(x, dur)
 
-        x = pack_padded_sequence(x, lengths=mel_lens.cpu(), enforce_sorted=False,
-                                 batch_first=True)
-
         x, _ = self.lstm(x)
-
-        x, _ = pad_packed_sequence(x, padding_value=self.padding_value, batch_first=True)
 
         x = self.lin(x)
         x = x.transpose(1, 2)

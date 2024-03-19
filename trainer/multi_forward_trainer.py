@@ -87,30 +87,6 @@ class MultiForwardTrainer:
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
-                d_loss = 0
-                score_fake = disc(batch['x'], pred['dur'].unsqueeze(-1).detach(),
-                                  pred['pitch'].transpose(1, 2).detach(), batch['speaker_emb'], batch['pitch_cond'])
-                score_real = disc(batch['x'], batch['dur'].unsqueeze(-1),
-                                  batch['pitch'].unsqueeze(-1), batch['speaker_emb'], batch['pitch_cond'])
-
-                for b in range(batch['x'].size(0)):
-                    d_loss += F.relu(1.0 - score_real[b, :batch['x_len'][b], :]).mean()
-                    d_loss += F.relu(1.0 + score_fake[b, :batch['x_len'][b], :]).mean()
-
-                d_loss /= batch['x'].size(0)
-                d_optim.zero_grad()
-                d_loss.backward()
-                d_optim.step()
-
-                score_fake = disc(batch['x'], pred['dur'].unsqueeze(-1), pred['pitch'].transpose(1, 2),
-                                  batch['speaker_emb'], batch['pitch_cond'])
-                g_loss = 0
-                for b in range(batch['x'].size(0)):
-                    g_loss += -score_fake[b, :batch['x_len'][b], :].mean()
-                g_loss /= batch['x'].size(0)
-
-                print('g_loss', g_loss)
-                print('d_loss', d_loss)
 
                 dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
                 pitch_loss = self.l1_loss(pred['pitch'], pitch_target.unsqueeze(1), batch['x_len'])
@@ -121,17 +97,45 @@ class MultiForwardTrainer:
                        + self.train_cfg['dur_loss_factor'] * dur_loss \
                        + self.train_cfg['pitch_loss_factor'] * pitch_loss \
                        + self.train_cfg['energy_loss_factor'] * energy_loss \
-                       + self.train_cfg['pitch_cond_loss_factor'] * pitch_cond_loss \
-                       + 0.1 * g_loss
-
-                pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
-                pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()
+                       + self.train_cfg['pitch_cond_loss_factor'] * pitch_cond_loss
 
                 optimizer.zero_grad()
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(),
                                                self.train_cfg['clip_grad_norm'])
                 optimizer.step()
+
+
+                batch_new = batch.copy()
+                dur_hat = model.dur_pred(batch['x'], batch['pitch_cond'], batch['speaker_emb'])
+                batch_new['dur'] = dur_hat.squeeze()
+                pred2 = model(batch_new, skip_dur=True)
+
+                score_fake = disc(pred2['mel'].detach())
+                score_real = disc(batch['mel'].detach())
+
+                d_loss = F.relu(1.0 - score_real).mean()
+                d_loss += F.relu(1.0 + score_fake).mean()
+
+                d_optim.zero_grad()
+                d_loss.backward()
+                d_optim.step()
+
+                score_fake = disc(pred2['mel'])
+                g_loss = -score_fake.mean()
+
+                print('g_loss', g_loss)
+                print('d_loss', d_loss)
+
+                optimizer.zero_grad()
+                g_loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(),
+                                               self.train_cfg['clip_grad_norm'])
+                optimizer.step()
+
+                pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
+                pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()
+
 
                 averages['mel_loss'].add(m1_loss.item() + m2_loss.item())
                 averages['dur_loss'].add(dur_loss.item())
