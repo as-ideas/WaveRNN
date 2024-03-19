@@ -204,6 +204,7 @@ class MultiForwardTrainer:
         self.writer.add_figure(f'Ground_Truth_Aligned/linear/{speaker}', m1_hat_fig, model.step)
         self.writer.add_figure(f'Ground_Truth_Aligned/postnet/{speaker}', m2_hat_fig, model.step)
 
+
         m2_hat_wav = self.dsp.griffinlim(m2_hat)
         target_wav = self.dsp.griffinlim(m_target)
 
@@ -220,6 +221,23 @@ class MultiForwardTrainer:
 
         self.writer.add_audio(
             tag=f'Generated/target_wav/{speaker}', snd_tensor=target_wav,
+            global_step=model.step, sample_rate=self.dsp.sample_rate)
+
+        speaker_emb = batch['speaker_emb'][0:1]
+        gen = model.generate(batch['x'][0:1], speaker_emb=speaker_emb)
+        m2_hat_fig = plot_mel(m2_hat)
+
+        pitch_gen_fig = plot_pitch(np_now(gen['pitch'].squeeze()))
+        energy_gen_fig = plot_pitch(np_now(gen['energy'].squeeze()))
+
+        self.writer.add_figure(f'Pitch/generated/{speaker}_gt_speaker_emb', pitch_gen_fig, model.step)
+        self.writer.add_figure(f'Energy/generated/{speaker}_gt_speaker_emb', energy_gen_fig, model.step)
+        self.writer.add_figure(f'Generated/postnet/{speaker}_gt_speaker_emb', m2_hat_fig, model.step)
+
+        m2_hat_wav = self.dsp.griffinlim(m2_hat)
+
+        self.writer.add_audio(
+            tag=f'Generated/postnet_wav/{speaker}_gt_speaker_emb', snd_tensor=m2_hat_wav,
             global_step=model.step, sample_rate=self.dsp.sample_rate)
 
         for speaker in speakers_to_plot:
