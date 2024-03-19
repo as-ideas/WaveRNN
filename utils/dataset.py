@@ -231,7 +231,7 @@ class TacoCollator:
         mel_lens = [b['mel_len'] for b in batch]
         mel_lens = torch.tensor(mel_lens)
         speaker_emb = [b['speaker_emb'] for b in batch]
-        speaker_emb = _stack_to_tensor(speaker_emb)
+        speaker_emb = _stack_to_tensor(speaker_emb).float()
 
         return {'x': text, 'mel': mel, 'item_id': item_id,
                 'x_len': x_len, 'mel_len': mel_lens,
