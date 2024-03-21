@@ -91,7 +91,7 @@ class MaskedL1Abs(torch.nn.Module):
         loss_low = loss_diff[loss_diff <= 0]
         loss_high = loss_diff[loss_diff > 0]
 
-        loss = torch.abs(loss_low).sum() + (loss_high ** 2).sum()
+        loss = (loss_low ** 2).sum() + torch.abs(loss_high).sum()
         loss = loss / mask.sum()
 
         return loss
