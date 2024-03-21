@@ -9,7 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from models.multi_fast_pitch import MultiFastPitch
 from models.multi_forward_tacotron import MultiForwardTacotron
-from trainer.common import Averager, TTSSession, MaskedL1, to_device, np_now
+from trainer.common import Averager, TTSSession, MaskedL1, to_device, np_now, MaskedL1Abs
 from utils.checkpoints import save_checkpoint
 from utils.dataset import get_forward_dataloaders
 from utils.decorators import ignore_exception
@@ -31,6 +31,7 @@ class MultiForwardTrainer:
         self.train_cfg = config[config['tts_model']]['training']
         self.writer = SummaryWriter(log_dir=paths.forward_log, comment='v1')
         self.l1_loss = MaskedL1()
+        self.l1_loss_abs = MaskedL1Abs()
         self.ce_loss = torch.nn.CrossEntropyLoss(ignore_index=0)
         self.speakers = sorted(list(set(unpickle_binary(paths.data / 'speaker_dict.pkl').values())))
         self.speaker_embs = {}
@@ -82,7 +83,7 @@ class MultiForwardTrainer:
                 m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
                 m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
 
-                dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
+                dur_loss = self.l1_loss_abs(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
                 pitch_loss = self.l1_loss(pred['pitch'], pitch_target.unsqueeze(1), batch['x_len'])
                 energy_loss = self.l1_loss(pred['energy'], energy_target.unsqueeze(1), batch['x_len'])
                 pitch_cond_loss = self.ce_loss(pred['pitch_cond'].transpose(1, 2), batch['pitch_cond'])

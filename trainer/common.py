@@ -2,6 +2,7 @@ from typing import Dict
 
 import torch
 import torch.nn.functional as F
+from torch.nn.functional import mse_loss
 from torch.utils.data.dataloader import DataLoader
 
 
@@ -76,6 +77,24 @@ class MaskedL1(torch.nn.Module):
         loss = F.l1_loss(
             x * mask, target * mask, reduction='sum')
         return loss / mask.sum()
+
+class MaskedL1Abs(torch.nn.Module):
+
+    def forward(self, x, target, lens):
+        target.requires_grad = False
+        max_len = target.size(2)
+        mask = pad_mask(lens, max_len)
+        mask = mask.unsqueeze(1).expand_as(x)
+
+        loss_diff = x * mask - target * mask
+
+        loss_low = loss_diff[loss_diff <= 0]
+        loss_high = loss_diff[loss_diff > 0]
+
+        loss = torch.abs(loss_low).sum() + (loss_high ** 2).sum()
+        loss = loss / mask.sum()
+
+        return loss
 
 
 class ForwardSumLoss(torch.nn.Module):
