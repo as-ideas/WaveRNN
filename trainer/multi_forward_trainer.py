@@ -82,11 +82,13 @@ class MultiForwardTrainer:
 
                 semb = self.speaker_embs['tj'].to(device)
                 delta = lin(semb)
-                semb_opti = semb + delta
-                self.speaker_embs['tj_optimized'] = semb_opti
+                semb_opti_single = semb + delta
 
-                dur_hat = model.dur_pred(batch['x'][0:1], batch['pitch_cond'][0:1], speaker_emb=semb_opti, alpha=1).squeeze(-1)
-                pitch_hat = model.pitch_pred(batch['x'][0:1], batch['pitch_cond'][0:1], speaker_emb=semb_opti).transpose(1, 2)
+                self.speaker_embs['tj_optimized'] = semb_opti_single
+                semb_opti = semb_opti_single.repeat(batch['x'].shape[0], 1)
+
+                dur_hat = model.dur_pred(batch['x'], batch['pitch_cond'], speaker_emb=semb_opti, alpha=1).squeeze(-1)
+                pitch_hat = model.pitch_pred(batch['x'], batch['pitch_cond'], speaker_emb=semb_opti).transpose(1, 2)
 
                 dur_loss = self.l1_loss(dur_hat.unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
                 pitch_loss = self.l1_loss(pitch_hat, batch['pitch'].unsqueeze(1), batch['x_len'])
