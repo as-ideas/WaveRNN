@@ -320,5 +320,5 @@ class MultiForwardTacotron(nn.Module):
     def from_checkpoint(cls, path: Union[Path, str]) -> 'MultiForwardTacotron':
         checkpoint = torch.load(path, map_location=torch.device('cpu'))
         model = MultiForwardTacotron.from_config(checkpoint['config'])
-        model.load_state_dict(checkpoint['model'])
+        Muload_state_dict(checkpoint['model'])
         return model

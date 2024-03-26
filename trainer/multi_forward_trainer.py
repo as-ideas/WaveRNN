@@ -76,10 +76,10 @@ class MultiForwardTrainer:
         for e in range(1, epochs + 1):
             for i, batch in tqdm.tqdm(enumerate(session.train_set, 1), total=len(session.train_set)):
 
+                model.train()
                 model.step += 1
                 batch = to_device(batch, device=device)
                 start = time.time()
-                model.train()
 
                 semb = self.speaker_embs['tj'].to(device)
                 delta = lin(semb)
@@ -126,14 +126,9 @@ class MultiForwardTrainer:
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
                 self.writer.add_scalar('Params/learning_rate', session.lr, model.get_step())
 
-            """
-            val_out = self.evaluate(model, session.val_set)
-            self.writer.add_scalar('Mel_Loss/val', val_out['mel_loss'], model.get_step())
+            val_out = self.evaluate(model, session.val_set, lin)
             self.writer.add_scalar('Duration_Loss/val', val_out['dur_loss'], model.get_step())
             self.writer.add_scalar('Pitch_Loss/val', val_out['pitch_loss'], model.get_step())
-            self.writer.add_scalar('Energy_Loss/val', val_out['energy_loss'], model.get_step())
-            self.writer.add_scalar('Pitch_Cond_Loss/val', val_out['pitch_cond_loss'], model.get_step())
-            self.writer.add_scalar('Pitch_Cond_Accuracy/val', val_out['pitch_cond_acc'], model.get_step())
             save_checkpoint(model=model, optim=optimizer, config=self.config,
                             path=self.paths.forward_checkpoints / 'latest_model.pt',
                             meta={'speaker_embeddings': self.speaker_embs})
@@ -141,9 +136,8 @@ class MultiForwardTrainer:
             for avg in averages.values():
                 avg.reset()
             print(' ')
-            """
 
-    def evaluate(self, model: Union[MultiForwardTacotron, MultiFastPitch], val_set: DataLoader) -> Dict[str, float]:
+    def evaluate(self, model: Union[MultiForwardTacotron, MultiFastPitch], val_set: DataLoader, lin) -> Dict[str, float]:
         model.eval()
         val_losses = {
             'mel_loss': 0, 'dur_loss': 0, 'pitch_loss': 0,
@@ -153,21 +147,19 @@ class MultiForwardTrainer:
         for i, batch in enumerate(val_set, 1):
             batch = to_device(batch, device=device)
             with torch.no_grad():
-                pred = model(batch)
-                m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
-                m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
-                dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
-                pitch_loss = self.l1_loss(pred['pitch'], batch['pitch'].unsqueeze(1), batch['x_len'])
-                energy_loss = self.l1_loss(pred['energy'], batch['energy'].unsqueeze(1), batch['x_len'])
-                pitch_cond_loss = self.ce_loss(pred['pitch_cond'].transpose(1, 2), batch['pitch_cond'])
-                pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
-                pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()
+                semb = self.speaker_embs['tj'].to(device)
+                delta = lin(semb)
+                semb_opti_single = semb + delta
+
+                self.speaker_embs['tj_optimized'] = semb_opti_single
+                semb_opti = semb_opti_single.repeat(batch['x'].shape[0], 1)
+                dur_hat = model.dur_pred(batch['x'], batch['pitch_cond'], speaker_emb=semb_opti, alpha=1).squeeze(-1)
+                pitch_hat = model.pitch_pred(batch['x'], batch['pitch_cond'], speaker_emb=semb_opti).transpose(1, 2)
+
+                dur_loss = self.l1_loss(dur_hat.unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
+                pitch_loss = self.l1_loss(pitch_hat, batch['pitch'].unsqueeze(1), batch['x_len'])
                 val_losses['pitch_loss'] += pitch_loss
-                val_losses['energy_loss'] += energy_loss
-                val_losses['mel_loss'] += m1_loss.item() + m2_loss.item()
                 val_losses['dur_loss'] += dur_loss
-                val_losses['pitch_cond_loss'] += pitch_cond_loss
-                val_losses['pitch_cond_acc'] += pitch_cond_acc
         val_losses = {k: v / len(val_set) for k, v in val_losses.items()}
         return val_losses
 
