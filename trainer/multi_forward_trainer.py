@@ -85,10 +85,8 @@ class MultiForwardTrainer:
                 semb_opti = semb + delta
                 self.speaker_embs['tj_optimized'] = semb_opti
 
-                pitch_cond_hat = model.pitch_cond_pred(batch['x'][0:1], semb=semb_opti).squeeze(-1)
-                pitch_cond_hat = torch.argmax(pitch_cond_hat.squeeze(), dim=1).long().unsqueeze(0)
-                dur_hat = model.dur_pred(batch['x'][0:1], pitch_cond_hat, speaker_emb=semb_opti, alpha=1).squeeze(-1)
-                pitch_hat = model.pitch_pred(batch['x'][0:1], pitch_cond_hat, speaker_emb=semb_opti).transpose(1, 2)
+                dur_hat = model.dur_pred(batch['x'][0:1], batch['pitch_cond'][0:1], speaker_emb=semb_opti, alpha=1).squeeze(-1)
+                pitch_hat = model.pitch_pred(batch['x'][0:1], batch['pitch_cond'][0:1], speaker_emb=semb_opti).transpose(1, 2)
 
                 dur_loss = self.l1_loss(dur_hat.unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
                 pitch_loss = self.l1_loss(pitch_hat, batch['dur'].unsqueeze(1), batch['mel_len'])
