@@ -83,7 +83,7 @@ class MultiForwardTrainer:
 
                 semb = self.speaker_embs['tj'].to(device)
                 delta = lin(semb)
-                semb_opti_single = semb + delta
+                semb_opti_single = delta
 
                 self.speaker_embs['tj_optimized'] = semb_opti_single
                 semb_opti = semb_opti_single.repeat(batch['x'].shape[0], 1)
@@ -149,7 +149,7 @@ class MultiForwardTrainer:
             with torch.no_grad():
                 semb = self.speaker_embs['tj'].to(device)
                 delta = lin(semb)
-                semb_opti_single = semb + delta
+                semb_opti_single = delta
 
                 self.speaker_embs['tj_optimized'] = semb_opti_single
                 semb_opti = semb_opti_single.repeat(batch['x'].shape[0], 1)
