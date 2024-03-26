@@ -81,7 +81,7 @@ class MultiForwardTrainer:
                 semb = self.speaker_embs['tj'].to(device)
                 delta = lin(semb)
                 semb_opti = semb + delta
-                self.speaker_embs['tj_optimized'] = np_now(semb_opti)
+                self.speaker_embs['tj_optimized'] = semb_opti
 
                 pitch_cond_hat = model.pitch_cond_pred(batch['x'][0:1], semb=semb_opti).squeeze(-1)
                 pitch_cond_hat = torch.argmax(pitch_cond_hat.squeeze(), dim=1).long().unsqueeze(0)
