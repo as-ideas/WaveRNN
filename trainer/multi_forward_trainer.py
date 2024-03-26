@@ -71,7 +71,7 @@ class MultiForwardTrainer:
 
         lin = torch.nn.Linear(256, 256).to(device)
         opti = torch.optim.Adam(lin.parameters(), lr=1e-4)
-
+        step = 0
         for e in range(1, epochs + 1):
             for i, batch in enumerate(session.train_set, 1):
                 batch = to_device(batch, device=device)
@@ -102,7 +102,7 @@ class MultiForwardTrainer:
                 opti.step()
 
                 averages['dur_loss'].add(dur_loss.item())
-                step = model.get_step()
+                step += 1
                 k = step // 1000
 
                 averages['step_duration'].add(time.time() - start)
