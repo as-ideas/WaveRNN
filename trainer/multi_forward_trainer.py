@@ -3,6 +3,7 @@ from typing import Dict, Any, Union
 
 import numpy as np
 import torch
+import tqdm
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
@@ -73,7 +74,7 @@ class MultiForwardTrainer:
         opti = torch.optim.Adam(lin.parameters(), lr=1e-5)
         step = 0
         for e in range(1, epochs + 1):
-            for i, batch in enumerate(session.train_set, 1):
+            for i, batch in tqdm.tqdm(enumerate(session.train_set, 1), total=len(session.train_set)):
 
                 model.step += 1
                 batch = to_device(batch, device=device)
