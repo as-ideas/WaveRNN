@@ -70,7 +70,7 @@ class MultiForwardTrainer:
         device = next(model.parameters()).device  # use same device as model parameters
 
         lin = torch.nn.Linear(256, 256).to(device)
-        opti = torch.optim.Adam(lin.parameters(), lr=1e-4)
+        opti = torch.optim.Adam(lin.parameters(), lr=1e-5)
         step = 0
         for e in range(1, epochs + 1):
             for i, batch in enumerate(session.train_set, 1):
