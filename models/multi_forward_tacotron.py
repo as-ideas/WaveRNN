@@ -250,7 +250,7 @@ class MultiForwardTacotron(nn.Module):
         self.eval()
         with torch.no_grad():
             ada_hat = self.ada_pred(x, speaker_emb)
-            dur_hat = self.dur_pred(ada_hat.transpose(1, 2)).squeeze()
+            dur_hat = self.dur_pred(ada_hat.transpose(1, 2)).squeeze(1)
             pitch_hat = self.pitch_pred(ada_hat.transpose(1, 2))
             energy_hat = self.energy_pred(ada_hat.transpose(1, 2))
             pitch_hat = pitch_function(pitch_hat)
