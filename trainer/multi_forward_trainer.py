@@ -68,41 +68,39 @@ class MultiForwardTrainer:
 
         averages = {'mel_loss': Averager(), 'dur_loss': Averager(), 'step_duration': Averager()}
         device = next(model.parameters()).device  # use same device as model parameters
+
+        lin = torch.nn.Linear(256, 256)
+        opti = torch.optim.Adam(lin.parameters(), lr=1e-4)
+
         for e in range(1, epochs + 1):
             for i, batch in enumerate(session.train_set, 1):
                 batch = to_device(batch, device=device)
                 start = time.time()
-                model.train()
+                model.eval()
 
-                pitch_target = batch['pitch'].detach().clone()
-                energy_target = batch['energy'].detach().clone()
+                semb = self.speaker_embs['tj'].to(device)
+                delta = lin(semb)
+                semb_opti = semb + delta
+                self.speaker_embs['tj_optimized'] = np_now(semb_opti)
 
-                pred = model(batch)
+                pitch_cond_hat = model.pitch_cond_pred(batch['x'][0:1], semb=self.speaker_embs['tj']).squeeze(-1)
+                pitch_cond_hat = torch.argmax(pitch_cond_hat.squeeze(), dim=1).long().unsqueeze(0)
+                dur_hat = model.dur_pred(batch['x'][0:1], pitch_cond_hat, speaker_emb=self.speaker_embs['tj'], alpha=1).squeeze(-1)
+                pitch_hat = model.pitch_pred(batch['x'][0:1], pitch_cond_hat, speaker_emb=self.speaker_embs['tj']).transpose(1, 2)
 
-                m1_loss = self.l1_loss(pred['mel'], batch['mel'], batch['mel_len'])
-                m2_loss = self.l1_loss(pred['mel_post'], batch['mel'], batch['mel_len'])
+                dur_loss = self.l1_loss(dur_hat.unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
+                pitch_loss = self.l1_loss(pitch_hat, batch['dur'].unsqueeze(1), batch['mel_len'])
 
-                dur_loss = self.l1_loss(pred['dur'].unsqueeze(1), batch['dur'].unsqueeze(1), batch['x_len'])
-                pitch_loss = self.l1_loss(pred['pitch'], pitch_target.unsqueeze(1), batch['x_len'])
-                energy_loss = self.l1_loss(pred['energy'], energy_target.unsqueeze(1), batch['x_len'])
-                pitch_cond_loss = self.ce_loss(pred['pitch_cond'].transpose(1, 2), batch['pitch_cond'])
+                loss = dur_loss + pitch_loss
 
-                loss = m1_loss + m2_loss \
-                       + self.train_cfg['dur_loss_factor'] * dur_loss \
-                       + self.train_cfg['pitch_loss_factor'] * pitch_loss \
-                       + self.train_cfg['energy_loss_factor'] * energy_loss \
-                       + self.train_cfg['pitch_cond_loss_factor'] * pitch_cond_loss
+                print(loss)
 
-                pitch_cond_true_pos = (torch.argmax(pred['pitch_cond'], dim=-1) == batch['pitch_cond'])
-                pitch_cond_acc = pitch_cond_true_pos[batch['pitch_cond'] != 0].sum() / (batch['pitch_cond'] != 0).sum()
-
-                optimizer.zero_grad()
+                opti.zero_grad()
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(),
                                                self.train_cfg['clip_grad_norm'])
-                optimizer.step()
+                opti.step()
 
-                averages['mel_loss'].add(m1_loss.item() + m2_loss.item())
                 averages['dur_loss'].add(dur_loss.item())
                 step = model.get_step()
                 k = step // 1000
@@ -110,8 +108,6 @@ class MultiForwardTrainer:
                 averages['step_duration'].add(time.time() - start)
 
                 speed = 1. / averages['step_duration'].get()
-                msg = f'| Epoch: {e}/{epochs} ({i}/{total_iters}) | Mel Loss: {averages["mel_loss"].get():#.4} ' \
-                      f'| Dur Loss: {averages["dur_loss"].get():#.4} | {speed:#.2} steps/s | Step: {k}k | '
 
                 if step % self.train_cfg['checkpoint_every'] == 0:
                     save_checkpoint(model=model, optim=optimizer, config=self.config,
@@ -121,17 +117,12 @@ class MultiForwardTrainer:
                 if step % self.train_cfg['plot_every'] == 0:
                     self.generate_plots(model, session)
 
-                self.writer.add_scalar('Mel_Loss/train', m1_loss + m2_loss, model.get_step())
                 self.writer.add_scalar('Pitch_Loss/train', pitch_loss, model.get_step())
-                self.writer.add_scalar('Energy_Loss/train', energy_loss, model.get_step())
                 self.writer.add_scalar('Duration_Loss/train', dur_loss, model.get_step())
-                self.writer.add_scalar('Pitch_Cond_Loss/train', pitch_cond_loss, model.get_step())
-                self.writer.add_scalar('Pitch_Cond_Accuracy/train', pitch_cond_acc, model.get_step())
                 self.writer.add_scalar('Params/batch_size', session.bs, model.get_step())
                 self.writer.add_scalar('Params/learning_rate', session.lr, model.get_step())
 
-                stream(msg)
-
+            """
             val_out = self.evaluate(model, session.val_set)
             self.writer.add_scalar('Mel_Loss/val', val_out['mel_loss'], model.get_step())
             self.writer.add_scalar('Duration_Loss/val', val_out['dur_loss'], model.get_step())
@@ -146,6 +137,7 @@ class MultiForwardTrainer:
             for avg in averages.values():
                 avg.reset()
             print(' ')
+            """
 
     def evaluate(self, model: Union[MultiForwardTacotron, MultiFastPitch], val_set: DataLoader) -> Dict[str, float]:
         model.eval()
