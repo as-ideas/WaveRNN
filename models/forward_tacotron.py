@@ -13,7 +13,7 @@ from utils.text.symbols import phonemes
 
 class SeriesPredictor(nn.Module):
 
-    def __init__(self, num_chars, emb_dim=64, conv_dims=256, rnn_dims=64, dropout=0.5):
+    def __init__(self, num_chars, emb_dim=64, conv_dims=256, rnn_dims=64, dropout=0.5, out_dims=1):
         super().__init__()
         self.embedding = Embedding(num_chars, emb_dim)
         self.convs = torch.nn.ModuleList([
@@ -22,7 +22,7 @@ class SeriesPredictor(nn.Module):
             BatchNormConv(conv_dims, conv_dims, 5, relu=True),
         ])
         self.rnn = nn.GRU(conv_dims, rnn_dims, batch_first=True, bidirectional=True)
-        self.lin = nn.Linear(2 * rnn_dims, 1)
+        self.lin = nn.Linear(2 * rnn_dims, out_dims)
         self.dropout = dropout
 
     def forward(self,
@@ -77,6 +77,12 @@ class ForwardTacotron(nn.Module):
                                         conv_dims=durpred_conv_dims,
                                         rnn_dims=durpred_rnn_dims,
                                         dropout=durpred_dropout)
+        self.ada_pred = SeriesPredictor(num_chars=num_chars,
+                                        emb_dim=series_embed_dims,
+                                        conv_dims=pitch_conv_dims,
+                                        rnn_dims=pitch_rnn_dims,
+                                        dropout=pitch_dropout,
+                                        out_dim=80)
         self.pitch_pred = SeriesPredictor(num_chars=num_chars,
                                           emb_dim=series_embed_dims,
                                           conv_dims=pitch_conv_dims,
@@ -126,6 +132,18 @@ class ForwardTacotron(nn.Module):
         if self.training:
             self.step += 1
 
+        B, T = x.size()
+        ada_in = torch.zeros((B, 80, T), device=x.device)
+        for b in range(B):
+            t1 = 0
+            for t in range(T):
+                t2 = t1 + int(dur[b, t])
+                ada_in[b, :, t] = mel[b, :, t1:t2].mean(dim=1)
+                t1 = t2
+        ada_in[ada_in != ada_in] = 0
+        ada_target = self.phon_train_pred(ada_in)
+        ada_hat = self.phon_pred(x)
+
         dur_hat = self.dur_pred(x).squeeze(-1)
         pitch_hat = self.pitch_pred(x).transpose(1, 2)
         energy_hat = self.energy_pred(x).transpose(1, 2)
@@ -162,7 +180,8 @@ class ForwardTacotron(nn.Module):
         x = self._pad(x, mel.size(2))
 
         return {'mel': x, 'mel_post': x_post,
-                'dur': dur_hat, 'pitch': pitch_hat, 'energy': energy_hat}
+                'dur': dur_hat, 'pitch': pitch_hat, 'energy': energy_hat,
+                'ada_hat': ada_hat, 'ada_target': ada_target}
 
     def generate(self,
                  x: torch.Tensor,

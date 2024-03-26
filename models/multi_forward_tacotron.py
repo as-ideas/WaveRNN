@@ -93,6 +93,7 @@ class ConditionalSeriesPredictor(nn.Module):
         return x / alpha
 
 
+
 class MultiForwardTacotron(nn.Module):
 
     def __init__(self,
@@ -132,29 +133,17 @@ class MultiForwardTacotron(nn.Module):
         self.padding_value = padding_value
         self.embedding = nn.Embedding(num_chars, embed_dims)
         self.lr = LengthRegulator()
-        self.dur_pred = ConditionalSeriesPredictor(num_chars=num_chars,
-                                                   emb_dim=series_embed_dims,
-                                                   conv_dims=durpred_conv_dims,
-                                                   rnn_dims=durpred_rnn_dims,
-                                                   cond_emb_dims=pitch_cond_emb_dims,
-                                                   dropout=durpred_dropout)
-        self.pitch_cond_pred = SeriesPredictor(num_chars=num_chars,
-                                               emb_dim=series_embed_dims,
-                                               conv_dims=pitch_cond_conv_dims,
-                                               rnn_dims=pitch_cond_rnn_dims,
-                                               dropout=pitch_cond_dropout,
-                                               out_dim=pitch_cond_categorical_dims)
-        self.pitch_pred = ConditionalSeriesPredictor(num_chars=num_chars,
-                                                     emb_dim=series_embed_dims,
-                                                     conv_dims=pitch_conv_dims,
-                                                     rnn_dims=pitch_rnn_dims,
-                                                     cond_emb_dims=pitch_cond_emb_dims,
-                                                     dropout=pitch_dropout, )
-        self.energy_pred = SeriesPredictor(num_chars=num_chars,
-                                           emb_dim=series_embed_dims,
-                                           conv_dims=energy_conv_dims,
-                                           rnn_dims=energy_rnn_dims,
-                                           dropout=energy_dropout)
+        self.dur_pred = nn.Conv1d(80, 1, kernel_size=3, padding=1)
+        self.pitch_pred = nn.Conv1d(80, 1, kernel_size=3, padding=1)
+        self.energy_pred = nn.Conv1d(80, 1, kernel_size=3, padding=1)
+
+        self.ada_pred = SeriesPredictor(num_chars=num_chars,
+                                        emb_dim=series_embed_dims,
+                                        conv_dims=pitch_conv_dims,
+                                        rnn_dims=pitch_rnn_dims,
+                                        dropout=pitch_dropout,
+                                        out_dim=80)
+
         self.prenet = CBHG(K=prenet_k,
                            in_channels=embed_dims,
                            channels=prenet_dims,
@@ -196,11 +185,22 @@ class MultiForwardTacotron(nn.Module):
         if self.training:
             self.step += 1
 
-        pitch_cond_hat = self.pitch_cond_pred(x, semb).squeeze(-1)
 
-        dur_hat = self.dur_pred(x, pitch_cond, semb).squeeze(-1)
-        pitch_hat = self.pitch_pred(x, pitch_cond, semb).transpose(1, 2)
-        energy_hat = self.energy_pred(x, semb).transpose(1, 2)
+        B, T = x.size()
+        ada_in = torch.zeros((B, 80, T), device=x.device)
+        for b in range(B):
+            t1 = 0
+            for t in range(T):
+                t2 = t1 + int(dur[b, t])
+                ada_in[b, :, t] = mel[b, :, t1:t2].mean(dim=1)
+                t1 = t2
+        ada_in[ada_in != ada_in] = 0
+        ada_target = ada_in.transpose(1, 2)
+        ada_hat = self.ada_pred(x, semb)
+
+        dur_hat = self.dur_pred(ada_target.transpose(1, 2)).squeeze()
+        pitch_hat = self.pitch_pred(ada_target.transpose(1, 2))
+        energy_hat = self.energy_pred(ada_target.transpose(1, 2))
 
         x = self.embedding(x)
         x = x.transpose(1, 2)
@@ -238,7 +238,8 @@ class MultiForwardTacotron(nn.Module):
 
         return {'mel': x, 'mel_post': x_post,
                 'dur': dur_hat, 'pitch': pitch_hat,
-                'energy': energy_hat, 'pitch_cond': pitch_cond_hat}
+                'energy': energy_hat,
+                'ada_hat': ada_hat, 'ada_target': ada_target}
 
     def generate(self,
                  x: torch.Tensor,
@@ -248,20 +249,16 @@ class MultiForwardTacotron(nn.Module):
                  energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, torch.Tensor]:
         self.eval()
         with torch.no_grad():
-            pitch_cond_hat = self.pitch_cond_pred(x, speaker_emb).squeeze(-1)
-            pitch_cond_hat = torch.argmax(pitch_cond_hat.squeeze(), dim=1).long().unsqueeze(0)
-            dur_hat = self.dur_pred(x, pitch_cond_hat, speaker_emb, alpha=alpha).squeeze(-1)
-            if torch.sum(dur_hat.long()) <= 0:
-                torch.fill_(dur_hat, value=2.)
-            pitch_hat = self.pitch_pred(x, pitch_cond_hat, speaker_emb).transpose(1, 2)
+            ada_hat = self.ada_pred(x, speaker_emb)
+            dur_hat = self.dur_pred(ada_hat.transpose(1, 2)).squeeze()
+            pitch_hat = self.pitch_pred(ada_hat.transpose(1, 2))
+            energy_hat = self.energy_pred(ada_hat.transpose(1, 2))
             pitch_hat = pitch_function(pitch_hat)
-            energy_hat = self.energy_pred(x, speaker_emb).transpose(1, 2)
             energy_hat = energy_function(energy_hat)
             return self._generate_mel(x=x,
                                       dur_hat=dur_hat,
                                       pitch_hat=pitch_hat,
                                       energy_hat=energy_hat,
-                                      pitch_cond_hat=pitch_cond_hat,
                                       semb=speaker_emb)
 
     def get_step(self) -> int:
@@ -272,7 +269,6 @@ class MultiForwardTacotron(nn.Module):
                       semb: torch.Tensor,
                       dur_hat: torch.Tensor,
                       pitch_hat: torch.Tensor,
-                      pitch_cond_hat: torch,
                       energy_hat: torch.Tensor) -> Dict[str, torch.Tensor]:
         x = self.embedding(x)
         x = x.transpose(1, 2)
@@ -301,8 +297,7 @@ class MultiForwardTacotron(nn.Module):
         x_post = x_post.transpose(1, 2)
 
         return {'mel': x, 'mel_post': x_post, 'dur': dur_hat,
-                'pitch': pitch_hat, 'energy': energy_hat,
-                'pitch_cond': pitch_cond_hat.unsqueeze(1)}
+                'pitch': pitch_hat, 'energy': energy_hat}
 
     def _pad(self, x: torch.Tensor, max_len: int) -> torch.Tensor:
         x = x[:, :, :max_len]
