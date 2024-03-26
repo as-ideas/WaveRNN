@@ -69,7 +69,7 @@ class MultiForwardTrainer:
         averages = {'mel_loss': Averager(), 'dur_loss': Averager(), 'step_duration': Averager()}
         device = next(model.parameters()).device  # use same device as model parameters
 
-        lin = torch.nn.Linear(256, 256)
+        lin = torch.nn.Linear(256, 256).to(device)
         opti = torch.optim.Adam(lin.parameters(), lr=1e-4)
 
         for e in range(1, epochs + 1):
