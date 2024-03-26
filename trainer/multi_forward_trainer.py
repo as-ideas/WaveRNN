@@ -74,6 +74,8 @@ class MultiForwardTrainer:
         step = 0
         for e in range(1, epochs + 1):
             for i, batch in enumerate(session.train_set, 1):
+
+                model.step += 1
                 batch = to_device(batch, device=device)
                 start = time.time()
                 model.train()
@@ -102,7 +104,7 @@ class MultiForwardTrainer:
                 opti.step()
 
                 averages['dur_loss'].add(dur_loss.item())
-                step += 1
+                step = model.get_step()
                 k = step // 1000
 
                 averages['step_duration'].add(time.time() - start)
