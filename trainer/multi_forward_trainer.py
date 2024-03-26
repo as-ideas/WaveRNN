@@ -76,7 +76,7 @@ class MultiForwardTrainer:
             for i, batch in enumerate(session.train_set, 1):
                 batch = to_device(batch, device=device)
                 start = time.time()
-                model.eval()
+                model.train()
 
                 semb = self.speaker_embs['tj'].to(device)
                 delta = lin(semb)
