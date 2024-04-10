@@ -226,7 +226,9 @@ class MultiForwardTacotron(nn.Module):
 
         x, _ = pad_packed_sequence(x, padding_value=self.padding_value, batch_first=True)
 
-        x = torch.cat([x, speaker_emb.transpose(1, 2)], dim=2)
+        speaker_emb = semb[:, None, :]
+        speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
+        x = torch.cat([x, speaker_emb], dim=2)
         x = self.lin(x)
         x = x.transpose(1, 2)
 
