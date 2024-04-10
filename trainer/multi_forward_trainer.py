@@ -244,7 +244,7 @@ class MultiForwardTrainer:
 
         for speaker in speakers_to_plot:
             speaker_emb = self.speaker_embs[speaker].to(device)
-            speaker_emb_2 = self.speaker_embs['welt']
+            speaker_emb_2 = self.speaker_embs['welt'].to(device)
             gen = model.generate(batch['x'][0:1, :batch['x_len'][0]], speaker_emb=speaker_emb, speaker_emb_2=speaker_emb_2)
             m2_hat = np_now(gen['mel_post'].squeeze())
 
