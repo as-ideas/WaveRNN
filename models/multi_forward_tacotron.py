@@ -267,7 +267,7 @@ class MultiForwardTacotron(nn.Module):
                                       energy_hat=energy_hat,
                                       pitch_cond_hat=pitch_cond_hat,
                                       semb=speaker_emb,
-                                      semb2=speaker_emb_2)
+                                      semb_2=speaker_emb_2)
 
     def get_step(self) -> int:
         return self.step.data.item()
