@@ -165,7 +165,7 @@ class MultiForwardTacotron(nn.Module):
                             rnn_dims,
                             batch_first=True,
                             bidirectional=True)
-        self.lin = torch.nn.Linear(2 * rnn_dims, n_mels)
+        self.lin = torch.nn.Linear(2 * rnn_dims + speaker_emb_dims, n_mels)
         self.register_buffer('step', torch.zeros(1, dtype=torch.long))
         self.postnet = CBHG(K=postnet_k,
                             in_channels=n_mels,
@@ -226,6 +226,7 @@ class MultiForwardTacotron(nn.Module):
 
         x, _ = pad_packed_sequence(x, padding_value=self.padding_value, batch_first=True)
 
+        x = torch.cat([x, speaker_emb], dim=2)
         x = self.lin(x)
         x = x.transpose(1, 2)
 
