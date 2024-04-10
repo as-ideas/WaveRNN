@@ -246,6 +246,7 @@ class MultiForwardTacotron(nn.Module):
     def generate(self,
                  x: torch.Tensor,
                  speaker_emb: torch.Tensor,
+                 speaker_emb_2: torch.Tensor=None,
                  alpha=1.0,
                  pitch_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x,
                  energy_function: Callable[[torch.Tensor], torch.Tensor] = lambda x: x) -> Dict[str, torch.Tensor]:
@@ -265,7 +266,8 @@ class MultiForwardTacotron(nn.Module):
                                       pitch_hat=pitch_hat,
                                       energy_hat=energy_hat,
                                       pitch_cond_hat=pitch_cond_hat,
-                                      semb=speaker_emb)
+                                      semb=speaker_emb,
+                                      semb2=speaker_emb_2)
 
     def get_step(self) -> int:
         return self.step.data.item()
@@ -273,6 +275,7 @@ class MultiForwardTacotron(nn.Module):
     def _generate_mel(self,
                       x: torch.Tensor,
                       semb: torch.Tensor,
+                      semb_2: torch.Tensor,
                       dur_hat: torch.Tensor,
                       pitch_hat: torch.Tensor,
                       pitch_cond_hat: torch,
@@ -296,6 +299,13 @@ class MultiForwardTacotron(nn.Module):
 
         x, _ = self.lstm(x)
 
+        if semb_2 is not None:
+            speaker_emb = semb_2[:, None, :]
+        else:
+            speaker_emb = semb[:, None, :]
+
+        speaker_emb = speaker_emb.repeat(1, x.shape[1], 1)
+        x = torch.cat([x, speaker_emb], dim=2)
         x = self.lin(x)
         x = x.transpose(1, 2)
 
