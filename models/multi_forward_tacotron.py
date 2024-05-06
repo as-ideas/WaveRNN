@@ -53,7 +53,11 @@ class AutoregSeriesPredictor(nn.Module):
         h_dec = torch.zeros(1, x.size(0), self.rnn_dims, device=x.device)
         x_dec_in = torch.cat([x, p_in], dim=-1)
         x_dec_in = self.I(x_dec_in)
+
+        res = x_dec_in
         x, _ = self.decoder(x_dec_in, h_dec)
+        x = x + res
+
         x_out = self.lin(x)
         return x_out
 
@@ -83,24 +87,27 @@ class AutoregSeriesPredictor(nn.Module):
 
             h = torch.zeros(b_size, self.rnn_dims, device=device)
             o = torch.zeros(b_size, 1, device=device, dtype=torch.long)
-
             output = []
 
             for i in range(seq_len):
                 x_i = x[0, i:i+1, :]
                 x_dec_in = torch.cat([x_i, o], dim=-1)
                 x_dec_in = self.I(x_dec_in)
+                res = x_dec_in
                 h, _ = self.decoder(x_dec_in, h)
-                logits = self.lin(h)
+                out_h = res + h
+                logits = self.lin(out_h)
                 posterior = F.softmax(logits, dim=1)
                 distrib = torch.distributions.Categorical(posterior)
                 sample = distrib.sample().unsqueeze(0).float()
+                prob = logits[sample.long()]
+                print(i, sample, prob)
                 sample = (sample - self.norm_mean) / self.norm_max
-
                 output.append(sample)
                 o = sample
                 if self.round:
                     o = torch.round(o)
+
 
             output = torch.stack(output)
         return output
@@ -372,8 +379,8 @@ class MultiForwardTacotron(nn.Module):
             energy_hat = self.energy_pred(x, speaker_emb).transpose(1, 2)
             energy_hat = energy_function(energy_hat)
 
-            print('dur', dur_hat.squeeze())
-            print('pitch', pitch_hat.squeeze())
+            #print('dur', dur_hat.squeeze())
+            #print('pitch', pitch_hat.squeeze())
 
             return self._generate_mel(x=x,
                                       dur_hat=dur_hat,
