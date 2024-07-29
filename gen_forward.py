@@ -113,6 +113,8 @@ if __name__ == '__main__':
             np.save(str(out_path / f'{wav_name}.npy'), m.numpy(), allow_pickle=False)
         elif args.vocoder == 'griffinlim':
             wav = dsp.griffinlim(m.squeeze().numpy())
+            wav=torch.from_numpy(wav) if isinstance(wav,np.ndarray) else wav
+            wav=wav.unsqueeze(0) if wav.dim() == 1 else wav       
             dsp.save_wav(wav, out_path / f'{wav_name}.wav')
 
     print('\n\nDone.\n')
