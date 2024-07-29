@@ -100,6 +100,8 @@ class DSP:
 
     def save_wav(self, waveform: torch.Tensor, path: Union[str, Path]) -> None:
         """Save waveform to file"""
+        if not isinstance(waveform,torch.Tensor):
+            raise TypeError(f"Expected torch.Tensor, got {type(waveform)}")
         torchaudio.save(filepath=path, src=waveform, sample_rate=self.sample_rate)
 
     def adjust_volume(self, waveform: torch.Tensor, target_dbfs: int = -30) -> torch.Tensor:
